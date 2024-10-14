@@ -5,10 +5,11 @@ on:
     branches: ['main']
     paths:
       - 'service/**'
+      - '.github/workflows/publish-docker-build.yml'
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: mira-eval-service
+  IMAGE_NAME: Aroha-Labs/mira-eval-service
 
 jobs:
   build-and-push-image:
