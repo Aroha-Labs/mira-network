@@ -264,6 +264,39 @@ var evalCmd = &cobra.Command{
 	},
 }
 
+// joinNetworkCmd represents the join-network command
+var joinNetworkCmd = &cobra.Command{
+	Use:   "join-network",
+	Short: "Join the ZeroTier network b15644912eeb3d59",
+	Long:  `Join the ZeroTier network b15644912eeb3d59 if not already joined`,
+	PreRunE: func(cmd *cobra.Command, args []string) error {
+		// Check if ZeroTier is installed
+		if !checkCommandExists("zerotier-cli") {
+			fmt.Println("ZeroTier is not installed. Please install ZeroTier by following the instructions at: https://www.zerotier.com/download/")
+			return fmt.Errorf("zerotier-cli is required but not installed")
+		}
+		return nil
+	},
+	RunE: func(cmd *cobra.Command, args []string) error {
+		// Check if the ZeroTier network is joined
+		checkCmd := exec.Command("zerotier-cli", "listnetworks")
+		output, err := checkCmd.Output()
+		if err != nil {
+			return fmt.Errorf("failed to check ZeroTier networks: %w", err)
+		}
+
+		if strings.Contains(string(output), "b15644912eeb3d59") {
+			fmt.Println("Already joined the ZeroTier network b15644912eeb3d59.")
+		} else {
+			fmt.Println("Not joined the ZeroTier network b15644912eeb3d59.")
+			fmt.Println("To join the network, run the following command:")
+			fmt.Println("zerotier-cli join b15644912eeb3d59")
+		}
+
+		return nil
+	},
+}
+
 func checkCommandExists(cmd string) bool {
 	_, err := exec.LookPath(cmd)
 	return err == nil
@@ -278,6 +311,7 @@ func main() {
 	serviceCmd.AddCommand(removeServiceCmd)
 
 	rootCmd.AddCommand(evalCmd)
+	rootCmd.AddCommand(joinNetworkCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
