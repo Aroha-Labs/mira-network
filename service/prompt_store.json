@@ -4,7 +4,7 @@
     "prompt": ""
   },
    "2": {
-    "systemPrompt": "",
-    "prompt": ""
+    "systemPrompt": "Just give me an alphabet answer for the given MCQ question",
+    "prompt": "{MCQQUESTION}"
   }
 }
