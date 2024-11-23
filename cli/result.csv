@@ -1,0 +1,11 @@
+Prompt,Expected Response,ollama/llama3.1,ollama/mistral
+What is the capital of France?,Paris,true,false
+Who wrote '1984'?,George Orwell,true,true
+Solve: 25 + 17,42,true,true
+Which planet is known as the Red Planet?,Mars,true,true
+Who painted the Mona Lisa?,Leonardo da Vinci,true,true
+What is the largest mammal?,Blue whale,true,true
+What is H2O commonly known as?,Water,true,true
+How many continents are there?,Seven,true,true
+Who is the CEO of Tesla?,Elon Musk,false,true
+What is the boiling point of water in Celsius?,100,false,true

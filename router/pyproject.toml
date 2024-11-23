@@ -1,0 +1,19 @@
+[project]
+name = "mira-client-dashboard"
+version = "0.1.0"
+description = "Default template for PDM package"
+authors = [
+    {name = "Hamid Raza", email = "contact@hamidraza.com"},
+]
+dependencies = ["fastapi>=0.115.5", "uvicorn>=0.32.1", "sqlmodel>=0.0.22", "redis>=5.2.0", "httpx>=0.27.2"]
+requires-python = "==3.11.*"
+readme = "README.md"
+license = {text = "MIT"}
+
+
+[tool.pdm]
+distribution = false
+
+[tool.pdm.scripts]
+start = "uvicorn src.mira_client_dashboard.main:app --reload"
+prod = "uvicorn src.mira_client_dashboard.main:app --host 0.0.0.0"
