@@ -3,8 +3,8 @@ from fastapi.responses import PlainTextResponse
 import csv
 import uvicorn
 import io
-from typing import List, Dict
-from pydantic import BaseModel
+from typing import List, Dict, Optional
+from pydantic import BaseModel, Field
 from eval import evaluate_model
 import os
 import asyncio
@@ -12,26 +12,86 @@ import httpx
 import logging
 import requests
 
+
+ROUTER_BASE_URL = os.getenv(
+    "ROUTER_BASE_URL",
+    "https://mira-client-balancer.arohalabs.dev",
+)
+
 logging.basicConfig(level=logging.INFO)
 
 
+class ModelProvider(BaseModel):
+    base_url: str
+    api_key: str
+
+
 model_providers = {
-    "openai": {
-        "base_url": "https://api.openai.com/v1",
-        "api_key": os.getenv("OPENAI_API_KEY"),
-    },
-    "openrouter": {
-        "base_url": "https://openrouter.ai/api/v1",
-        "api_key": os.getenv("OPENROUTER_API_KEY"),
-    },
-    "anthropic": {
-        "base_url": "https://api.anthropic.com/v1",
-        "api_key": os.getenv("ANTHROPIC_API_KEY"),
-    },
+    "openai": ModelProvider(
+        base_url="https://api.openai.com/v1",
+        api_key=os.getenv("OPENAI_API_KEY"),
+    ),
+    "openrouter": ModelProvider(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=os.getenv("OPENROUTER_API_KEY"),
+    ),
+    "anthropic": ModelProvider(
+        base_url="https://api.anthropic.com/v1",
+        api_key=os.getenv("ANTHROPIC_API_KEY"),
+    ),
+    "mira": ModelProvider(
+        base_url="https://ollama.arohalabs.dev/v1",
+        api_key=os.getenv("MIRA_API_KEY"),
+    ),
 }
 
 
 app = FastAPI()
+
+
+def get_model_provider(
+    model: str,
+    model_provider: ModelProvider | None,
+) -> tuple[ModelProvider, str]:
+    if model == "":
+        raise HTTPException(status_code=400, detail="Model is required")
+
+    if model_provider is not None:
+        return model_provider, model
+
+    provider_name, model_name = model.split("/", 1)
+
+    if not model_name or model_name == "":
+        raise HTTPException(status_code=400, detail="Invalid model name")
+
+    if provider_name not in model_providers:
+        raise HTTPException(status_code=400, detail="Invalid model provider")
+
+    return model_providers[provider_name], model_name
+
+
+def get_llm_completion(
+    model: str,
+    model_provider: ModelProvider,
+    messages: list[dict],
+):
+    req = requests.post(
+        url=f"{model_provider.base_url}/chat/completions",
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {model_provider.api_key}",
+        },
+        json={
+            "model": model,
+            "messages": messages,
+        },
+    )
+
+    if req.ok != True:
+        print(f"Error: {req.status_code}")
+        raise HTTPException(status_code=req.status_code, detail=req.text)
+
+    return req.json()
 
 
 @app.get("/health")
@@ -81,88 +141,53 @@ async def evaluate(req: EvaluationRequest) -> str:
     return output.getvalue()
 
 
-# class ModelProvider(BaseModel):
-#     base_url: str
-#     api_key: str
+class AiRequest(BaseModel):
+    prompt: str = Field(..., title="Prompt")
+    model: str = Field(title="Model", default="")
+    model_provider: Optional[ModelProvider] = Field(None, title="Model Provider")
 
 
-# class AiRequest(BaseModel):
-#     prompt: str = None
-#     model: str = None
-#     model_provider: Optional[ModelProvider] = None
-
-
-@app.post("/v1/ai/{full_path:path}")
-async def generate(req: Request, full_path: str):
-    body = await req.json()
-
-    prompt = body.get("prompt")
-    model = body.get("model")
-    model_provider = body.get("model_provider")
-
-    if not model:
-        raise HTTPException(status_code=400, detail="Model is required")
-
-    if not prompt:
+@app.post("/v1/generate")
+async def generate(req: AiRequest):
+    if not req.prompt:
         raise HTTPException(status_code=400, detail="Prompt is required")
 
-    if model_provider is None:
-        model_parts = model.split("/", 1)
-        if len(model_parts) < 2:
-            raise HTTPException(status_code=400, detail="Invalid model name")
+    model_provider, model = get_model_provider(req.model, req.model_provider)
 
-        provider_name = model_parts[0]
-        model = model_parts[1]
+    return get_llm_completion(
+        model,
+        model_provider,
+        messages=[{"role": "user", "content": req.prompt}],
+    )
 
-        model_provider = model_providers.get(provider_name)
 
-        if model_provider is None:
-            raise HTTPException(status_code=400, detail="Invalid model provider")
+@app.post("/v1/verify")
+async def verify(req: AiRequest):
+    if not req.prompt:
+        raise HTTPException(status_code=400, detail="Prompt is required")
 
-    # curl https://api.openai.com/v1/chat/completions \
-    #     -H "Content-Type: application/json" \
-    #     -H "Authorization: Bearer $OPENAI_API_KEY" \
-    #     -d '{
-    #         "model": "gpt-4o-mini",
-    #         "messages": [{"role": "user", "content": "Say this is a test!"}],
-    #         "temperature": 0.7
-    #     }'
+    model_provider, model = get_model_provider(req.model, req.model_provider)
 
-    # url = model_provider.get("base_url") + "/chat/completions"
-    # api_key = model_provider.get("api_key")
+    res = get_llm_completion(
+        model,
+        model_provider,
+        messages=[
+            {
+                "role": "system",
+                "content": "You are a expert in user prompts verification, don't be verbose, just say yes or no. Don't add any other information or explanation or context or anything else.",
+            },
+            {"role": "user", "content": req.prompt},
+        ],
+    )
 
-    url = "http://172.25.208.199:11434/v1/chat/completions"
-    api_key = "sk-test"
-
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {api_key}",
-    }
-    data = {
-        "model": "llama3.1",
-        "messages": [{"role": "user", "content": prompt}],
-    }
-
-    # r = requests.post(url, headers=headers, json=data)
-    # r.raise_for_status()
-    # return r.json()
-
-    re = requests.post(url, headers=headers, json=data)
-
-    if re.status_code == 200:
-        return re.json()
+    if res["choices"][0]["message"]["content"].lower() == "yes":
+        return {"result": "yes"}
     else:
-        print(f"Error: {re.status_code}")
-        return re.text
-
-    # async with httpx.AsyncClient() as client:
-    #     response = await client.post(url, headers=headers, json=data)
-    #     response.raise_for_status()
-    #     return response.text()
+        return {"result": "no"}
 
 
 async def update_liveness(machine_uid: str):
-    url = f"https://mira-client-balancer.arohalabs.dev/liveness/{machine_uid}"
+    url = f"{ROUTER_BASE_URL}/liveness/{machine_uid}"
     while True:
         async with httpx.AsyncClient() as client:
             try:
