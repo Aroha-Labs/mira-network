@@ -1,8 +1,14 @@
 services:
-  app:
+  router:
     build:
       context: .
       dockerfile: ./Dockerfile
+    container_name: router
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
     volumes:
       - ./database.db:/app/database.db
     ports:
@@ -12,6 +18,7 @@ services:
 
   redis:
     image: redis/redis-stack:latest
+    container_name: redis
     ports:
       - "8001:8001"
     healthcheck:
@@ -19,3 +26,5 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
+    volumes:
+      - ./.v/redis/data:/data

@@ -1,13 +1,15 @@
 import random
-from typing import Annotated
+from typing import Annotated, Optional
 import datetime
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Response
 from pydantic import BaseModel
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 import redis
-import httpx
+import requests
 from fastapi.middleware.cors import CORSMiddleware
+import time
+import httpx
 
 
 class Machine(SQLModel, table=True):
@@ -68,8 +70,20 @@ def read_root():
     return {"message": "Welcome to the FastAPI service"}
 
 
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
+
+
 class RegisterMachineRequest(BaseModel):
     network_ip: str
+
+
+def get_online_machines() -> list[str]:
+    return [
+        key.decode("utf-8").split(":")[1]
+        for key in redis_client.keys(pattern="liveness:*")
+    ]
 
 
 @app.post("/register/{machine_uid}")
@@ -113,36 +127,76 @@ def check_liveness(machine_uid: str, session: SessionDep):
 
 @app.post("/liveness/{machine_uid}")
 def set_liveness(machine_uid: str, session: SessionDep):
-    redis_client.setex(machine_uid, 6, "true")
+    now = time.time()
+    redis_client.setnx(f"liveness-start:{machine_uid}", now)
+    created_at = float(redis_client.get(f"liveness-start:{machine_uid}"))
+    ttl = int((now - created_at) + 12)
+    redis_client.expire(f"liveness-start:{machine_uid}", ttl)
+
+    network_ip = redis_client.get(f"network_ip:{machine_uid}")
+    if not network_ip:
+        machine = session.exec(
+            select(Machine).where(Machine.network_machine_uid == machine_uid)
+        ).first()
+        if not machine:
+            raise HTTPException(status_code=404, detail="Machine not found")
+        redis_client.set(f"network_ip:{machine_uid}", machine.network_ip)
+        network_ip = machine.network_ip
+
+    redis_client.hset(
+        f"liveness:{machine_uid}",
+        mapping={
+            "network_ip": network_ip,
+            "timestamp": now,
+            "machine_uid": machine_uid,
+        },
+    )
+    redis_client.expire(f"liveness:{machine_uid}", 6)
+
     return {"machine_uid": machine_uid, "status": "online"}
 
 
 @app.get("/machines")
 def list_all_machines(session: SessionDep):
     machines = session.exec(select(Machine)).all()
-    machine_list = []
-    for machine in machines:
-        status = redis_client.get(machine.network_machine_uid)
-        machine_list.append(
-            {
-                "machine_uid": machine.network_machine_uid,
-                "network_ip": machine.network_ip,
-                "status": "online" if status else "offline",
-            }
-        )
-    return machine_list
+    online_machines = get_online_machines()
+
+    return [
+        {
+            "machine_uid": machine.network_machine_uid,
+            "network_ip": machine.network_ip,
+            "status": (
+                "online"
+                if machine.network_machine_uid in online_machines
+                else "offline"
+            ),
+        }
+        for machine in machines
+    ]
 
 
 @app.get("/machines/online")
 def list_online_machines():
-    machine_ids = [key.decode("utf-8") for key in redis_client.keys()]
-    online_machines = [{"machine_uid": machine_id} for machine_id in machine_ids]
-    return online_machines
+    online_machines = get_online_machines()
+    return [{"machine_uid": key} for key in online_machines]
 
 
-@app.post("/e/{rest_of_path:path}")
-async def eval_proxy(request: Request):
-    machine_ids = [key.decode("utf-8") for key in redis_client.keys()]
+class ModelProvider(BaseModel):
+    base_url: str
+    api_key: str
+
+
+class AiRequest(BaseModel):
+    prompt: str = Field(..., title="Prompt")
+    model: str = Field("mira/llama3.1", title="Model")
+    model_provider: Optional[ModelProvider] = Field(
+        None, title="Model Provider (optional)"
+    )
+
+
+@app.post("/v1/generate")
+async def generate(request: AiRequest):
+    machine_ids = get_online_machines()
     if not machine_ids:
         raise HTTPException(status_code=404, detail="No online machines available")
 
@@ -154,21 +208,95 @@ async def eval_proxy(request: Request):
     if not machine:
         raise HTTPException(status_code=404, detail="Machine not found")
 
-    # remove /e from beginning
-    urlPath = request.url.path[2:]
+    proxy_url = f"http://{machine.network_ip}:34523/v1/generate"
 
-    proxy_url = f"http://{machine.network_ip}:34523{urlPath}"
-
-    async with httpx.AsyncClient() as client:
-        response = await client.request(
-            method=request.method,
-            url=proxy_url,
-            headers=request.headers,
-            content=await request.body(),
-        )
+    response = requests.post(
+        proxy_url,
+        json=request.model_dump(),
+    )
 
     return Response(
         content=response.text,
         status_code=response.status_code,
         headers=dict(response.headers),
     )
+
+
+class VerifyRequest(AiRequest):
+    # prompt: str = Field(..., title="Prompt")
+    # models: list[str] = Field(["mira/llama3.1"], title="Models")
+    total_runs: int = Field(5, title="Total runs")
+    min_yes: int = Field(3, title="Minimum yes")
+
+
+@app.post("/v1/verify")
+async def verify(req: VerifyRequest, session: SessionDep):
+    if req.total_runs < 1:
+        raise HTTPException(status_code=400, detail="Total runs must be at least 1")
+
+    if req.min_yes < 1:
+        raise HTTPException(status_code=400, detail="Minimum yes must be at least 1")
+
+    if req.min_yes > req.total_runs:
+        raise HTTPException(
+            status_code=400, detail="Minimum yes must be less than total runs"
+        )
+
+    machine_ids = get_online_machines()
+    if not machine_ids:
+        raise HTTPException(status_code=404, detail="No online machines available")
+
+    if len(machine_ids) < req.total_runs:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Not enough online machines for total runs, we have {len(machine_ids)} online machines",
+        )
+
+    selected_machines = random.sample(machine_ids, req.total_runs)
+    selected_ips = redis_client.mget(
+        [f"network_ip:{machine_id}" for machine_id in selected_machines]
+    )
+    ips = [ip.decode("utf-8") for ip in selected_ips]
+
+    print("=====>", selected_machines, ips)
+
+    if len(selected_machines) != len(ips):
+        raise HTTPException(status_code=400, detail="Machine not found")
+
+    results = []
+    async with httpx.AsyncClient() as client:
+        for ip in ips:
+            proxy_url = f"http://{ip}:34523/v1/verify"
+            response = await client.post(
+                proxy_url,
+                json={
+                    "prompt": req.prompt,
+                    "model": req.model,
+                    "model_provider": req.model_provider,
+                },
+            )
+            results.append({"machine_ip": ip, "result": response.json()["result"]})
+
+    # for ip in ips:
+    #     proxy_url = f"http://{ip}:34523/v1/verify"
+    #     response = requests.post(
+    #         proxy_url,
+    #         json={
+    #             "prompt": req.prompt,
+    #             "model": req.model,
+    #             "model_provider": req.model_provider,
+    #         },
+    #     )
+
+    #     if not response.ok:
+    #         raise HTTPException(
+    #             status_code=500, detail=f"Error from machine {ip}: {response.text}"
+    #         )
+
+    #     results.append({"machine_ip": ip, "result": response.json()["result"]})
+
+    yes_count = sum(1 for result in results if result["result"] == "yes")
+    if yes_count >= req.min_yes:
+        return {"result": "yes", "results": results}
+    else:
+        return {"result": "no", "results": results}

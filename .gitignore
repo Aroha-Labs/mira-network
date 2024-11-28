@@ -1,3 +1,9 @@
 temp/
 cli/mira-client
 cli/bin
+
+# docker-volume
+.v/
+
+.DS_Store
+*test.py
