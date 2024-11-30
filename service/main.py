@@ -15,7 +15,7 @@ import requests
 
 ROUTER_BASE_URL = os.getenv(
     "ROUTER_BASE_URL",
-    "https://mira-client-balancer.arohalabs.dev",
+    "https://mira-client-balancer.alts.dev",
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -40,7 +40,7 @@ model_providers = {
         api_key=os.getenv("ANTHROPIC_API_KEY"),
     ),
     "mira": ModelProvider(
-        base_url="https://ollama.arohalabs.dev/v1",
+        base_url="https://ollama.alts.dev/v1",
         api_key=os.getenv("MIRA_API_KEY"),
     ),
 }
@@ -200,7 +200,7 @@ async def update_liveness(machine_uid: str):
                 )
             except Exception as exc:
                 logging.error(f"An error occurred: {exc}")
-        await asyncio.sleep(5)
+        await asyncio.sleep(3)
 
 
 @app.on_event("startup")

@@ -2,14 +2,14 @@ name: Build and Publish Docker Image
 
 on:
   push:
-    branches: ['main']
+    branches: ["main"]
     paths:
-      - 'service/**'
-      - '.github/workflows/publish-docker-build.yml'
+      - "service/**"
+      - ".github/workflows/publish-docker-build.yml"
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: Aroha-Labs/mira-eval-service
+  IMAGE_NAME: Aroha-Labs/mira-client-service
 
 jobs:
   build-and-push-image:
