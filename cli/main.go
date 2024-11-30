@@ -21,6 +21,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var balancer_base_url = "https://mira-client-balancer.alts.dev"
+var miraClientNetworkId = "12ac4a1e716ea031"
+
 // serviceCmd represents the parent service command
 var serviceCmd = &cobra.Command{
 	Use:   "service",
@@ -29,7 +32,7 @@ var serviceCmd = &cobra.Command{
 }
 
 func getMachineID() (string, error) {
-	cmd := exec.Command("zerotier-cli", "info", "-j")
+	cmd := exec.Command("sudo", "zerotier-cli", "info", "-j")
 	output, err := cmd.Output()
 	if err != nil {
 		return "", err
@@ -47,7 +50,7 @@ func getMachineID() (string, error) {
 }
 
 func getNetworkIP() (string, error) {
-	cmd := exec.Command("zerotier-cli", "listnetworks", "-j")
+	cmd := exec.Command("sudo", "zerotier-cli", "listnetworks", "-j")
 	output, err := cmd.Output()
 	if err != nil {
 		return "", err
@@ -63,7 +66,7 @@ func getNetworkIP() (string, error) {
 	}
 
 	for _, network := range networks {
-		if network.ID == "8056c2e21c04cb4d" && len(network.AssignedAddresses) > 0 {
+		if network.ID == miraClientNetworkId && len(network.AssignedAddresses) > 0 {
 			fullIP := network.AssignedAddresses[0]
 			ip := strings.Split(fullIP, "/")[0]
 			return ip, nil
@@ -74,7 +77,7 @@ func getNetworkIP() (string, error) {
 }
 
 func registerClient(machineID, networkIP string) error {
-	url := fmt.Sprintf("https://mira-client-balancer.arohalabs.dev/register/%s", machineID)
+	url := fmt.Sprintf("%s/register/%s", balancer_base_url, machineID)
 	payload := map[string]string{"network_ip": networkIP}
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
@@ -175,7 +178,7 @@ func handleServiceStartRestart(serviceName string, image string, args []string) 
 		if err := restartCmd.Run(); err != nil {
 			return fmt.Errorf("failed to restart %s service: %w", serviceName, err)
 		}
-		fmt.Println("Eval service restarted successfully.")
+		fmt.Println(serviceName, "restarted successfully.")
 	} else {
 		// Check if the Docker service is stopped
 		checkStoppedCmd := exec.Command("docker", "ps", "-a", "--filter", "label=service-name="+serviceName, "--filter", "status=exited", "--format", "{{.ID}}")
@@ -194,7 +197,7 @@ func handleServiceStartRestart(serviceName string, image string, args []string) 
 			if err := startCmd.Run(); err != nil {
 				return fmt.Errorf("failed to start stopped %s service: %w", serviceName, err)
 			}
-			fmt.Println("Eval service started successfully.")
+			fmt.Println(serviceName, " started successfully.")
 		} else {
 			// Service is not running or stopped, create and start a new container
 			command := []string{"docker", "run", "-d", "--network", "mira-client-network", "--label", "service-runner=mira-client", "--label", "service-name=" + serviceName}
@@ -212,7 +215,7 @@ func handleServiceStartRestart(serviceName string, image string, args []string) 
 				return fmt.Errorf("docker command failed: %w", err)
 			}
 
-			fmt.Println("Eval service started successfully.")
+			fmt.Println(serviceName, "service started successfully.")
 		}
 	}
 
@@ -372,8 +375,8 @@ var startServiceCmd = &cobra.Command{
 		}
 
 		if err := handleServiceStartRestart(
-			"mira-eval-service",
-			"mira-eval-service",
+			"mira-client-service",
+			"ghcr.io/aroha-labs/mira-client-service:main",
 			[]string{
 				"-p", "34523:8000",
 				"-e", "MC_NETWORK_IP=" + networkIp,
@@ -617,8 +620,6 @@ var evalCmd = &cobra.Command{
 	},
 }
 
-var miraClientNetworkId = "8056c2e21c04cb4d"
-
 var joinNetworkCmd = &cobra.Command{
 	Use:   "join-network",
 	Short: fmt.Sprintf("Join the ZeroTier network %s", miraClientNetworkId),
@@ -631,7 +632,7 @@ var joinNetworkCmd = &cobra.Command{
 		return nil
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		checkCmd := exec.Command("zerotier-cli", "listnetworks", "-j")
+		checkCmd := exec.Command("sudo", "zerotier-cli", "listnetworks", "-j")
 		output, err := checkCmd.Output()
 		if err != nil {
 			return fmt.Errorf("failed to check ZeroTier networks: %w", err)
