@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import PlainTextResponse
 import csv
 import uvicorn
@@ -46,6 +46,11 @@ model_providers = {
 }
 
 
+class Message(BaseModel):
+    role: str
+    content: str
+
+
 app = FastAPI()
 
 
@@ -73,7 +78,7 @@ def get_model_provider(
 def get_llm_completion(
     model: str,
     model_provider: ModelProvider,
-    messages: list[dict],
+    messages: list[Message],
 ):
     req = requests.post(
         url=f"{model_provider.base_url}/chat/completions",
@@ -83,7 +88,9 @@ def get_llm_completion(
         },
         json={
             "model": model,
-            "messages": messages,
+            "messages": [
+                {"role": msg["role"], "content": msg["content"]} for msg in messages
+            ],
         },
     )
 
@@ -142,42 +149,54 @@ async def evaluate(req: EvaluationRequest) -> str:
 
 
 class AiRequest(BaseModel):
-    prompt: str = Field(..., title="Prompt")
     model: str = Field(title="Model", default="")
     model_provider: Optional[ModelProvider] = Field(None, title="Model Provider")
+    messages: List[Message] = Field(None, title="Chat History")
 
 
-@app.post("/v1/generate")
+@app.post("/v1/chat/completions")
 async def generate(req: AiRequest):
-    if not req.prompt:
-        raise HTTPException(status_code=400, detail="Prompt is required")
+    if not req.messages or not any(msg.role == "user" for msg in req.messages):
+        raise HTTPException(
+            status_code=400, detail="At least one user message is required"
+        )
 
     model_provider, model = get_model_provider(req.model, req.model_provider)
+
+    # Convert Message objects to dictionaries
+    messages = [{"role": msg.role, "content": msg.content} for msg in req.messages]
 
     return get_llm_completion(
         model,
         model_provider,
-        messages=[{"role": "user", "content": req.prompt}],
+        messages=messages,
     )
 
 
+@app.get("/v1/models")
+async def list_models():
+    return {"object": "list", "data": [{"id": "mira/llama3.1", "object": "model"}]}
+
+
+class VerifyRequest(BaseModel):
+    models: str
+    model_provider: Optional[ModelProvider]
+    prompt: str
+
+
 @app.post("/v1/verify")
-async def verify(req: AiRequest):
+async def verify(req: VerifyRequest):
     if not req.prompt:
         raise HTTPException(status_code=400, detail="Prompt is required")
 
     model_provider, model = get_model_provider(req.model, req.model_provider)
 
+    messages = [{"role": "user", "content": req.prompt}]
+
     res = get_llm_completion(
         model,
         model_provider,
-        messages=[
-            {
-                "role": "system",
-                "content": "You are a expert in user prompts verification, don't be verbose, just say yes or no. Don't add any other information or explanation or context or anything else.",
-            },
-            {"role": "user", "content": req.prompt},
-        ],
+        messages=messages,
     )
 
     if res["choices"][0]["message"]["content"].lower() == "yes":
