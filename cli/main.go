@@ -27,8 +27,8 @@ var miraClientNetworkId = "12ac4a1e716ea031"
 // serviceCmd represents the parent service command
 var serviceCmd = &cobra.Command{
 	Use:   "service",
-	Short: "Manage the mira-eval-service Docker container",
-	Long:  `Manage the mira-eval-service Docker container with start, stop, and remove commands`,
+	Short: "Manage the mira-client-service Docker container",
+	Long:  `Manage the mira-client-service Docker container with start, stop, and remove commands`,
 }
 
 func getMachineID() (string, error) {
@@ -387,18 +387,18 @@ var startServiceCmd = &cobra.Command{
 			return err
 		}
 
-		if err := handleServiceStartRestart(
-			"litellm",
-			"ghcr.io/berriai/litellm:main-latest",
-			[]string{
-				"-p", "34510:4000",
-				"-v", liteLLMConfigFile + ":/app/config.yaml",
-				"--env-file", liteLLMEnvFIle,
-				"--env-file", llmKeyDotEnvFile,
-			},
-		); err != nil {
-			return err
-		}
+		// if err := handleServiceStartRestart(
+		// 	"litellm",
+		// 	"ghcr.io/berriai/litellm:main-latest",
+		// 	[]string{
+		// 		"-p", "34510:4000",
+		// 		"-v", liteLLMConfigFile + ":/app/config.yaml",
+		// 		"--env-file", liteLLMEnvFIle,
+		// 		"--env-file", llmKeyDotEnvFile,
+		// 	},
+		// ); err != nil {
+		// 	return err
+		// }
 
 		return nil
 	},
@@ -442,13 +442,13 @@ var stopServiceCmd = &cobra.Command{
 
 		// return nil
 
-		if err := handleServiceStop("mira-eval-service"); err != nil {
+		if err := handleServiceStop("mira-client-service"); err != nil {
 			return err
 		}
 
-		if err := handleServiceStop("litellm"); err != nil {
-			return err
-		}
+		// if err := handleServiceStop("litellm"); err != nil {
+		// 	return err
+		// }
 
 		return nil
 	},
@@ -457,8 +457,8 @@ var stopServiceCmd = &cobra.Command{
 // removeServiceCmd represents the service remove command
 var removeServiceCmd = &cobra.Command{
 	Use:   "remove",
-	Short: "Remove the mira-eval-service Docker container",
-	Long:  `Remove the mira-eval-service Docker container if it exists`,
+	Short: "Remove the mira-client-service Docker container",
+	Long:  `Remove the mira-client-service Docker container if it exists`,
 	PreRunE: func(cmd *cobra.Command, args []string) error {
 		// Check if Docker is installed
 		if !checkCommandExists("docker") {
@@ -492,13 +492,13 @@ var removeServiceCmd = &cobra.Command{
 
 		// return nil
 
-		if err := handleServiceRemove("mira-eval-service"); err != nil {
+		if err := handleServiceRemove("mira-client-service"); err != nil {
 			return err
 		}
 
-		if err := handleServiceRemove("litellm"); err != nil {
-			return err
-		}
+		// if err := handleServiceRemove("litellm"); err != nil {
+		// 	return err
+		// }
 
 		return nil
 	},
