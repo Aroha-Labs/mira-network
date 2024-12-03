@@ -11,7 +11,17 @@ import asyncio
 import httpx
 import logging
 import requests
+from fastapi.middleware.cors import CORSMiddleware
 
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 ROUTER_BASE_URL = os.getenv(
     "ROUTER_BASE_URL",
@@ -49,9 +59,6 @@ model_providers = {
 class Message(BaseModel):
     role: str
     content: str
-
-
-app = FastAPI()
 
 
 def get_model_provider(
