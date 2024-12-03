@@ -175,7 +175,59 @@ async def generate(req: AiRequest):
 
 @app.get("/v1/models")
 async def list_models():
-    return {"object": "list", "data": [{"id": "mira/llama3.1", "object": "model"}]}
+    return {
+        "object": "list",
+        "data": [
+            {
+                "id": "mira/llama3.2:3b-instruct-q8_0",
+                "object": "model",
+            },
+            {
+                "id": "mira/llama3.1:8b-instruct-q8_0.1",
+                "object": "model",
+            },
+            {
+                "id": "mira/llama3:instruct",
+                "object": "model",
+            },
+            {
+                "id": "mira/mistral:instruct",
+                "object": "model",
+            },
+            {
+                "id": "openai/gpt-4o-mini",
+                "object": "model",
+            },
+            {
+                "id": "openai/gpt-4o",
+                "object": "model",
+            },
+            {
+                "id": "openai/gpt-3.5-turbo-instruct-0914",
+                "object": "model",
+            },
+            {
+                "id": "openrouter/meta-llama/llama-3.1-70b-instruct:free",
+                "object": "model",
+            },
+            {
+                "id": "openrouter/meta-llama/llama-3.1-8b-instruct:free",
+                "object": "model",
+            },
+            {
+                "id": "openrouter/meta-llama/meta-llama/llama-3.2-1b-instruct:free",
+                "object": "model",
+            },
+            {
+                "id": "openrouter/mistralai/mistral-7b-instruct:free",
+                "object": "model",
+            },
+            {
+                "id": "openrouter/mistralai/mixtral-8x22b-instruct",
+                "object": "model",
+            },
+        ],
+    }
 
 
 class VerifyRequest(BaseModel):
