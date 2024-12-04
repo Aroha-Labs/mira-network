@@ -1,0 +1,8 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  /* darker light background color */
+  background-color: #f7f7f7;
+}
