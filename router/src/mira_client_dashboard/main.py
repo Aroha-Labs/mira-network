@@ -181,20 +181,25 @@ def list_online_machines():
     return [{"machine_uid": key} for key in online_machines]
 
 
+class Message(BaseModel):
+    role: str
+    content: str
+
+
 class ModelProvider(BaseModel):
     base_url: str
     api_key: str
 
 
 class AiRequest(BaseModel):
-    prompt: str = Field(..., title="Prompt")
     model: str = Field("mira/llama3.1", title="Model")
     model_provider: Optional[ModelProvider] = Field(
         None, title="Model Provider (optional)"
     )
+    messages: list[Message] = Field([], title="Messages")
 
 
-@app.post("/v1/generate")
+@app.post("/v1/chat/completions")
 async def generate(request: AiRequest):
     machine_ids = get_online_machines()
     if not machine_ids:
@@ -222,15 +227,15 @@ async def generate(request: AiRequest):
     )
 
 
-class VerifyRequest(AiRequest):
-    # prompt: str = Field(..., title="Prompt")
-    # models: list[str] = Field(["mira/llama3.1"], title="Models")
+class VerifyRequest(BaseModel):
+    messages: list[Message] = Field([], title="Messages")
+    models: list[str] = Field(["mira/llama3.1"], title="Models")
     total_runs: int = Field(5, title="Total runs")
     min_yes: int = Field(3, title="Minimum yes")
 
 
 @app.post("/v1/verify")
-async def verify(req: VerifyRequest, session: SessionDep):
+async def verify(req: VerifyRequest):
     if req.total_runs < 1:
         raise HTTPException(status_code=400, detail="Total runs must be at least 1")
 
@@ -258,8 +263,6 @@ async def verify(req: VerifyRequest, session: SessionDep):
     )
     ips = [ip.decode("utf-8") for ip in selected_ips]
 
-    print("=====>", selected_machines, ips)
-
     if len(selected_machines) != len(ips):
         raise HTTPException(status_code=400, detail="Machine not found")
 
@@ -270,30 +273,11 @@ async def verify(req: VerifyRequest, session: SessionDep):
             response = await client.post(
                 proxy_url,
                 json={
-                    "prompt": req.prompt,
-                    "model": req.model,
-                    "model_provider": req.model_provider,
+                    "messages": req.messages,
+                    "models": req.models,
                 },
             )
             results.append({"machine_ip": ip, "result": response.json()["result"]})
-
-    # for ip in ips:
-    #     proxy_url = f"http://{ip}:34523/v1/verify"
-    #     response = requests.post(
-    #         proxy_url,
-    #         json={
-    #             "prompt": req.prompt,
-    #             "model": req.model,
-    #             "model_provider": req.model_provider,
-    #         },
-    #     )
-
-    #     if not response.ok:
-    #         raise HTTPException(
-    #             status_code=500, detail=f"Error from machine {ip}: {response.text}"
-    #         )
-
-    #     results.append({"machine_ip": ip, "result": response.json()["result"]})
 
     yes_count = sum(1 for result in results if result["result"] == "yes")
     if yes_count >= req.min_yes:
