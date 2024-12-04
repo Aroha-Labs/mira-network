@@ -239,22 +239,23 @@ async def list_models():
 
 class VerifyRequest(BaseModel):
     models: str
-    model_provider: Optional[ModelProvider]
-    prompt: str
+    # model_provider: Optional[ModelProvider]
+    messages: List[Message] = Field(None, title="Chat History")
 
 
 @app.post("/v1/verify")
 async def verify(req: VerifyRequest):
-    if not req.prompt:
+    if not req.messages:
         raise HTTPException(status_code=400, detail="Prompt is required")
 
-    model_provider, model = get_model_provider(req.model, req.model_provider)
+    model_provider, model = get_model_provider(model=req.models[0], model_provider=None)
 
-    messages = [{"role": "user", "content": req.prompt}]
+    # Convert Message objects to dictionaries
+    messages = [{"role": msg.role, "content": msg.content} for msg in req.messages]
 
     res = get_llm_completion(
-        model,
-        model_provider,
+        model=model,
+        model_provider=model_provider,
         messages=messages,
     )
 
