@@ -1,0 +1,27 @@
+/* styles.css */
+@media (max-width: 768px) {
+  .sidebar {
+    display: none;
+  }
+
+  .sidebar-open .sidebar {
+    display: block;
+  }
+}
+
+@media (min-width: 768px) {
+  .sidebar {
+    display: block;
+  }
+}
+
+.sidebar a {
+  display: flex;
+  padding: 10px 15px;
+  color: white;
+  text-decoration: none;
+}
+
+.sidebar a:hover {
+  background-color: #575757;
+}
