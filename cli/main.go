@@ -22,7 +22,7 @@ import (
 )
 
 var balancer_base_url = "https://mira-client-balancer.alts.dev"
-var miraClientNetworkId = "12ac4a1e716ea031"
+var miraClientNetworkId = "a84ac5c10a5b4a1a"
 
 // serviceCmd represents the parent service command
 var serviceCmd = &cobra.Command{
