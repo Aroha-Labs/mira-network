@@ -56,7 +56,7 @@ sudo apt-get install ca-certificates curl
    ```
 2. Join the ZeroTier network:
    ```bash
-   sudo zerotier-cli join 12ac4a1e716ea031
+   sudo zerotier-cli join a84ac5c10a5b4a1a
    ```
 3. Verify the network connection:
    ```bash
