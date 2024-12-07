@@ -174,7 +174,13 @@ export default function Playground({ flow }: PlaygroundProps) {
 
           try {
             const djson = JSON.parse(d.replace(/^data: /, ""));
-            const chunk = djson.choices[0].delta.content;
+            let chunk: any;
+            if (djson.choices[0].delta) {
+              // from stream response
+              chunk = djson.choices[0].delta.content;
+            } else {
+              chunk = djson.choices[0].message.content;
+            }
             setResponse((prev) => prev + chunk);
           } catch (e) {
             console.error("Error parsing JSON", e);
