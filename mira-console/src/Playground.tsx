@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react"; // Add useEffect
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import ReactMarkdown from "react-markdown";
 import { useModels } from "./hooks/useModels";
 import { LLM_BASE_URL } from "./config/llm";
@@ -7,7 +7,9 @@ import {
   useStateSelectedModel,
   useStateSelectedProvider,
 } from "./recoil/atoms";
-import { supabase } from "./supabase";
+import { useUpdateFlow } from "./hooks/flows";
+import { Flow } from "./types";
+import { useNavigate } from "@tanstack/react-router";
 
 // Error display component
 const ErrorMessage = ({ error }: { error: Error }) => (
@@ -44,16 +46,10 @@ const rolePlaceholders = {
 
 interface SavePromptForm {
   name: string;
-  icon: string;
 }
 
 interface PlaygroundProps {
-  flow?: {
-    id: number;
-    name: string;
-    icon: string;
-    system_prompt: string;
-  };
+  flow?: Flow;
 }
 
 interface Variables {
@@ -61,8 +57,7 @@ interface Variables {
 }
 
 export default function Playground({ flow }: PlaygroundProps) {
-  const queryClient = useQueryClient();
-
+  const navigate = useNavigate();
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "system",
@@ -86,10 +81,7 @@ export default function Playground({ flow }: PlaygroundProps) {
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [saveForm, setSaveForm] = useState<SavePromptForm>({
-    name: "",
-    icon: "",
-  });
+  const [saveForm, setSaveForm] = useState<SavePromptForm>({ name: "" });
 
   // Add new state for form errors
   const [formError, setFormError] = useState<string>("");
@@ -172,8 +164,25 @@ export default function Playground({ flow }: PlaygroundProps) {
           const d = decoder.decode(value);
           if (d.includes("[DONE]")) break;
 
-          try {
-            const djson = JSON.parse(d.replace(/^data: /, ""));
+          let djson: any = {};
+          const lines = d
+            .split("\n")
+            .map((l) =>
+              l
+                .replace(/\r/g, "")
+                .replace(/^data: /, "")
+                .trim()
+            )
+            .filter(Boolean);
+
+          lines.forEach((line) => {
+            try {
+              djson = JSON.parse(line);
+            } catch (e) {
+              console.error("Error parsing JSON", e);
+              console.log("clean JSON====>", line);
+            }
+
             let chunk: any;
             if (djson.choices[0].delta) {
               // from stream response
@@ -182,9 +191,7 @@ export default function Playground({ flow }: PlaygroundProps) {
               chunk = djson.choices[0].message.content;
             }
             setResponse((prev) => prev + chunk);
-          } catch (e) {
-            console.error("Error parsing JSON", e);
-          }
+          });
         }
         setIsStreaming(false);
       } catch (error) {
@@ -195,36 +202,13 @@ export default function Playground({ flow }: PlaygroundProps) {
   });
 
   // Update savePromptMutation
-  const savePromptMutation = useMutation({
-    mutationFn: async (data: SavePromptForm & { system_prompt: string }) => {
-      if (flow) {
-        // Update existing flow
-        const { error } = await supabase
-          .from("flows")
-          .update({
-            name: data.name,
-            icon: data.icon,
-            system_prompt: data.system_prompt,
-          })
-          .eq("id", flow.id);
-
-        if (error) throw error;
-      } else {
-        // Create new flow
-        const { error } = await supabase.from("flows").insert([data]);
-
-        if (error) throw error;
-      }
-    },
-    onSuccess: () => {
+  const savePromptMutation = useUpdateFlow({
+    onSuccess: (data, flow) => {
       setIsModalOpen(false);
-      setSaveForm({ name: "", icon: "" });
-      queryClient.invalidateQueries({ queryKey: ["flows"] });
-      if (flow) {
-        // Also invalidate single flow query
-        queryClient.invalidateQueries({
-          queryKey: ["flow", flow.id.toString()],
-        });
+      setSaveForm({ name: "" });
+
+      if (data.id && flow?.id !== data.id) {
+        navigate({ to: `/flows/${data.id}` });
       }
     },
   });
@@ -338,14 +322,10 @@ export default function Playground({ flow }: PlaygroundProps) {
       return;
     }
 
-    if (!saveForm.icon.trim()) {
-      setFormError("Icon is required");
-      return;
-    }
-
     try {
       await savePromptMutation.mutateAsync({
         ...saveForm,
+        id: flow?.id,
         system_prompt: systemMessage.content,
       });
     } catch (error) {
@@ -377,7 +357,6 @@ export default function Playground({ flow }: PlaygroundProps) {
     if (flow) {
       setSaveForm({
         name: flow.name,
-        icon: flow.icon,
       });
     }
   }, [flow]);
@@ -392,7 +371,10 @@ export default function Playground({ flow }: PlaygroundProps) {
   }, [messages]);
 
   return (
-    <main className="flex flex-col flex-grow p-4 gap-2 sm:container sm:mx-auto">
+    <main
+      className="flex flex-col flex-grow p-4 gap-2 sm:container sm:mx-auto"
+      style={{ maxWidth: 800 }}
+    >
       {isModelsError && <ErrorMessage error={modelsError} />}
 
       {/* Model selector with better styling */}
@@ -684,23 +666,6 @@ export default function Playground({ flow }: PlaygroundProps) {
                     className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
                     placeholder="Enter a name for your flow"
                     required
-                  />
-                </div>
-
-                <div className="mt-4">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Icon (emoji)
-                  </label>
-                  <input
-                    type="text"
-                    value={saveForm.icon}
-                    onChange={(e) =>
-                      setSaveForm({ ...saveForm, icon: e.target.value })
-                    }
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
-                    placeholder="Enter an emoji 😊"
-                    required
-                    maxLength={2}
                   />
                 </div>
 
