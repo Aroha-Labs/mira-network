@@ -3,8 +3,8 @@ from typing import Annotated, Optional
 import datetime
 
 from fastapi import Depends, FastAPI, HTTPException, Response
-from pydantic import BaseModel
-from sqlmodel import Field, Session, SQLModel, create_engine, select
+from pydantic import BaseModel, Field
+from sqlmodel import Field as SQLField, Session, SQLModel, create_engine, select
 import redis
 import requests
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,15 +13,29 @@ import httpx
 
 
 class Machine(SQLModel, table=True):
-    id: int = Field(primary_key=True)
-    network_machine_uid: str = Field(index=True)
-    network_ip: str = Field(index=True)
+    id: int = SQLField(primary_key=True)
+    network_machine_uid: str = SQLField(index=True)
+    network_ip: str = SQLField(index=True)
 
     # now as default
-    created_at: str = Field(
+    created_at: str = SQLField(
         default=datetime.datetime.now(datetime.timezone.utc), nullable=False
     )
-    updated_at: str = Field(
+    updated_at: str = SQLField(
+        default=datetime.datetime.now(datetime.timezone.utc), nullable=False
+    )
+
+
+class Flows(SQLModel, table=True):
+    id: int = SQLField(primary_key=True)
+    system_prompt: str = SQLField(nullable=False)
+    name: str = SQLField(nullable=False, unique=True)
+
+    # now as default
+    created_at: str = SQLField(
+        default=datetime.datetime.now(datetime.timezone.utc), nullable=False
+    )
+    updated_at: str = SQLField(
         default=datetime.datetime.now(datetime.timezone.utc), nullable=False
     )
 
@@ -199,7 +213,7 @@ class AiRequest(BaseModel):
     messages: list[Message] = Field([], title="Messages")
 
 
-@app.post("/v1/chat/completions")
+@app.post("/v1/chat/completions", tags=["network"])
 async def generate(request: AiRequest):
     machine_ids = get_online_machines()
     if not machine_ids:
@@ -234,7 +248,7 @@ class VerifyRequest(BaseModel):
     min_yes: int = Field(3, title="Minimum yes")
 
 
-@app.post("/v1/verify")
+@app.post("/v1/verify", tags=["network"])
 async def verify(req: VerifyRequest):
     if req.total_runs < 1:
         raise HTTPException(status_code=400, detail="Total runs must be at least 1")
@@ -284,3 +298,124 @@ async def verify(req: VerifyRequest):
         return {"result": "yes", "results": results}
     else:
         return {"result": "no", "results": results}
+
+
+class FlowChatCompletion(AiRequest):
+    variables: dict | None = Field(title="Variables", default=None)
+
+
+@app.post("/v1/flow/{flow_id}/chat/completions", tags=["network"])
+async def generate_with_flow_id(
+    flow_id: str, req: FlowChatCompletion, db: Session = Depends(get_session)
+):
+    flow = db.query(Flows).filter(Flows.id == flow_id).first()
+    if not flow:
+        raise HTTPException(status_code=404, detail="Flow not found")
+
+    system_prompt = flow.system_prompt
+    # prepend system prompt to messages
+    req.messages.insert(0, Message(role="system", content=system_prompt))
+
+    machine_ids = get_online_machines()
+    if not machine_ids:
+        raise HTTPException(status_code=404, detail="No online machines available")
+
+    random_machine_id = random.choice(machine_ids)
+    session = next(get_session())
+    machine = session.exec(
+        select(Machine).where(Machine.network_machine_uid == random_machine_id)
+    ).first()
+
+    if not machine:
+        raise HTTPException(status_code=404, detail="Machine not found")
+
+    proxy_url = f"http://{machine.network_ip}:34523/v1/generate"
+
+    response = requests.post(
+        proxy_url,
+        json=req.model_dump(),
+    )
+
+    return Response(
+        content=response.text,
+        status_code=response.status_code,
+        headers=dict(response.headers),
+    )
+
+
+@app.get("/flows", tags=["flows"])
+def list_all_flows(db: Session = Depends(get_session)):
+    flows = db.query(Flows).all()
+    return flows
+
+
+@app.get("/flows/{flow_id}", tags=["flows"])
+def get_flow(flow_id: str, db: Session = Depends(get_session)):
+    flow = db.query(Flows).filter(Flows.id == flow_id).first()
+    if not flow:
+        raise HTTPException(status_code=404, detail="Flow not found")
+    return flow
+
+
+class FlowRequest(BaseModel):
+    system_prompt: str
+    name: str
+
+
+@app.post("/flows", tags=["flows"])
+def create_flow(flow: FlowRequest, db: Session = Depends(get_session)):
+    new_flow = Flows(
+        system_prompt=flow.system_prompt,
+        name=flow.name,
+    )
+    db.add(new_flow)
+    db.commit()
+    db.refresh(new_flow)
+    return new_flow
+
+
+@app.put("/flows/{flow_id}", tags=["flows"])
+def update_flow(flow_id: str, flow: FlowRequest, db: Session = Depends(get_session)):
+    existing_flow = db.query(Flows).filter(Flows.id == flow_id).first()
+    if not existing_flow:
+        raise HTTPException(status_code=404, detail="Flow not found")
+
+    existing_flow.system_prompt = flow.system_prompt
+    existing_flow.name = flow.name
+
+    db.commit()
+    db.refresh(existing_flow)
+    return existing_flow
+
+
+@app.delete("/flows/{flow_id}", tags=["flows"])
+def delete_flow(flow_id: str, db: Session = Depends(get_session)):
+    existing_flow = db.query(Flows).filter(Flows.id == flow_id).first()
+    if not existing_flow:
+        raise HTTPException(status_code=404, detail="Flow not found")
+
+    db.delete(existing_flow)
+    db.commit()
+    return {"message": "Flow deleted successfully"}
+
+
+class FlowUpdateRequest(BaseModel):
+    system_prompt: str | None = Field(None, title="System Prompt")
+    name: str | None = Field(None, title="Name")
+
+
+@app.patch("/flows/{flow_id}", tags=["flows"])
+def update_flow(flow_id: str, flow: FlowRequest, db: Session = Depends(get_session)):
+    existing_flow = db.query(Flows).filter(Flows.id == flow_id).first()
+    if not existing_flow:
+        raise HTTPException(status_code=404, detail="Flow not found")
+
+    if flow.system_prompt is not None:
+        existing_flow.system_prompt = flow.system_prompt
+
+    if flow.name is not None:
+        existing_flow.name = flow.name
+
+    db.commit()
+    db.refresh(existing_flow)
+    return existing_flow

@@ -1,8 +1,9 @@
 import { Link } from "@tanstack/react-router";
-import { useFlows } from "../hooks/useFlows";
+import { useGetFlows } from "../hooks/flows";
+import "./sidebar.css";
 
 const Sidebar = () => {
-  const { data: flows, isLoading, error, refetch, isFetching } = useFlows();
+  const { data: flows, isLoading, error, refetch, isFetching } = useGetFlows();
 
   return (
     <div className="sidebar bg-gray-800 text-white w-64 min-h-screen fixed top-0 left-0 md:relative md:flex md:flex-col z-50">
@@ -48,7 +49,6 @@ const Sidebar = () => {
                   href={`/flows/${flow.id}`}
                   className="flex items-center px-4 py-2 rounded hover:bg-gray-700"
                 >
-                  <span className="mr-3">{flow.icon}</span>
                   {flow.name}
                 </Link>
               </li>
