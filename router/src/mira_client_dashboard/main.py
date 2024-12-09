@@ -213,6 +213,63 @@ class AiRequest(BaseModel):
     messages: list[Message] = Field([], title="Messages")
 
 
+@app.get("/v1/models", tags=["network"])
+async def list_models():
+    return {
+        "object": "list",
+        "data": [
+            {
+                "id": "mira/llama3.2:3b-instruct-q8_0",
+                "object": "model",
+            },
+            {
+                "id": "mira/llama3.1:8b-instruct-q8_0.1",
+                "object": "model",
+            },
+            {
+                "id": "mira/llama3:instruct",
+                "object": "model",
+            },
+            {
+                "id": "mira/mistral:instruct",
+                "object": "model",
+            },
+            {
+                "id": "openai/gpt-4o-mini",
+                "object": "model",
+            },
+            {
+                "id": "openai/gpt-4o",
+                "object": "model",
+            },
+            {
+                "id": "openai/gpt-3.5-turbo-instruct-0914",
+                "object": "model",
+            },
+            {
+                "id": "openrouter/meta-llama/llama-3.1-70b-instruct:free",
+                "object": "model",
+            },
+            {
+                "id": "openrouter/meta-llama/llama-3.1-8b-instruct:free",
+                "object": "model",
+            },
+            {
+                "id": "openrouter/meta-llama/meta-llama/llama-3.2-1b-instruct:free",
+                "object": "model",
+            },
+            {
+                "id": "openrouter/mistralai/mistral-7b-instruct:free",
+                "object": "model",
+            },
+            {
+                "id": "openrouter/mistralai/mixtral-8x22b-instruct",
+                "object": "model",
+            },
+        ],
+    }
+
+
 @app.post("/v1/chat/completions", tags=["network"])
 async def generate(request: AiRequest):
     machine_ids = get_online_machines()
@@ -314,6 +371,32 @@ async def generate_with_flow_id(
 
     system_prompt = flow.system_prompt
     # prepend system prompt to messages
+    req.messages.insert(0, Message(role="system", content=system_prompt))
+
+    # Extract variables from system_prompt
+    def extract_variables(prompt):
+        # Use regex to find all text within {}
+        import re
+
+        pattern = r"\{([^}]+)\}"
+        variables = re.findall(pattern, prompt)
+        return variables
+
+    # Get required variables
+    required_vars = extract_variables(system_prompt)
+
+    if required_vars:  # Only check if there are variables to verify
+        if req.variables is None:
+            raise ValueError("Variables are required but none were provided")
+        missing_vars = [var for var in required_vars if var not in req.variables]
+        if missing_vars:
+            raise ValueError(f"Missing required variables: {', '.join(missing_vars)}")
+
+        # Replace variables in system_prompt
+        for var in required_vars:
+            system_prompt = system_prompt.replace(f"{{{var}}}", str(req.variables[var]))
+
+    # Now system_prompt has all variables replaced
     req.messages.insert(0, Message(role="system", content=system_prompt))
 
     machine_ids = get_online_machines()
