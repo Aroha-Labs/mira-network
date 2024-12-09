@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo } from "react"; // Add useEffect
 import { useMutation } from "@tanstack/react-query";
 import ReactMarkdown from "react-markdown";
 import { useModels } from "./hooks/useModels";
-import { LLM_BASE_URL } from "./config/llm";
+import { ROUTER_BASE_URL } from "./config/llm";
 import {
   useStateSelectedModel,
   useStateSelectedProvider,
@@ -118,7 +118,7 @@ export default function Playground({ flow }: PlaygroundProps) {
       abortControllerRef.current = new AbortController();
 
       try {
-        const baseUrl = selectedProvider.baseUrl || LLM_BASE_URL;
+        const baseUrl = selectedProvider.baseUrl || ROUTER_BASE_URL;
         const headers: Record<string, string> = {};
 
         if (selectedProvider.apiKey) {
