@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { useStateSelectedProvider } from "../recoil/atoms";
-import { ROUTER_BASE_URL } from "../config/llm";
+import { LLM_BASE_URL } from "../config/llm";
 
 interface Model {
   id: string;
@@ -15,7 +15,7 @@ interface ModelsResponse {
 
 export function useModels() {
   const [selectedProvider] = useStateSelectedProvider();
-  const baseUrl = selectedProvider.baseUrl || ROUTER_BASE_URL;
+  const baseUrl = selectedProvider.baseUrl || LLM_BASE_URL;
 
   return useQuery({
     queryKey: ["models", selectedProvider.baseUrl],
