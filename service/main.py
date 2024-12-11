@@ -12,6 +12,7 @@ import httpx
 import logging
 import requests
 from fastapi.middleware.cors import CORSMiddleware
+import json
 
 app = FastAPI()
 
@@ -180,78 +181,70 @@ async def generate(req: AiRequest):
     )
 
 
-@app.get("/v1/models")
+@app.get("/v1/models", tags=["network"])
 async def list_models():
+    file_path = os.path.join(
+        os.path.dirname(__file__), "../router/supported-models.json"
+    )
+
+    with open(file_path, "r") as f:
+        supported_models: list[str] = json.load(f)
+
     return {
         "object": "list",
-        "data": [
-            {
-                "id": "mira/llama3.2:3b-instruct-q8_0",
-                "object": "model",
-            },
-            {
-                "id": "mira/llama3.1:8b-instruct-q8_0.1",
-                "object": "model",
-            },
-            {
-                "id": "mira/llama3:instruct",
-                "object": "model",
-            },
-            {
-                "id": "mira/mistral:instruct",
-                "object": "model",
-            },
-            {
-                "id": "openai/gpt-4o-mini",
-                "object": "model",
-            },
-            {
-                "id": "openai/gpt-4o",
-                "object": "model",
-            },
-            {
-                "id": "openai/gpt-3.5-turbo-instruct-0914",
-                "object": "model",
-            },
-            {
-                "id": "openrouter/meta-llama/llama-3.1-70b-instruct:free",
-                "object": "model",
-            },
-            {
-                "id": "openrouter/meta-llama/llama-3.1-8b-instruct:free",
-                "object": "model",
-            },
-            {
-                "id": "openrouter/meta-llama/meta-llama/llama-3.2-1b-instruct:free",
-                "object": "model",
-            },
-            {
-                "id": "openrouter/mistralai/mistral-7b-instruct:free",
-                "object": "model",
-            },
-            {
-                "id": "openrouter/mistralai/mixtral-8x22b-instruct",
-                "object": "model",
-            },
-        ],
+        "data": [{"id": model, "object": "model"} for model in supported_models],
     }
 
 
 class VerifyRequest(BaseModel):
-    models: str
-    # model_provider: Optional[ModelProvider]
-    messages: List[Message] = Field(None, title="Chat History")
+    model: str = Field(title="Model", default="mira/llama3.1")
+    model_provider: Optional[ModelProvider] = Field(None, title="Model Provider")
+    messages: List[Message] = Field([], title="Chat History")
 
 
 @app.post("/v1/verify")
 async def verify(req: VerifyRequest):
     if not req.messages:
-        raise HTTPException(status_code=400, detail="Prompt is required")
+        raise HTTPException(status_code=400, detail="At least one message is required")
 
-    model_provider, model = get_model_provider(model=req.models[0], model_provider=None)
+    # message with role=system shouldn't be present
+    if any(msg.role == "system" for msg in req.messages):
+        raise HTTPException(status_code=400, detail="System message is not allowed")
+
+    system_message = Message(
+        role="system",
+        content="""You verify user message with `yes` or `no`.
+                Don't be verbose.
+                Don't ask questions.
+                Don't provide explanations.
+                Don't provide suggestions.
+                Don't provide opinions.
+                Don't provide additional information.
+
+                you only need to verify the user message.
+                you only reply with `yes` or `no`.
+
+                Example:
+                User: India is a country.
+                Assistant: yes
+
+                User: Bangladesh is a continent.
+                Assistant: no
+
+                User: Delhi is capital of India.
+                Assistant: yes
+
+                User: who is the president of India?
+                Assistant: no""",
+    )
+
+    model_provider, model = get_model_provider(req.model, req.model_provider)
 
     # Convert Message objects to dictionaries
     messages = [{"role": msg.role, "content": msg.content} for msg in req.messages]
+
+    # prepend system message
+    messages.insert(0, {"role": system_message.role, "content": system_message.content})
 
     res = get_llm_completion(
         model=model,
