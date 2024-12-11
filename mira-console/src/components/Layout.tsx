@@ -12,7 +12,7 @@ const Layout = ({ children, sidebar, headerLeft }: LayoutProps) => {
     <>
       {sidebar ? <Sidebar>{sidebar}</Sidebar> : null}
       <div className="flex flex-col flex-1">
-        <Header left={headerLeft} />
+        <Header left={headerLeft} sidebarToggleButtonVisible={!!sidebar} />
         {children}
       </div>
     </>
