@@ -12,6 +12,7 @@
 
 import { Route as rootRoute } from './routes/__root'
 import { Route as VerifyImport } from './routes/verify'
+import { Route as MachinesImport } from './routes/machines'
 import { Route as AboutImport } from './routes/about'
 import { Route as IndexImport } from './routes/index'
 import { Route as FlowsFlowidImport } from './routes/flows/$flowid'
@@ -21,6 +22,12 @@ import { Route as FlowsFlowidImport } from './routes/flows/$flowid'
 const VerifyRoute = VerifyImport.update({
   id: '/verify',
   path: '/verify',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const MachinesRoute = MachinesImport.update({
+  id: '/machines',
+  path: '/machines',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -60,6 +67,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AboutImport
       parentRoute: typeof rootRoute
     }
+    '/machines': {
+      id: '/machines'
+      path: '/machines'
+      fullPath: '/machines'
+      preLoaderRoute: typeof MachinesImport
+      parentRoute: typeof rootRoute
+    }
     '/verify': {
       id: '/verify'
       path: '/verify'
@@ -82,6 +96,7 @@ declare module '@tanstack/react-router' {
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/machines': typeof MachinesRoute
   '/verify': typeof VerifyRoute
   '/flows/$flowid': typeof FlowsFlowidRoute
 }
@@ -89,6 +104,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/machines': typeof MachinesRoute
   '/verify': typeof VerifyRoute
   '/flows/$flowid': typeof FlowsFlowidRoute
 }
@@ -97,22 +113,24 @@ export interface FileRoutesById {
   __root__: typeof rootRoute
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/machines': typeof MachinesRoute
   '/verify': typeof VerifyRoute
   '/flows/$flowid': typeof FlowsFlowidRoute
 }
 
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/about' | '/verify' | '/flows/$flowid'
+  fullPaths: '/' | '/about' | '/machines' | '/verify' | '/flows/$flowid'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/about' | '/verify' | '/flows/$flowid'
-  id: '__root__' | '/' | '/about' | '/verify' | '/flows/$flowid'
+  to: '/' | '/about' | '/machines' | '/verify' | '/flows/$flowid'
+  id: '__root__' | '/' | '/about' | '/machines' | '/verify' | '/flows/$flowid'
   fileRoutesById: FileRoutesById
 }
 
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
+  MachinesRoute: typeof MachinesRoute
   VerifyRoute: typeof VerifyRoute
   FlowsFlowidRoute: typeof FlowsFlowidRoute
 }
@@ -120,6 +138,7 @@ export interface RootRouteChildren {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
+  MachinesRoute: MachinesRoute,
   VerifyRoute: VerifyRoute,
   FlowsFlowidRoute: FlowsFlowidRoute,
 }
@@ -136,6 +155,7 @@ export const routeTree = rootRoute
       "children": [
         "/",
         "/about",
+        "/machines",
         "/verify",
         "/flows/$flowid"
       ]
@@ -145,6 +165,9 @@ export const routeTree = rootRoute
     },
     "/about": {
       "filePath": "about.tsx"
+    },
+    "/machines": {
+      "filePath": "machines.tsx"
     },
     "/verify": {
       "filePath": "verify.tsx"
