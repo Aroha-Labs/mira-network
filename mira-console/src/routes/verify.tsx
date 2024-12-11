@@ -112,7 +112,7 @@ function RouteComponent() {
                 );
                 setSelectedModels(selected);
               }}
-              className="mt-1 block max-w-xl rounded-md border border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3"
+              className="mt-1 block max-w-xl rounded-md border border-gray-700 bg-gray-800 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3 text-gray-200"
             >
               {isLoading ? (
                 <option disabled>Loading models...</option>
@@ -138,7 +138,7 @@ function RouteComponent() {
               min="1"
               value={minYes}
               onChange={(e) => setMinYes(Number(e.target.value))}
-              className="mt-1 block max-w-xl rounded-md border border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3"
+              className="mt-1 block max-w-xl rounded-md border border-gray-700 bg-gray-800 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3 text-gray-200"
             />
           </div>
           <div>
@@ -151,11 +151,11 @@ function RouteComponent() {
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              className="w-full h-32 p-2 border rounded"
+              className="w-full h-32 p-2 border border-gray-700 bg-gray-800 rounded text-gray-200"
               placeholder="Enter verification input..."
             />
           </div>
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-start gap-2">
             <button
               type="submit"
               disabled={mutation.isPending || !input}
@@ -175,17 +175,169 @@ function RouteComponent() {
             Result:{" "}
             <span
               className={c(
-                "font-bold uppercase",
+                "font-bold",
                 mutation.data.result === "yes"
                   ? "text-green-700"
                   : "text-red-700"
               )}
             >
-              {mutation.data.result}
+              {mutation.data.result === "yes" ? "Pass ✅" : "Failed ❌"}
             </span>
           </div>
         )}
+
+        {/* Add after the form and result display */}
+        <div className="mt-8 p-6 bg-gray-800 rounded-lg border border-gray-700">
+          <h3 className="text-lg font-semibold mb-1 text-gray-200">
+            Verify Prompt Examples
+          </h3>
+          <p className="text-gray-500 mb-6 text-sm">
+            Below are examples of how to structure your prompts. Follow the Do's
+            for effective prompts and avoid the Don'ts.
+          </p>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            <div>
+              <h4 className="text-green-400 font-medium mb-2 flex items-center">
+                <svg
+                  className="w-5 h-5 mr-2"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                Do's
+              </h4>
+              <p className="text-gray-500 mb-4 text-sm">
+                These are examples of well-structured statements that provide
+                clear and direct information.
+              </p>
+              <ul className="space-y-2">
+                <li className="p-2 bg-gray-700 rounded text-gray-200">
+                  Delhi is capital of India
+                </li>
+                <li className="p-2 bg-gray-700 rounded text-gray-200">
+                  Earth has one moon
+                </li>
+                <li className="p-2 bg-gray-700 rounded text-gray-200">
+                  Water boils at 100 degrees Celsius
+                </li>
+                <li className="p-2 bg-gray-700 rounded text-gray-200">
+                  1 + 1 = 2
+                </li>
+                <li className="p-2 bg-gray-700 rounded text-gray-200">
+                  The square root of 9 is 3
+                </li>
+                <li className="p-2 bg-gray-700 rounded text-gray-200">
+                  The capital of France is Paris
+                </li>
+                <li className="p-2 bg-gray-700 rounded text-gray-200">
+                  Which of the following is a fruit?
+                  <ul className="list-disc list-inside ml-4">
+                    <li>Apple</li>
+                    <li>Carrot</li>
+                    <li>Broccoli</li>
+                  </ul>
+                  Answer: Apple
+                </li>
+                <li className="p-2 bg-gray-700 rounded text-gray-200">
+                  What is the largest planet in our solar system?
+                  <ul className="list-disc list-inside ml-4">
+                    <li>Earth</li>
+                    <li>Mars</li>
+                    <li>Jupiter</li>
+                    <li>Saturn</li>
+                  </ul>
+                  Answer: Jupiter
+                </li>
+                <li className="p-2 bg-gray-700 rounded text-gray-200">
+                  Which element has the chemical symbol 'O'?
+                  <ul className="list-disc list-inside ml-4">
+                    <li>Oxygen</li>
+                    <li>Gold</li>
+                    <li>Silver</li>
+                    <li>Iron</li>
+                  </ul>
+                  Answer: Oxygen
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <h4 className="text-red-400 font-medium mb-2 flex items-center">
+                <svg
+                  className="w-5 h-5 mr-2"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                Don'ts
+              </h4>
+              <p className="text-gray-500 mb-4 text-sm">
+                Avoid these types of prompts as they are incomplete, unclear, or
+                in question form.
+              </p>
+              <ul className="space-y-2">
+                <li className="p-2 bg-gray-700 rounded text-gray-200">
+                  Which city is capital of India?
+                </li>
+                <li className="p-2 bg-gray-700 rounded text-gray-200">
+                  How many moons earth has?
+                </li>
+                <li className="p-2 bg-gray-700 rounded text-gray-200">
+                  What is water's boiling point?
+                </li>
+                <li className="p-2 bg-gray-700 rounded text-gray-200">
+                  What is 1 + 1?
+                </li>
+                <li className="p-2 bg-gray-700 rounded text-gray-200">
+                  Calculate the square root of 9
+                </li>
+                <li className="p-2 bg-gray-700 rounded text-gray-200">
+                  What is the capital of France?
+                </li>
+                <li className="p-2 bg-gray-700 rounded text-gray-200">
+                  Which of the following is a fruit?
+                  <ul className="list-disc list-inside ml-4">
+                    <li>Apple</li>
+                    <li>Carrot</li>
+                    <li>Broccoli</li>
+                    <li>None of the above</li>
+                  </ul>
+                </li>
+                <li className="p-2 bg-gray-700 rounded text-gray-200">
+                  What is the largest planet in our solar system?
+                  <ul className="list-disc list-inside ml-4">
+                    <li>Earth</li>
+                    <li>Mars</li>
+                    <li>Jupiter</li>
+                    <li>Saturn</li>
+                  </ul>
+                </li>
+                <li className="p-2 bg-gray-700 rounded text-gray-200">
+                  Which element has the chemical symbol 'O'?
+                  <ul className="list-disc list-inside ml-4">
+                    <li>Oxygen</li>
+                    <li>Gold</li>
+                    <li>Silver</li>
+                    <li>Iron</li>
+                  </ul>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
       </main>
+      <div className="mt-32">&nbsp;</div>
     </Layout>
   );
 }
