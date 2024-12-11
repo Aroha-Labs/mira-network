@@ -45,6 +45,11 @@ async function verifyPrompt({ prompt, minYes, models }: VerifyPromptProps) {
   }
 }
 
+const autoResizeTextArea = (element: HTMLTextAreaElement) => {
+  element.style.height = "auto";
+  element.style.height = element.scrollHeight + "px";
+};
+
 export const Route = createFileRoute("/verify")({
   component: RouteComponent,
 });
@@ -87,7 +92,10 @@ function RouteComponent() {
   // Add error display to JSX
   return (
     <Layout headerLeft={<NetworkSelector />}>
-      <main className="flex flex-col flex-grow p-4 gap-2 sm:container sm:mx-auto">
+      <main
+        className="flex flex-col flex-grow p-4 gap-2 sm:container sm:mx-auto"
+        style={{ maxWidth: 900 }}
+      >
         {(mutation.error || error) && (
           <div className="p-4 mb-4 text-red-700 bg-red-100 rounded-lg">
             {mutation.error?.message || error}
@@ -112,7 +120,7 @@ function RouteComponent() {
                 );
                 setSelectedModels(selected);
               }}
-              className="mt-1 block max-w-xl rounded-md border border-gray-700 bg-gray-800 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3 text-gray-200"
+              className="mt-1 block w-full max-w-sm rounded-md border border-gray-700 bg-gray-800 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3 text-gray-200"
             >
               {isLoading ? (
                 <option disabled>Loading models...</option>
@@ -153,6 +161,9 @@ function RouteComponent() {
               onChange={(e) => setInput(e.target.value)}
               className="w-full h-32 p-2 border border-gray-700 bg-gray-800 rounded text-gray-200"
               placeholder="Enter verification input..."
+              ref={(el) => {
+                if (el) autoResizeTextArea(el);
+              }}
             />
           </div>
           <div className="flex justify-start gap-2">
@@ -181,7 +192,7 @@ function RouteComponent() {
                   : "text-red-700"
               )}
             >
-              {mutation.data.result === "yes" ? "Pass ✅" : "Failed ❌"}
+              {mutation.data.result === "yes" ? "Valid ✅" : "Invalid ❌"}
             </span>
           </div>
         )}
