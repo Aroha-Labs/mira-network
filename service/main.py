@@ -215,16 +215,11 @@ async def verify(req: VerifyRequest):
         role="system",
         content="""You verify user message if it is correct or not.
                 Don't be verbose.
-                Don't ask questions.
-                Don't provide explanations.
-                Don't provide suggestions.
-                Don't provide opinions.
                 Don't provide additional information.
 
-                you only need to verify the user message.
                 you only reply with `yes` or `no`.
                 reply with `yes` if the user message is correct.
-                reply with `no` if the user message is incorrect or incomplete or irrelevant or not factual or not making sense or not clear or not understandable.
+                reply with `no` if the user message is a question or incorrect or incomplete or irrelevant or not factual or not making sense or not clear or not understandable.
 
                 Examples:
                 User: India is a country.
