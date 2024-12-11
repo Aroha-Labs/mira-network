@@ -1,6 +1,6 @@
 [
   "mira/llama3.2:3b-instruct-q8_0",
-  "mira/llama3.1:8b-instruct-q8_0.1",
+  "mira/llama3.1:8b-instruct-q8_0",
   "mira/llama3:instruct",
   "mira/mistral:instruct",
   "openai/gpt-4o-mini",
