@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useStateSidebarOpen } from "../recoil/atoms";
+import { Link } from "@tanstack/react-router";
 
 interface HeaderProps {
   left?: React.ReactNode;
@@ -39,6 +40,17 @@ const Header = ({ left }: HeaderProps) => {
           ></path>
         </svg>
       </button>
+
+      <div className="flex-1"></div>
+
+      <div className="flex items-center gap-4">
+        <Link href="/" className="text-white">
+          Flows
+        </Link>
+        <Link href="/verify" className="text-white">
+          Verify
+        </Link>
+      </div>
     </header>
   );
 };

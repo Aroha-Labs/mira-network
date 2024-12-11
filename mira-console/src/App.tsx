@@ -1,4 +1,3 @@
-import Sidebar from "./components/Sidebar";
 import { useValueSidebarOpen } from "./recoil/atoms";
 import clsx from "clsx";
 
@@ -15,8 +14,7 @@ function App(props: AppProps) {
         "sidebar-open": isSidebarOpen,
       })}
     >
-      <Sidebar />
-      <div className="flex flex-col flex-1">{props.children}</div>
+      {props.children}
     </div>
   );
 }
