@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import Playground from "../Playground";
-import Header from "../components/Header";
 import NetworkSelector from "../components/NetworkSelector";
+import FlowSidebar from "../components/FlowSidebar";
+import Layout from "../components/Layout";
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -9,9 +10,8 @@ export const Route = createFileRoute("/")({
 
 function Index() {
   return (
-    <>
-      <Header left={<NetworkSelector />} />
+    <Layout headerLeft={<NetworkSelector />} sidebar={<FlowSidebar />}>
       <Playground />
-    </>
+    </Layout>
   );
 }

@@ -11,11 +11,18 @@
 // Import Routes
 
 import { Route as rootRoute } from './routes/__root'
+import { Route as VerifyImport } from './routes/verify'
 import { Route as AboutImport } from './routes/about'
 import { Route as IndexImport } from './routes/index'
 import { Route as FlowsFlowidImport } from './routes/flows/$flowid'
 
 // Create/Update Routes
+
+const VerifyRoute = VerifyImport.update({
+  id: '/verify',
+  path: '/verify',
+  getParentRoute: () => rootRoute,
+} as any)
 
 const AboutRoute = AboutImport.update({
   id: '/about',
@@ -53,6 +60,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AboutImport
       parentRoute: typeof rootRoute
     }
+    '/verify': {
+      id: '/verify'
+      path: '/verify'
+      fullPath: '/verify'
+      preLoaderRoute: typeof VerifyImport
+      parentRoute: typeof rootRoute
+    }
     '/flows/$flowid': {
       id: '/flows/$flowid'
       path: '/flows/$flowid'
@@ -68,12 +82,14 @@ declare module '@tanstack/react-router' {
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/verify': typeof VerifyRoute
   '/flows/$flowid': typeof FlowsFlowidRoute
 }
 
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/verify': typeof VerifyRoute
   '/flows/$flowid': typeof FlowsFlowidRoute
 }
 
@@ -81,27 +97,30 @@ export interface FileRoutesById {
   __root__: typeof rootRoute
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/verify': typeof VerifyRoute
   '/flows/$flowid': typeof FlowsFlowidRoute
 }
 
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/about' | '/flows/$flowid'
+  fullPaths: '/' | '/about' | '/verify' | '/flows/$flowid'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/about' | '/flows/$flowid'
-  id: '__root__' | '/' | '/about' | '/flows/$flowid'
+  to: '/' | '/about' | '/verify' | '/flows/$flowid'
+  id: '__root__' | '/' | '/about' | '/verify' | '/flows/$flowid'
   fileRoutesById: FileRoutesById
 }
 
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
+  VerifyRoute: typeof VerifyRoute
   FlowsFlowidRoute: typeof FlowsFlowidRoute
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
+  VerifyRoute: VerifyRoute,
   FlowsFlowidRoute: FlowsFlowidRoute,
 }
 
@@ -117,6 +136,7 @@ export const routeTree = rootRoute
       "children": [
         "/",
         "/about",
+        "/verify",
         "/flows/$flowid"
       ]
     },
@@ -125,6 +145,9 @@ export const routeTree = rootRoute
     },
     "/about": {
       "filePath": "about.tsx"
+    },
+    "/verify": {
+      "filePath": "verify.tsx"
     },
     "/flows/$flowid": {
       "filePath": "flows/$flowid.tsx"
