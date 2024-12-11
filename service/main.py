@@ -213,7 +213,7 @@ async def verify(req: VerifyRequest):
 
     system_message = Message(
         role="system",
-        content="""You verify user message with `yes` or `no`.
+        content="""You verify user message if it is correct or not.
                 Don't be verbose.
                 Don't ask questions.
                 Don't provide explanations.
@@ -223,15 +223,17 @@ async def verify(req: VerifyRequest):
 
                 you only need to verify the user message.
                 you only reply with `yes` or `no`.
+                reply with `yes` if the user message is correct.
+                reply with `no` if the user message is incorrect or incomplete or irrelevant or not factual or not making sense or not clear or not understandable.
 
-                Example:
+                Examples:
                 User: India is a country.
                 Assistant: yes
 
-                User: Bangladesh is a continent.
+                User: 1+1
                 Assistant: no
 
-                User: Delhi is capital of India.
+                User: 1+1=2
                 Assistant: yes
 
                 User: who is the president of India?
@@ -252,10 +254,12 @@ async def verify(req: VerifyRequest):
         messages=messages,
     )
 
-    if res["choices"][0]["message"]["content"].lower() == "yes":
-        return {"result": "yes"}
+    content = res["choices"][0]["message"]["content"]
+
+    if content.strip().lower() == "yes":
+        return {"result": "yes", "content": content}
     else:
-        return {"result": "no"}
+        return {"result": "no", "content": content}
 
 
 async def update_liveness(machine_uid: str):

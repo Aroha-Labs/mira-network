@@ -315,6 +315,7 @@ async def verify(req: VerifyRequest):
                 {
                     "machine": machine.model_dump(),
                     "result": response_data["result"],
+                    "response": response_data,
                 }
             )
 
