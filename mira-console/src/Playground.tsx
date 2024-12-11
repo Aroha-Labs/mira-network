@@ -11,9 +11,9 @@ import { useUpdateFlow } from "./hooks/flows";
 import { Flow } from "./types";
 import { useNavigate } from "@tanstack/react-router";
 
-// Error display component
+// Update ErrorMessage component with softer colors
 const ErrorMessage = ({ error }: { error: Error }) => (
-  <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
+  <div className="bg-red-900/50 border border-red-800 text-red-200 px-4 py-3 rounded relative">
     <span className="block sm:inline">
       {error.message || "An unexpected error occurred"}
     </span>
@@ -32,10 +32,11 @@ const autoResizeTextArea = (element: HTMLTextAreaElement) => {
 };
 
 // Add to top of file
+// Modified balanced dark theme color scheme
 const roleColors = {
-  system: "bg-purple-50 border-purple-200",
-  user: "bg-blue-50 border-blue-200",
-  assistant: "bg-green-50 border-green-200",
+  system: "bg-slate-700 border-slate-600 text-slate-200",
+  user: "bg-slate-800 border-slate-700 text-slate-200",
+  assistant: "bg-slate-750 border-slate-600 text-slate-200", // Custom shade
 };
 
 const rolePlaceholders = {
@@ -372,18 +373,18 @@ export default function Playground({ flow }: PlaygroundProps) {
 
   return (
     <main
-      className="flex flex-col flex-grow p-4 gap-2 sm:container sm:mx-auto"
+      className="flex flex-col flex-grow p-4 gap-2 sm:container sm:mx-auto text-slate-300"
       style={{ maxWidth: 800 }}
     >
       {isModelsError && <ErrorMessage error={modelsError} />}
 
       {/* Model selector with better styling */}
-      <div className="bg-white rounded-lg shadow-sm border p-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+      <div className="bg-slate-700 border border-slate-600 rounded-lg p-4">
+        <label className="block text-sm font-medium text-gray-300 mb-2">
           Model
         </label>
         <select
-          className="w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          className="w-full border bg-slate-700 border-slate-600 text-slate-200 rounded-md shadow-sm py-2 px-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           value={model}
           onChange={(e) => setModel(e.target.value)}
           disabled={isLoadingModels}
@@ -422,7 +423,7 @@ export default function Playground({ flow }: PlaygroundProps) {
                     e.target.value as Message["role"]
                   )
                 }
-                className="px-3 py-2 text-sm rounded border border-gray-300"
+                className="px-3 py-2 text-sm bg-slate-700 border border-slate-600 text-slate-200 rounded border"
                 // disabled={message.role === "system" && index === 0}
               >
                 <option value="system">System</option>
@@ -468,7 +469,7 @@ export default function Playground({ flow }: PlaygroundProps) {
             <textarea
               value={message.content}
               onChange={(e) => updateMessage(index, "content", e.target.value)}
-              className={`w-full p-3 text-sm border rounded `}
+              className={`w-full p-3 text-sm bg-slate-700 border border-slate-600 text-slate-200 rounded `}
               placeholder={rolePlaceholders[message.role]}
               rows={1}
               ref={(el) => {
@@ -478,14 +479,14 @@ export default function Playground({ flow }: PlaygroundProps) {
 
             {/* Show variables only for system message */}
             {message.role === "system" && extractVariables.length > 0 && (
-              <div className="mt-3 pt-3 border-t border-gray-200">
-                <div className="text-sm font-medium text-gray-700 mb-2">
+              <div className="mt-3 pt-3">
+                <div className="text-sm font-medium text-gray-400 mb-2">
                   Variables
                 </div>
                 <div className="space-y-2">
                   {extractVariables.map((variable) => (
                     <div key={variable} className="flex items-center gap-2">
-                      <label className="text-sm text-gray-600">{`{${variable}}`}</label>
+                      <label className="text-sm text-gray-300">{`{${variable}}`}</label>
                       <input
                         type="text"
                         value={variables[variable] || ""}
@@ -495,8 +496,8 @@ export default function Playground({ flow }: PlaygroundProps) {
                             [variable]: e.target.value,
                           }))
                         }
-                        className="flex-1 px-3 py-2 text-sm border rounded-md focus:ring-blue-500 focus:border-blue-500"
-                        placeholder={`Enter value for ${variable}`}
+                        className="flex-1 px-3 py-2 text-sm bg-slate-700 border border-slate-600 text-slate-200 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                        placeholder={`Enter value for "${variable}"`}
                       />
                     </div>
                   ))}
@@ -517,7 +518,7 @@ export default function Playground({ flow }: PlaygroundProps) {
 
       {/* Response section */}
       {response && (
-        <div className="bg-white rounded-lg shadow-lg p-8 border border-gray-100">
+        <div className="rounded-lg shadow-lg p-8 border border-slate-700">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <svg
@@ -535,7 +536,7 @@ export default function Playground({ flow }: PlaygroundProps) {
                 <circle cx="8" cy="13" r="1" />
                 <circle cx="16" cy="13" r="1" />
               </svg>
-              <h3 className="text-xl font-semibold text-gray-900">Assistant</h3>
+              <h3 className="text-xl font-semibold">Assistant</h3>
             </div>
             <div className="flex gap-3">
               {isStreaming ? (
@@ -599,17 +600,19 @@ export default function Playground({ flow }: PlaygroundProps) {
               )}
             </div>
           </div>
-          <ReactMarkdown className="prose max-w-none">{response}</ReactMarkdown>
+          <ReactMarkdown className="prose prose-invert max-w-none">
+            {response}
+          </ReactMarkdown>
         </div>
       )}
 
       {/* Reply section */}
       {response && (
-        <div className="flex gap-3 p-4 rounded-lg border bg-blue-50 border-blue-200">
+        <div className="flex gap-3 p-4 rounded-lg border  border-slate-600">
           <select
             value={replyRole}
             onChange={(e) => setReplyRole(e.target.value as Message["role"])}
-            className="bg-white/50 border-0 rounded-md shadow-sm py-1 px-2 text-sm focus:ring-2 focus:ring-blue-500"
+            className="bg-slate-700 border border-slate-600 rounded-md shadow-sm py-1 px-2 text-sm focus:ring-2 focus:ring-blue-500"
           >
             <option value="user">User</option>
             <option value="assistant">Assistant</option>
@@ -621,7 +624,7 @@ export default function Playground({ flow }: PlaygroundProps) {
               setReplyContent(e.target.value);
               autoResizeTextArea(e.target);
             }}
-            className="flex-1 bg-white/50 border-0 rounded-md p-2 resize-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1 bg-slate-700 border-slate-600 text-slate-300 border-0 rounded-md p-2 resize-none focus:ring-2 focus:ring-blue-500"
             placeholder="Enter your reply..."
           />
         </div>
