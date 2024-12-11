@@ -10,6 +10,8 @@ import requests
 from fastapi.middleware.cors import CORSMiddleware
 import time
 import httpx
+import os
+import json
 
 
 class Machine(SQLModel, table=True):
@@ -74,6 +76,45 @@ app.add_middleware(
 redis_client = redis.Redis(host="redis", port=6379, db=0)
 
 
+def get_online_machines() -> list[str]:
+    return [
+        key.decode("utf-8").split(":")[1]
+        for key in redis_client.keys(pattern="liveness:*")
+    ]
+
+
+class MachineInfo(BaseModel):
+    machine_uid: str
+    network_ip: str
+
+
+def get_random_machines(number_of_machines: int = 1) -> list[MachineInfo]:
+    machine_ids = get_online_machines()
+    if not machine_ids:
+        raise HTTPException(status_code=404, detail="No online machines available")
+
+    if number_of_machines > len(machine_ids):
+        raise HTTPException(
+            status_code=404,
+            detail=f"Not enough online machines available, we have {len(machine_ids)} online machines",
+        )
+
+    random_machine_ids = random.sample(machine_ids, number_of_machines)
+
+    # get machine ips
+    network_ips = redis_client.mget(
+        [f"network_ip:{machine_id}" for machine_id in random_machine_ids]
+    )
+
+    if len(random_machine_ids) != len(network_ips):
+        raise HTTPException(status_code=404, detail="Machine not found")
+
+    return [
+        MachineInfo(machine_uid=machine_id, network_ip=network_ip.decode("utf-8"))
+        for machine_id, network_ip in zip(random_machine_ids, network_ips)
+    ]
+
+
 @app.on_event("startup")
 def on_startup():
     create_db_and_tables()
@@ -91,13 +132,6 @@ def health_check():
 
 class RegisterMachineRequest(BaseModel):
     network_ip: str
-
-
-def get_online_machines() -> list[str]:
-    return [
-        key.decode("utf-8").split(":")[1]
-        for key in redis_client.keys(pattern="liveness:*")
-    ]
 
 
 @app.post("/register/{machine_uid}")
@@ -205,6 +239,19 @@ class ModelProvider(BaseModel):
     api_key: str
 
 
+@app.get("/v1/models", tags=["network"])
+async def list_models():
+    file_path = os.path.join(os.path.dirname(__file__), "../../supported-models.json")
+
+    with open(file_path, "r") as f:
+        supported_models: list[str] = json.load(f)
+
+    return {
+        "object": "list",
+        "data": [{"id": model, "object": "model"} for model in supported_models],
+    }
+
+
 class AiRequest(BaseModel):
     model: str = Field("mira/llama3.1", title="Model")
     model_provider: Optional[ModelProvider] = Field(
@@ -213,83 +260,11 @@ class AiRequest(BaseModel):
     messages: list[Message] = Field([], title="Messages")
 
 
-@app.get("/v1/models", tags=["network"])
-async def list_models():
-    return {
-        "object": "list",
-        "data": [
-            {
-                "id": "mira/llama3.2:3b-instruct-q8_0",
-                "object": "model",
-            },
-            {
-                "id": "mira/llama3.1:8b-instruct-q8_0.1",
-                "object": "model",
-            },
-            {
-                "id": "mira/llama3:instruct",
-                "object": "model",
-            },
-            {
-                "id": "mira/mistral:instruct",
-                "object": "model",
-            },
-            {
-                "id": "openai/gpt-4o-mini",
-                "object": "model",
-            },
-            {
-                "id": "openai/gpt-4o",
-                "object": "model",
-            },
-            {
-                "id": "openai/gpt-3.5-turbo-instruct-0914",
-                "object": "model",
-            },
-            {
-                "id": "openrouter/meta-llama/llama-3.1-70b-instruct:free",
-                "object": "model",
-            },
-            {
-                "id": "openrouter/meta-llama/llama-3.1-8b-instruct:free",
-                "object": "model",
-            },
-            {
-                "id": "openrouter/meta-llama/meta-llama/llama-3.2-1b-instruct:free",
-                "object": "model",
-            },
-            {
-                "id": "openrouter/mistralai/mistral-7b-instruct:free",
-                "object": "model",
-            },
-            {
-                "id": "openrouter/mistralai/mixtral-8x22b-instruct",
-                "object": "model",
-            },
-        ],
-    }
-
-
 @app.post("/v1/chat/completions", tags=["network"])
 async def generate(request: AiRequest):
-    machine_ids = get_online_machines()
-    if not machine_ids:
-        raise HTTPException(status_code=404, detail="No online machines available")
-
-    random_machine_id = random.choice(machine_ids)
-    session = next(get_session())
-    machine = session.exec(
-        select(Machine).where(Machine.network_machine_uid == random_machine_id)
-    ).first()
-    if not machine:
-        raise HTTPException(status_code=404, detail="Machine not found")
-
-    proxy_url = f"http://{machine.network_ip}:34523/v1/generate"
-
-    response = requests.post(
-        proxy_url,
-        json=request.model_dump(),
-    )
+    machine = get_random_machines(1)[0]
+    proxy_url = f"http://{machine.network_ip}:34523/v1/chat/completions"
+    response = requests.post(proxy_url, json=request.model_dump())
 
     return Response(
         content=response.text,
@@ -301,54 +276,47 @@ async def generate(request: AiRequest):
 class VerifyRequest(BaseModel):
     messages: list[Message] = Field([], title="Messages")
     models: list[str] = Field(["mira/llama3.1"], title="Models")
-    total_runs: int = Field(5, title="Total runs")
+    # total_runs: int = Field(5, title="Total runs")
     min_yes: int = Field(3, title="Minimum yes")
 
 
 @app.post("/v1/verify", tags=["network"])
 async def verify(req: VerifyRequest):
-    if req.total_runs < 1:
-        raise HTTPException(status_code=400, detail="Total runs must be at least 1")
+    if len(req.models) < 1:
+        raise HTTPException(status_code=400, detail="At least one model is required")
 
     if req.min_yes < 1:
         raise HTTPException(status_code=400, detail="Minimum yes must be at least 1")
 
-    if req.min_yes > req.total_runs:
-        raise HTTPException(
-            status_code=400, detail="Minimum yes must be less than total runs"
-        )
-
-    machine_ids = get_online_machines()
-    if not machine_ids:
-        raise HTTPException(status_code=404, detail="No online machines available")
-
-    if len(machine_ids) < req.total_runs:
+    if req.min_yes > len(req.models):
         raise HTTPException(
             status_code=400,
-            detail=f"Not enough online machines for total runs, we have {len(machine_ids)} online machines",
+            detail="Minimum yes must be less than or equal to the number of models",
         )
 
-    selected_machines = random.sample(machine_ids, req.total_runs)
-    selected_ips = redis_client.mget(
-        [f"network_ip:{machine_id}" for machine_id in selected_machines]
-    )
-    ips = [ip.decode("utf-8") for ip in selected_ips]
-
-    if len(selected_machines) != len(ips):
-        raise HTTPException(status_code=400, detail="Machine not found")
+    machines = get_random_machines(len(req.models))
 
     results = []
     async with httpx.AsyncClient() as client:
-        for ip in ips:
-            proxy_url = f"http://{ip}:34523/v1/verify"
+        for idx, machine in enumerate(machines):
+            proxy_url = f"http://{machine.network_ip}:34523/v1/verify"
             response = await client.post(
                 proxy_url,
                 json={
-                    "messages": req.messages,
-                    "models": req.models,
+                    "messages": [
+                        {"role": msg.role, "content": msg.content}
+                        for msg in req.messages
+                    ],
+                    "model": req.models[idx],
                 },
             )
-            results.append({"machine_ip": ip, "result": response.json()["result"]})
+            response_data = response.json()
+            results.append(
+                {
+                    "machine": machine.model_dump(),
+                    "result": response_data["result"],
+                }
+            )
 
     yes_count = sum(1 for result in results if result["result"] == "yes")
     if yes_count >= req.min_yes:
@@ -365,13 +333,17 @@ class FlowChatCompletion(AiRequest):
 async def generate_with_flow_id(
     flow_id: str, req: FlowChatCompletion, db: Session = Depends(get_session)
 ):
-    flow = db.query(Flows).filter(Flows.id == flow_id).first()
+    if any(msg.role == "system" for msg in req.messages):
+        raise HTTPException(
+            status_code=400,
+            detail="System message is not allowed in request",
+        )
+
+    flow = db.exec(select(Flows).where(Flows.id == flow_id)).first()
     if not flow:
         raise HTTPException(status_code=404, detail="Flow not found")
 
     system_prompt = flow.system_prompt
-    # prepend system prompt to messages
-    req.messages.insert(0, Message(role="system", content=system_prompt))
 
     # Extract variables from system_prompt
     def extract_variables(prompt):
@@ -399,25 +371,9 @@ async def generate_with_flow_id(
     # Now system_prompt has all variables replaced
     req.messages.insert(0, Message(role="system", content=system_prompt))
 
-    machine_ids = get_online_machines()
-    if not machine_ids:
-        raise HTTPException(status_code=404, detail="No online machines available")
-
-    random_machine_id = random.choice(machine_ids)
-    session = next(get_session())
-    machine = session.exec(
-        select(Machine).where(Machine.network_machine_uid == random_machine_id)
-    ).first()
-
-    if not machine:
-        raise HTTPException(status_code=404, detail="Machine not found")
-
-    proxy_url = f"http://{machine.network_ip}:34523/v1/generate"
-
-    response = requests.post(
-        proxy_url,
-        json=req.model_dump(),
-    )
+    machine = get_random_machines(1)[0]
+    proxy_url = f"http://{machine.network_ip}:34523/v1/chat/completions"
+    response = requests.post(proxy_url, json=req.model_dump())
 
     return Response(
         content=response.text,
@@ -434,7 +390,7 @@ def list_all_flows(db: Session = Depends(get_session)):
 
 @app.get("/flows/{flow_id}", tags=["flows"])
 def get_flow(flow_id: str, db: Session = Depends(get_session)):
-    flow = db.query(Flows).filter(Flows.id == flow_id).first()
+    flow = db.exec(select(Flows).where(Flows.id == flow_id)).first()
     if not flow:
         raise HTTPException(status_code=404, detail="Flow not found")
     return flow
