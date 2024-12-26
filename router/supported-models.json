@@ -1,14 +1,6 @@
 [
-  "mira/llama3.2:3b-instruct-q8_0",
-  "mira/llama3.1:8b-instruct-q8_0",
-  "mira/llama3:instruct",
-  "mira/mistral:instruct",
-  "openai/gpt-4o-mini",
+  "mira/llama3.3",
+  "openrouter/meta-llama/llama-3.3-70b-instruct",
   "openai/gpt-4o",
-  "openai/gpt-3.5-turbo-instruct-0914",
-  "openrouter/meta-llama/llama-3.1-70b-instruct:free",
-  "openrouter/meta-llama/llama-3.1-8b-instruct:free",
-  "openrouter/meta-llama/meta-llama/llama-3.2-1b-instruct:free",
-  "openrouter/mistralai/mistral-7b-instruct:free",
-  "openrouter/mistralai/mixtral-8x22b-instruct"
+  "anthropic/claude-3-5-sonnet-20241022"
 ]
