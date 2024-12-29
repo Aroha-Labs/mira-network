@@ -7,7 +7,7 @@ from datetime import datetime  # Add this import
 
 from fastapi import Depends, FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 from pydantic import BaseModel, Field
 from sqlmodel import Session, select
 import requests
@@ -15,6 +15,7 @@ import httpx
 from prometheus_fastapi_instrumentator import Instrumentator
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from supabase import create_client, Client
+from hashlib import md5
 
 from .models import Machine, Flows, ApiLogs, ApiToken, UserCredits, UserCreditsHistory
 from .db import create_db_and_tables, get_session
@@ -556,6 +557,8 @@ def list_all_logs(
     page_size: int = 10,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
+    order_by: Optional[str] = "created_at",
+    order: Optional[str] = "desc",
 ):
     offset = (page - 1) * page_size
     query = db.query(ApiLogs).filter(ApiLogs.user_id == user.id)
@@ -564,6 +567,16 @@ def list_all_logs(
         query = query.filter(ApiLogs.created_at >= start_date)
     if end_date:
         query = query.filter(ApiLogs.created_at <= end_date)
+
+    if order_by not in ["created_at", "total_response_time", "total_tokens"]:
+        raise HTTPException(status_code=400, detail="Invalid order_by field")
+
+    if order == "desc":
+        query = query.order_by(getattr(ApiLogs, order_by).desc())
+    elif order == "asc":
+        query = query.order_by(getattr(ApiLogs, order_by).asc())
+    else:
+        raise HTTPException(status_code=400, detail="Invalid order direction")
 
     logs = query.offset(offset).limit(page_size).all()
     total_logs = query.count()
@@ -707,3 +720,37 @@ def get_user_credits_history(
     ).all()
 
     return user_credits_history
+
+
+IMAGE_CACHE_DIR = "image_cache"
+os.makedirs(IMAGE_CACHE_DIR, exist_ok=True)
+
+
+@app.get("/proxy-image")
+async def proxy_image(url: str):
+    # Generate a unique filename based on the URL
+    filename = md5(url.encode()).hexdigest()
+    filepath = os.path.join(IMAGE_CACHE_DIR, filename)
+
+    # Check if the image is already cached
+    if os.path.exists(filepath):
+        return FileResponse(filepath)
+
+    # Download the image and save it to the cache
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url)
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=response.status_code, detail="Failed to fetch image"
+            )
+
+        # Determine the file extension from the response headers
+        content_type = response.headers.get("content-type")
+        if content_type:
+            extension = content_type.split("/")[-1]
+            filepath += f".{extension}"
+
+        with open(filepath, "wb") as f:
+            f.write(response.content)
+
+    return FileResponse(filepath)
