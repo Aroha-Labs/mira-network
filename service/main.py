@@ -1,5 +1,5 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import PlainTextResponse
+from fastapi import FastAPI, HTTPException, Response
+from fastapi.responses import PlainTextResponse, StreamingResponse
 import csv
 import uvicorn
 import io
@@ -10,9 +10,9 @@ import os
 import asyncio
 import httpx
 import logging
-import requests
 from fastapi.middleware.cors import CORSMiddleware
 import json
+import requests
 
 app = FastAPI()
 
@@ -51,7 +51,7 @@ model_providers = {
         api_key=os.getenv("ANTHROPIC_API_KEY"),
     ),
     "mira": ModelProvider(
-        base_url="https://ollama.alts.dev/v1",
+        base_url=os.getenv("MIRA_BASE_URL", "https://ollama.alts.dev/v1"),
         api_key=os.getenv("MIRA_API_KEY"),
     ),
 }
@@ -87,6 +87,7 @@ def get_llm_completion(
     model: str,
     model_provider: ModelProvider,
     messages: list[Message],
+    stream: bool = False,
 ):
     req = requests.post(
         url=f"{model_provider.base_url}/chat/completions",
@@ -99,14 +100,22 @@ def get_llm_completion(
             "messages": [
                 {"role": msg["role"], "content": msg["content"]} for msg in messages
             ],
+            "stream": stream,
         },
+        stream=stream,
     )
 
-    if req.ok != True:
-        print(f"Error: {req.status_code}")
-        raise HTTPException(status_code=req.status_code, detail=req.text)
+    if stream is True:
+        return StreamingResponse(
+            req.iter_content(chunk_size=1024),
+            media_type="text/event-stream",
+        )
 
-    return req.json()
+    return Response(
+        content=req.text,
+        status_code=req.status_code,
+        headers=dict(req.headers),
+    )
 
 
 @app.get("/health")
@@ -160,6 +169,7 @@ class AiRequest(BaseModel):
     model: str = Field(title="Model", default="")
     model_provider: Optional[ModelProvider] = Field(None, title="Model Provider")
     messages: List[Message] = Field(None, title="Chat History")
+    stream: Optional[bool] = Field(False, title="Stream")
 
 
 @app.post("/v1/chat/completions")
@@ -178,6 +188,7 @@ async def generate(req: AiRequest):
         model,
         model_provider,
         messages=messages,
+        stream=req.stream,
     )
 
 
@@ -247,6 +258,7 @@ async def verify(req: VerifyRequest):
         model=model,
         model_provider=model_provider,
         messages=messages,
+        stream=False,
     )
 
     content = res["choices"][0]["message"]["content"]

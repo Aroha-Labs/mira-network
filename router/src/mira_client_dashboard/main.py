@@ -1,67 +1,69 @@
 import random
 from typing import Annotated, Optional
-import datetime
-
-from fastapi import Depends, FastAPI, HTTPException, Response
-from pydantic import BaseModel, Field
-from sqlmodel import Field as SQLField, Session, SQLModel, create_engine, select
-import redis
-import requests
-from fastapi.middleware.cors import CORSMiddleware
 import time
-import httpx
 import os
 import json
+from datetime import datetime  # Add this import
 
+from fastapi import Depends, FastAPI, HTTPException, Response
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
+from sqlmodel import Session, select
+import requests
+import httpx
+from prometheus_fastapi_instrumentator import Instrumentator
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from supabase import create_client, Client
 
-class Machine(SQLModel, table=True):
-    id: int = SQLField(primary_key=True)
-    network_machine_uid: str = SQLField(index=True)
-    network_ip: str = SQLField(index=True)
+from .models import Machine, Flows, ApiLogs, ApiToken, UserCredits, UserCreditsHistory
+from .db import create_db_and_tables, get_session
+from .redis_client import redis_client, get_online_machines
 
-    # now as default
-    created_at: str = SQLField(
-        default=datetime.datetime.now(datetime.timezone.utc), nullable=False
+from fastapi.openapi.models import OAuthFlows as OAuthFlowsModel
+from fastapi.openapi.models import OAuth2 as OAuth2Model
+from fastapi.openapi.models import OAuthFlowPassword as OAuthFlowPasswordModel
+from fastapi.openapi.models import (
+    OAuthFlowAuthorizationCode as OAuthFlowAuthorizationCodeModel,
+)
+
+oauth2_scheme = OAuth2Model(
+    flows=OAuthFlowsModel(
+        password=OAuthFlowPasswordModel(tokenUrl="token"),
+        authorizationCode=OAuthFlowAuthorizationCodeModel(
+            authorizationUrl="authorize", tokenUrl="token"
+        ),
     )
-    updated_at: str = SQLField(
-        default=datetime.datetime.now(datetime.timezone.utc), nullable=False
-    )
+)
 
+app = FastAPI(
+    title="Mira Client Dashboard",
+    description="API documentation for Mira Client Dashboard",
+    version="1.0.0",
+    openapi_tags=[
+        {"name": "network", "description": "Network related operations"},
+        {"name": "tokens", "description": "API token management"},
+        {"name": "logs", "description": "API logs"},
+        {"name": "credits", "description": "User credits management"},
+        {"name": "flows", "description": "Flow management"},
+    ],
+    openapi_url="/openapi.json",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    swagger_ui_oauth2_redirect_url="/docs/oauth2-redirect",
+    swagger_ui_init_oauth={
+        "clientId": "your-client-id",
+        "clientSecret": "your-client-secret",
+        "realm": "your-realm",
+        "appName": "Mira Client Dashboard",
+        "scopeSeparator": " ",
+        "scopes": {"read": "Read access", "write": "Write access"},
+    },
+)
 
-class Flows(SQLModel, table=True):
-    id: int = SQLField(primary_key=True)
-    system_prompt: str = SQLField(nullable=False)
-    name: str = SQLField(nullable=False, unique=True)
-
-    # now as default
-    created_at: str = SQLField(
-        default=datetime.datetime.now(datetime.timezone.utc), nullable=False
-    )
-    updated_at: str = SQLField(
-        default=datetime.datetime.now(datetime.timezone.utc), nullable=False
-    )
-
-
-sqlite_file_name = "database.db"
-sqlite_url = f"sqlite:///{sqlite_file_name}"
-
-connect_args = {"check_same_thread": False}
-engine = create_engine(sqlite_url, connect_args=connect_args)
-
-
-def create_db_and_tables():
-    SQLModel.metadata.create_all(engine)
-
-
-def get_session():
-    with Session(engine) as session:
-        yield session
-
+instrumentator = Instrumentator().instrument(app)
 
 SessionDep = Annotated[Session, Depends(get_session)]
-
-
-app = FastAPI()
 
 origins = ["*"]
 
@@ -73,14 +75,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-redis_client = redis.Redis(host="redis", port=6379, db=0)
+PROXY_PORT = 34523
 
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-def get_online_machines() -> list[str]:
-    return [
-        key.decode("utf-8").split(":")[1]
-        for key in redis_client.keys(pattern="liveness:*")
-    ]
+security = HTTPBearer()
 
 
 class MachineInfo(BaseModel):
@@ -118,6 +119,7 @@ def get_random_machines(number_of_machines: int = 1) -> list[MachineInfo]:
 @app.on_event("startup")
 def on_startup():
     create_db_and_tables()
+    instrumentator.expose(app)
 
 
 @app.get("/")
@@ -258,25 +260,110 @@ class AiRequest(BaseModel):
         None, title="Model Provider (optional)"
     )
     messages: list[Message] = Field([], title="Messages")
+    stream: Optional[bool] = Field(False, title="Stream")
+
+
+def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    token = credentials.credentials
+    isJwtToken = len(token.split(".")) == 3
+
+    if isJwtToken:
+        response = supabase.auth.get_user(token)
+        if response.user is not None:
+            return response.user
+        else:
+            raise HTTPException(status_code=401, detail="Unauthorized access")
+
+    session = next(get_session())
+    api_token = session.exec(
+        select(ApiToken).where(ApiToken.token == token, ApiToken.deleted_at.is_(None))
+    ).first()
+
+    if api_token is None:
+        raise HTTPException(status_code=401, detail="Unauthorized access")
+
+    user_response = supabase.auth.admin.get_user_by_id(api_token.user_id)
+    if user_response.user is None:
+        raise HTTPException(status_code=401, detail="Unauthorized access")
+
+    return user_response.user
 
 
 @app.post("/v1/chat/completions", tags=["network"])
-async def generate(request: AiRequest):
-    machine = get_random_machines(1)[0]
-    proxy_url = f"http://{machine.network_ip}:34523/v1/chat/completions"
-    response = requests.post(proxy_url, json=request.model_dump())
+async def generate(
+    req: AiRequest,
+    user=Depends(verify_token),
+    db: Session = Depends(get_session),
+) -> Response:
+    timeStart = time.time()
 
-    return Response(
-        content=response.text,
-        status_code=response.status_code,
-        headers=dict(response.headers),
-    )
+    machine = get_random_machines(1)[0]
+    proxy_url = f"http://{machine.network_ip}:{PROXY_PORT}/v1/chat/completions"
+    llmres = requests.post(proxy_url, json=req.model_dump(), stream=req.stream)
+
+    def generate():
+        usage = {}
+        result_text = ""
+        for line in llmres.iter_lines():
+            l = line.decode("utf-8")
+            if l.startswith("data: "):
+                l = l[6:]
+            try:
+                json_line = json.loads(l)
+                if "choices" in json_line:
+                    choice = json_line["choices"][0]
+                    if "delta" in choice:
+                        delta = choice["delta"]
+                        if "content" in delta:
+                            result_text += delta["content"]
+                if "usage" in json_line:
+                    usage = json_line["usage"]
+            except json.JSONDecodeError as e:
+                print(e)
+            yield line
+
+        # Log the request
+        api_log = ApiLogs(
+            user_id=user.id,
+            payload=req.model_dump_json(),
+            response=result_text,
+            prompt_tokens=usage.get("prompt_tokens", 0),
+            completion_tokens=usage.get("completion_tokens", 0),
+            total_tokens=usage.get("total_tokens", 0),
+            total_response_time=time.time() - timeStart,
+            model=req.model,
+        )
+
+        db.add(api_log)
+
+        # Calculate cost and reduce user credits
+        total_tokens = usage.get("total_tokens", 0)
+        cost = total_tokens * 0.0003
+        user_credits = db.exec(
+            select(UserCredits).where(UserCredits.user_id == user.id)
+        ).first()
+        if user_credits:
+            user_credits.credits -= cost
+            db.add(user_credits)
+
+            # Update user credit history
+            user_credits_history = UserCreditsHistory(
+                user_id=user.id,
+                amount=-cost,
+                description=f"Used {total_tokens} tokens",
+            )
+            db.add(user_credits_history)
+
+        db.commit()
+
+    res = StreamingResponse(generate(), media_type="text/event-stream")
+
+    return res
 
 
 class VerifyRequest(BaseModel):
     messages: list[Message] = Field([], title="Messages")
     models: list[str] = Field(["mira/llama3.1"], title="Models")
-    # total_runs: int = Field(5, title="Total runs")
     min_yes: int = Field(3, title="Minimum yes")
 
 
@@ -299,7 +386,7 @@ async def verify(req: VerifyRequest):
     results = []
     async with httpx.AsyncClient() as client:
         for idx, machine in enumerate(machines):
-            proxy_url = f"http://{machine.network_ip}:34523/v1/verify"
+            proxy_url = f"http://{machine.network_ip}:{PROXY_PORT}/v1/verify"
             response = await client.post(
                 proxy_url,
                 json={
@@ -373,7 +460,7 @@ async def generate_with_flow_id(
     req.messages.insert(0, Message(role="system", content=system_prompt))
 
     machine = get_random_machines(1)[0]
-    proxy_url = f"http://{machine.network_ip}:34523/v1/chat/completions"
+    proxy_url = f"http://{machine.network_ip}:{PROXY_PORT}/v1/chat/completions"
     response = requests.post(proxy_url, json=req.model_dump())
 
     return Response(
@@ -459,3 +546,164 @@ def update_flow(flow_id: str, flow: FlowRequest, db: Session = Depends(get_sessi
     db.commit()
     db.refresh(existing_flow)
     return existing_flow
+
+
+@app.get("/api-logs", tags=["logs"])
+def list_all_logs(
+    db: Session = Depends(get_session),
+    user=Depends(verify_token),
+    page: int = 1,
+    page_size: int = 10,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+):
+    offset = (page - 1) * page_size
+    query = db.query(ApiLogs).filter(ApiLogs.user_id == user.id)
+
+    if start_date:
+        query = query.filter(ApiLogs.created_at >= start_date)
+    if end_date:
+        query = query.filter(ApiLogs.created_at <= end_date)
+
+    logs = query.offset(offset).limit(page_size).all()
+    total_logs = query.count()
+    return {
+        "logs": logs,
+        "total": total_logs,
+        "page": page,
+        "page_size": page_size,
+    }
+
+
+class ApiTokenRequest(BaseModel):
+    description: Optional[str] = None
+
+
+@app.post("/api-tokens", tags=["tokens"])
+def create_api_token(
+    request: ApiTokenRequest,
+    db: Session = Depends(get_session),
+    user=Depends(verify_token),
+):
+    token = f"sk-mira-{os.urandom(24).hex()}"
+    api_token = ApiToken(user_id=user.id, token=token, description=request.description)
+    db.add(api_token)
+    db.commit()
+    db.refresh(api_token)
+    return {
+        "token": api_token.token,
+        "description": api_token.description,
+        "created_at": api_token.created_at,
+    }
+
+
+@app.get("/api-tokens", tags=["tokens"])
+def list_api_tokens(db: Session = Depends(get_session), user=Depends(verify_token)):
+    tokens = (
+        db.query(ApiToken)
+        .filter(ApiToken.user_id == user.id, ApiToken.deleted_at.is_(None))
+        .all()
+    )
+    return [
+        {
+            "token": token.token,
+            "description": token.description,
+            "created_at": token.created_at,
+        }
+        for token in tokens
+    ]
+
+
+@app.delete("/api-tokens/{token}", tags=["tokens"])
+def delete_api_token(
+    token: str, db: Session = Depends(get_session), user=Depends(verify_token)
+):
+    api_token = (
+        db.query(ApiToken)
+        .filter(ApiToken.token == token, ApiToken.user_id == user.id)
+        .first()
+    )
+    if not api_token:
+        raise HTTPException(status_code=404, detail="Token not found")
+
+    api_token.deleted_at = datetime.utcnow()
+    db.commit()
+    db.refresh(api_token)
+    return {"message": "Token deleted successfully"}
+
+
+@app.get("/total-inference-calls", tags=["logs"])
+def total_inference_calls(
+    db: Session = Depends(get_session), user=Depends(verify_token)
+):
+    logs = db.query(ApiLogs).filter(ApiLogs.user_id == user.id).all()
+    return len(logs)
+
+
+class AddCreditRequest(BaseModel):
+    user_id: str
+    amount: float
+    description: Optional[str] = None
+
+
+@app.post("/add-credit", tags=["credits"])
+def add_credit(request: AddCreditRequest, db: Session = Depends(get_session)):
+    user_credits = db.exec(
+        select(UserCredits).where(UserCredits.user_id == request.user_id)
+    ).first()
+
+    if user_credits is None:
+        user_credits = UserCredits(
+            user_id=request.user_id,
+            credits=request.amount,
+        )
+        db.add(user_credits)
+    else:
+        user_credits.credits += request.amount
+
+    # Update user credit history
+    user_credits_history = UserCreditsHistory(
+        user_id=request.user_id,
+        amount=request.amount,
+        description=request.description,
+    )
+    db.add(user_credits_history)
+
+    db.commit()
+    db.refresh(user_credits)
+    return {
+        "user_id": user_credits.user_id,
+        "credits": user_credits.credits,
+        "updated_at": user_credits.updated_at,
+    }
+
+
+@app.get("/user-credits", tags=["credits"])
+def get_user_credits(user=Depends(verify_token), db: Session = Depends(get_session)):
+    user_credits = db.exec(
+        select(UserCredits).where(UserCredits.user_id == user.id)
+    ).first()
+
+    if user_credits is None:
+        return {
+            "user_id": user.id,
+            "credits": 0.0,
+            "updated_at": None,
+        }
+
+    return {
+        "user_id": user_credits.user_id,
+        "credits": user_credits.credits,
+        "updated_at": user_credits.updated_at,
+    }
+
+
+@app.get("/user-credits-history", tags=["credits"])
+def get_user_credits_history(
+    user=Depends(verify_token), db: Session = Depends(get_session)
+):
+    user_credits_history = db.exec(
+        select(UserCreditsHistory).where(UserCreditsHistory.user_id == user.id)
+    ).all()
+
+    return user_credits_history
