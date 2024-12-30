@@ -59,6 +59,25 @@ Mira Client consists of several integrated components:
 
 See the [Setup Guide](SETUP.md) for detailed installation and configuration instructions.
 
+## Configuration
+
+The system can be configured through environment variables or configuration files:
+
+- `MIRA_CONFIG_PATH`: Path to the configuration file (default: `~/.mira/config.yaml`)
+- `MIRA_LOG_LEVEL`: Logging level (default: `info`)
+- `MIRA_API_KEY`: Your Mira API key for authentication
+- `PROVIDER_API_KEYS`: Provider-specific API keys (see [Setup Guide](SETUP.md))
+
+## Playground
+
+The playground environment provides:
+
+- Interactive testing of LLM providers and models
+- Real-time response streaming visualization
+- System prompt experimentation
+- Flow creation and management
+- Conversation history and export capabilities
+
 ## Development
 
 ### Building Components
@@ -77,6 +96,46 @@ cd mira-console
 npm install
 npm run build
 ```
+
+### Running Tests
+
+```bash
+# Run CLI tests
+cd cli
+make test
+
+# Run console tests
+cd mira-console
+npm test
+
+# Run service tests
+cd service
+python -m pytest
+```
+
+### Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
+
+### Architecture
+
+The system follows a microservices architecture with the following components:
+
+- **Router Service**: Core routing and load balancing
+- **Console**: Web-based management interface
+- **CLI**: Command-line management tool
+- **Service**: Provider integration and request handling
+
+### Requirements
+
+- Python 3.8+
+- Node.js 16+
+- Redis 6+
+- Go 1.19+ (for CLI)
 
 ### Basic Usage
 
