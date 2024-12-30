@@ -1,11 +1,11 @@
-# Mira SDK
+# Mira Network SDK
 
 A Python SDK for interacting with the Mira Network API. This SDK provides a simple interface to access all Mira API endpoints including model inference, flow management, and credit system.
 
 ## Installation
 
 ```bash
-pip install mira-sdk
+pip install mira-network
 ```
 
 ## Quick Start
