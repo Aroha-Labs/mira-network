@@ -71,8 +71,12 @@ const ApiKeyPage = () => {
   const [tokenToDelete, setTokenToDelete] = useState<string | null>(null);
 
   const addMutation = useMutation({
-    mutationFn: (description: string) =>
-      addApiKey(userSession?.access_token!, description),
+    mutationFn: (description: string) => {
+      if (!userSession?.access_token) {
+        throw new Error("User session not found");
+      }
+      return addApiKey(userSession.access_token, description);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["apiKeys"],
@@ -84,7 +88,10 @@ const ApiKeyPage = () => {
 
   const deleteMutation = useMutation({
     mutationFn: (tokenId: string) => {
-      return deleteApiKey(userSession?.access_token!, tokenId);
+      if (!userSession?.access_token) {
+        throw new Error("User session not found");
+      }
+      return deleteApiKey(userSession.access_token, tokenId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({

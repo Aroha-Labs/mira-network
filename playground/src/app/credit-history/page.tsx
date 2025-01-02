@@ -4,7 +4,6 @@ import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { API_BASE_URL } from "src/config";
 import { useSession } from "src/hooks/useSession";
-import { useState } from "react";
 import { format } from "date-fns";
 import Loading from "src/components/Loading";
 
@@ -29,7 +28,12 @@ const CreditHistoryPage = () => {
   const { data: userSession } = useSession();
   const { data, error, isLoading } = useQuery({
     queryKey: ["creditHistory"],
-    queryFn: () => fetchCreditHistory(userSession?.access_token!),
+    queryFn: () => {
+      if (!userSession?.access_token) {
+        throw new Error("User session not found");
+      }
+      return fetchCreditHistory(userSession.access_token);
+    },
     enabled: !!userSession?.access_token,
   });
 

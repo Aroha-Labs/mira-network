@@ -62,7 +62,12 @@ const AnalyticsPage = () => {
 
   const { data, error, isLoading } = useQuery({
     queryKey: ["apiLogs", startDate, endDate],
-    queryFn: () => fetchApiLogs(userSession?.access_token!, startDate, endDate),
+    queryFn: () => {
+      if (!userSession?.access_token) {
+        throw new Error("User session not found");
+      }
+      return fetchApiLogs(userSession.access_token, startDate, endDate);
+    },
     enabled: !!userSession?.access_token,
   });
 

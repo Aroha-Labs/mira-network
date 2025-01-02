@@ -27,7 +27,12 @@ const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({ userSession }) => {
     isLoading,
   } = useQuery({
     queryKey: ["inferenceCalls"],
-    queryFn: () => fetchInferenceCalls(userSession?.access_token!),
+    queryFn: () => {
+      if (!userSession?.access_token) {
+        throw new Error("User session not found");
+      }
+      return fetchInferenceCalls(userSession.access_token);
+    },
     enabled: !!userSession?.access_token,
   });
 
