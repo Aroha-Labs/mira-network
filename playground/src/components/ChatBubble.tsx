@@ -11,6 +11,7 @@ import CopyToClipboardIcon from "src/components/CopyToClipboardIcon";
 import ConfirmModal from "src/components/ConfirmModal";
 import { User } from "@supabase/supabase-js";
 import { useState } from "react";
+import ProfileImage from "./ProfileImage";
 
 interface ChatBubbleProps {
   msg: {
@@ -56,7 +57,7 @@ export default function ChatBubble({
     >
       <div className="flex items-center gap-2 px-2">
         {msg.role === "user" ? (
-          <img
+          <ProfileImage
             src={userInfo.avatar_url}
             alt="User Avatar"
             className="h-6 w-6 rounded-full inline-block"

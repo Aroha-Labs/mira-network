@@ -734,7 +734,9 @@ async def proxy_image(url: str):
 
     # Check if the image is already cached
     if os.path.exists(filepath):
-        return FileResponse(filepath)
+        return FileResponse(
+            filepath, headers={"Cache-Control": "public, max-age=31536000"}
+        )
 
     # Download the image and save it to the cache
     async with httpx.AsyncClient() as client:
@@ -753,4 +755,4 @@ async def proxy_image(url: str):
         with open(filepath, "wb") as f:
             f.write(response.content)
 
-    return FileResponse(filepath)
+    return FileResponse(filepath, headers={"Cache-Control": "public, max-age=31536000"})
