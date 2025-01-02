@@ -26,7 +26,12 @@ export default function Home() {
 
   const { data: userCredits, isLoading: isCreditsLoading } = useQuery({
     queryKey: ["userCredits"],
-    queryFn: () => fetchUserCredits(userSession?.access_token!),
+    queryFn: () => {
+      if (!userSession?.access_token) {
+        throw new Error("User session not found");
+      }
+      return fetchUserCredits(userSession.access_token);
+    },
     enabled: !!userSession?.access_token,
   });
 
