@@ -2,6 +2,7 @@ import Link from "next/link";
 import React from "react";
 import { User } from "@supabase/supabase-js";
 import { useLogout } from "src/hooks/useLogout";
+import ProfileImage from "src/components/ProfileImage";
 
 interface UserInfoProps {
   user: User | null;
@@ -22,7 +23,7 @@ const UserInfo: React.FC<UserInfoProps> = ({ user, children }) => {
       <div className="bg-gray-50 p-4 rounded-t">
         <div className="flex items-center justify-between">
           <div className="flex items-center">
-            <img
+            <ProfileImage
               src={
                 isLoggedIn
                   ? user.user_metadata.avatar_url
