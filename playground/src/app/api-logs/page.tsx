@@ -35,7 +35,9 @@ const fetchApiLogs = async (
   page: number = 1,
   pageSize: number = 100,
   startDate?: string,
-  endDate?: string
+  endDate?: string,
+  orderBy: string = "created_at",
+  order: string = "desc"
 ): Promise<ApiLogsResponse> => {
   if (!token) {
     throw new Error("No token provided");
@@ -49,6 +51,8 @@ const fetchApiLogs = async (
       page_size: pageSize,
       start_date: startDate,
       end_date: endDate,
+      order_by: orderBy,
+      order,
     },
   });
   return response.data;
@@ -60,16 +64,20 @@ const ApiLogsPage = () => {
   const [pageSize] = useState(100);
   const [startDate, setStartDate] = useState<string | undefined>(undefined);
   const [endDate, setEndDate] = useState<string | undefined>(undefined);
+  const [orderBy, setOrderBy] = useState<string>("created_at");
+  const [order, setOrder] = useState<string>("desc");
 
   const { data, error, isLoading } = useQuery({
-    queryKey: ["apiLogs", page, startDate, endDate],
+    queryKey: ["apiLogs", page, startDate, endDate, orderBy, order],
     queryFn: () =>
       fetchApiLogs(
         userSession?.access_token,
         page,
         pageSize,
         startDate,
-        endDate
+        endDate,
+        orderBy,
+        order
       ),
     enabled: !!userSession?.access_token,
   });
@@ -103,6 +111,22 @@ const ApiLogsPage = () => {
 
   const handleEndDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setEndDate(e.target.value);
+  };
+
+  const handleOrderByChange = (field: string) => {
+    if (orderBy === field) {
+      setOrder(order === "asc" ? "desc" : "asc");
+    } else {
+      setOrderBy(field);
+      setOrder("asc");
+    }
+  };
+
+  const getOrderIcon = (field: string) => {
+    if (orderBy === field) {
+      return order === "asc" ? "▲" : "▼";
+    }
+    return "";
   };
 
   if (isLoading) {
@@ -148,11 +172,26 @@ const ApiLogsPage = () => {
         <table className="min-w-full bg-white border border-gray-200">
           <thead>
             <tr>
-              <th className="px-4 py-2 text-left border-b">Timestamp</th>
-              <th className="px-4 py-2 text-left border-b">Tokens</th>
+              <th
+                className="px-4 py-2 text-left border-b cursor-pointer"
+                onClick={() => handleOrderByChange("created_at")}
+              >
+                Timestamp {getOrderIcon("created_at")}
+              </th>
+              <th
+                className="px-4 py-2 text-left border-b cursor-pointer"
+                onClick={() => handleOrderByChange("total_tokens")}
+              >
+                Tokens {getOrderIcon("total_tokens")}
+              </th>
               <th className="px-4 py-2 text-left border-b">Provider</th>
               <th className="px-4 py-2 text-left border-b">Model</th>
-              <th className="px-4 py-2 text-left border-b">Cost</th>
+              <th
+                className="px-4 py-2 text-left border-b cursor-pointer"
+                onClick={() => handleOrderByChange("total_response_time")}
+              >
+                Cost {getOrderIcon("total_response_time")}
+              </th>
               <th className="px-4 py-2 text-left border-b"></th>
             </tr>
           </thead>
