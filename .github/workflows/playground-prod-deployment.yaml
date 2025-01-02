@@ -34,6 +34,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: "b9d9855d1fdfcd9fb504dc752c05499f"
           projectName: "mira-playground"
+          workingDirectory: playground
           directory: out
           # Optional: Enable this if you want to have GitHub Deployments triggered
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
