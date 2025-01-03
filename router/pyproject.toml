@@ -5,7 +5,7 @@ description = "Default template for PDM package"
 authors = [
     {name = "Hamid Raza", email = "contact@hamidraza.com"},
 ]
-dependencies = ["fastapi>=0.115.5", "uvicorn>=0.32.1", "sqlmodel>=0.0.22", "redis>=5.2.0", "httpx>=0.27.2", "requests>=2.32.3", "prometheus-fastapi-instrumentator>=7.0.0", "supabase>=2.10.0"]
+dependencies = ["fastapi>=0.115.5", "uvicorn>=0.32.1", "sqlmodel>=0.0.22", "redis>=5.2.0", "httpx>=0.27.2", "requests>=2.32.3", "prometheus-fastapi-instrumentator>=7.0.0", "supabase>=2.10.0", "newrelic"]
 requires-python = "==3.11.*"
 readme = "README.md"
 license = {text = "MIT"}
@@ -16,5 +16,5 @@ distribution = false
 
 [tool.pdm.scripts]
 _.env_file = ".env"
-dev = "uvicorn src.mira_client_dashboard.main:app --host 0.0.0.0 --reload"
-prod = "uvicorn src.mira_client_dashboard.main:app --host 0.0.0.0"
+dev = "newrelic-admin run-python -m uvicorn src.mira_client_dashboard.main:app --host 0.0.0.0 --reload"
+prod = "newrelic-admin run-python -m uvicorn src.mira_client_dashboard.main:app --host 0.0.0.0"
