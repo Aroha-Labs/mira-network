@@ -3,7 +3,7 @@ import { supabase } from "src/utils/supabase/client";
 
 export function useSession() {
   return useQuery({
-    queryKey: ["useSession"],
+    queryKey: ["userSession"],
     queryFn: async () => {
       const { data, error } = await supabase.auth.getSession();
       if (error) {
