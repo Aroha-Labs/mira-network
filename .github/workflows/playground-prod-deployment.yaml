@@ -26,6 +26,8 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://atmocsvasyapsvwsustd.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_API_BASE_URL: https://mira-client-balancer.alts.dev
+          NEXT_PUBLIC_LLM_BASE_URL: https://mira-client-balancer.alts.dev/v1
         run: yarn build
 
       - name: Publish to Cloudflare Pages
