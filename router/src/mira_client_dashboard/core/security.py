@@ -5,10 +5,11 @@ from supabase import create_client, Client
 from src.mira_client_dashboard.models.tokens import ApiToken
 from src.mira_client_dashboard.db.session import get_session
 from src.mira_client_dashboard.core.config import SUPABASE_URL, SUPABASE_KEY
-    
+
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 security = HTTPBearer()
+
 
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     token = credentials.credentials
