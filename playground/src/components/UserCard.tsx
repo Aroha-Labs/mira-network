@@ -8,7 +8,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import ProfileImage from "./ProfileImage";
 import { PlusIcon } from "@heroicons/react/24/outline";
 
-let USDollar = new Intl.NumberFormat("en-US", {
+const USDollar = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
   minimumFractionDigits: 2,
