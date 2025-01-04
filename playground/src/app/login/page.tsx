@@ -10,6 +10,9 @@ export default function Login() {
     e.preventDefault();
     supabase.auth.signInWithOAuth({
       provider: "google",
+      options: {
+        redirectTo: window.location.origin,
+      },
     });
   };
 
