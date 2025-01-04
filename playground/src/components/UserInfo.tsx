@@ -5,7 +5,7 @@ import { useLogout } from "src/hooks/useLogout";
 import ProfileImage from "src/components/ProfileImage";
 
 interface UserInfoProps {
-  user: User | null;
+  user?: User;
   children?: React.ReactNode;
 }
 

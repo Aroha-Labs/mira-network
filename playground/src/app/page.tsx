@@ -4,7 +4,6 @@ import Link from "next/link";
 import LinkBox from "src/components/LinkBox";
 import UserInfo from "src/components/UserInfo";
 import AnalyticsSection from "src/components/AnalyticsSection";
-import { User } from "@supabase/supabase-js";
 import Loading from "src/components/Loading";
 import { useSession } from "src/hooks/useSession";
 import { useQuery } from "@tanstack/react-query";
@@ -22,7 +21,6 @@ const fetchUserCredits = async (token: string) => {
 
 export default function Home() {
   const { data: userSession, error, isLoading } = useSession();
-  const user = userSession?.user;
 
   const { data: userCredits, isLoading: isCreditsLoading } = useQuery({
     queryKey: ["userCredits"],
@@ -55,7 +53,7 @@ export default function Home() {
 
   return (
     <div className="flex flex-col items-center justify-center flex-1 bg-gray-100 p-4 space-y-4">
-      <UserInfo user={user as User | null}>
+      <UserInfo user={userSession?.user}>
         <AnalyticsSection userSession={userSession} />
       </UserInfo>
       <div className="bg-white p-4 rounded shadow w-full max-w-md">
@@ -65,7 +63,7 @@ export default function Home() {
             <div className="font-bold text-lg">
               {isCreditsLoading ? (
                 <div className="animate-pulse bg-gray-300 h-6 w-12 rounded mt-1"></div>
-              ) : user ? (
+              ) : userSession?.user ? (
                 <Link href="/credit-history">
                   {`$${userCredits?.credits.toFixed(2)}`}
                 </Link>
@@ -91,9 +89,21 @@ export default function Home() {
           </div>
         </div>
       </div>
-      <LinkBox href="/api-logs" label="View API Logs" isDisabled={!user} />
-      <LinkBox href="/api-keys" label="Manage API Keys" isDisabled={!user} />
-      <LinkBox href="/network" label="Network" isDisabled={!user} />
+      <LinkBox
+        href="/api-logs"
+        label="View API Logs"
+        isDisabled={!userSession?.user}
+      />
+      <LinkBox
+        href="/api-keys"
+        label="Manage API Keys"
+        isDisabled={!userSession?.user}
+      />
+      <LinkBox
+        href="/network"
+        label="Network"
+        isDisabled={!userSession?.user}
+      />
     </div>
   );
 }
