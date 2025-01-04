@@ -17,7 +17,7 @@ export default function Login() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
+    <div className="flex flex-1 flex-col items-center justify-center bg-gray-100">
       <img src="/img/logo.svg" alt="Mira" className="mb-4" />
       <h1 className="text-2xl font-bold">Login to Mira</h1>
       <button
