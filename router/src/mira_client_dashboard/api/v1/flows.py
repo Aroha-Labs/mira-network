@@ -3,16 +3,15 @@ from sqlmodel import Session, select
 from src.mira_client_dashboard.models.flows import Flows
 from src.mira_client_dashboard.schemas.flows import FlowRequest, FlowChatCompletion
 from src.mira_client_dashboard.db.session import get_session
-from src.mira_client_dashboard.core.security import verify_token
 from src.mira_client_dashboard.utils.helpers import extract_variables
 from src.mira_client_dashboard.utils.network import get_random_machines, PROXY_PORT
 import requests
 
 router = APIRouter()
 
+
 @router.post("/flows")
 def create_flow(flow: FlowRequest, db: Session = Depends(get_session)):
-    print(flow.system_prompt)
     new_flow = Flows(
         system_prompt=flow.system_prompt,
         name=flow.name,
@@ -22,10 +21,12 @@ def create_flow(flow: FlowRequest, db: Session = Depends(get_session)):
     db.refresh(new_flow)
     return new_flow
 
+
 @router.get("/flows")
 def list_all_flows(db: Session = Depends(get_session)):
     flows = db.query(Flows).all()
     return flows
+
 
 @router.get("/flows/{flow_id}")
 def get_flow(flow_id: str, db: Session = Depends(get_session)):
@@ -33,6 +34,7 @@ def get_flow(flow_id: str, db: Session = Depends(get_session)):
     if not flow:
         raise HTTPException(status_code=404, detail="Flow not found")
     return flow
+
 
 @router.put("/flows/{flow_id}")
 def update_flow(flow_id: str, flow: FlowRequest, db: Session = Depends(get_session)):
@@ -47,6 +49,7 @@ def update_flow(flow_id: str, flow: FlowRequest, db: Session = Depends(get_sessi
     db.refresh(existing_flow)
     return existing_flow
 
+
 @router.delete("/flows/{flow_id}")
 def delete_flow(flow_id: str, db: Session = Depends(get_session)):
     existing_flow = db.query(Flows).filter(Flows.id == flow_id).first()
@@ -57,11 +60,10 @@ def delete_flow(flow_id: str, db: Session = Depends(get_session)):
     db.commit()
     return {"message": "Flow deleted successfully"}
 
+
 @router.post("/v1/flow/{flow_id}/chat/completions")
 async def generate_with_flow_id(
-    flow_id: str, 
-    req: FlowChatCompletion, 
-    db: Session = Depends(get_session)
+    flow_id: str, req: FlowChatCompletion, db: Session = Depends(get_session)
 ):
     if any(msg.role == "system" for msg in req.messages):
         raise HTTPException(
