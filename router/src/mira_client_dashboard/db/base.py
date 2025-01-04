@@ -1,6 +1,7 @@
-from sqlmodel import create_engine, SQLModel
+import os
+from sqlmodel import create_engine
 
 engine = create_engine(
-    "sqlite:///database.db",
-    connect_args={"check_same_thread": False},
+    os.getenv("DB_CONNECTION_STRING"),
+    connect_args={"sslmode": "require"},
 )
