@@ -14,6 +14,7 @@ import json
 
 router = APIRouter()
 
+
 @router.post("/v1/verify", tags=["network"])
 async def verify(req: VerifyRequest):
     if len(req.models) < 1:
@@ -58,10 +59,13 @@ async def verify(req: VerifyRequest):
         return {"result": "yes", "results": results}
     else:
         return {"result": "no", "results": results}
-    
+
+
 @router.get("/v1/models", tags=["network"])
 async def list_models():
-    file_path = os.path.join(os.path.dirname(__file__), "../../supported-models.json")
+    file_path = os.path.join(
+        os.path.dirname(__file__), "../../../../supported-models.json"
+    )
 
     with open(file_path, "r") as f:
         supported_models: list[str] = json.load(f)
@@ -71,6 +75,7 @@ async def list_models():
         "data": [{"id": model, "object": "model"} for model in supported_models],
     }
 
+
 @router.post("/v1/chat/completions")
 async def generate(
     req: AiRequest,
@@ -78,12 +83,12 @@ async def generate(
     db: Session = Depends(get_session),
 ) -> Response:
     start_time = time.time()
-    
+
     machine = get_random_machines(1)[0]
     proxy_url = f"http://{machine.network_ip}:{PROXY_PORT}/v1/chat/completions"
-    
+
     response = requests.post(proxy_url, json=req.model_dump())
-    
+
     end_time = time.time()
     total_response_time = end_time - start_time
 
