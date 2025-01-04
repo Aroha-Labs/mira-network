@@ -8,7 +8,31 @@ import uvicorn
 from prometheus_fastapi_instrumentator import Instrumentator
 
 
-app = FastAPI()
+app = FastAPI(
+    title="Mira Client Dashboard",
+    description="API documentation for Mira Client Dashboard",
+    version="1.0.0",
+    openapi_tags=[
+        {"name": "network", "description": "Network related operations"},
+        {"name": "tokens", "description": "API token management"},
+        {"name": "logs", "description": "API logs"},
+        {"name": "credits", "description": "User credits management"},
+        {"name": "flows", "description": "Flow management"},
+    ],
+    openapi_url="/openapi.json",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    swagger_ui_oauth2_redirect_url="/docs/oauth2-redirect",
+    swagger_ui_init_oauth={
+        "clientId": "your-client-id",
+        "clientSecret": "your-client-secret",
+        "realm": "your-realm",
+        "appName": "Mira Client Dashboard",
+        "scopeSeparator": " ",
+        "scopes": {"read": "Read access", "write": "Write access"},
+    },
+)
+
 Instrumentator().instrument(app).expose(app)
 
 # CORS middleware
@@ -21,7 +45,7 @@ app.add_middleware(
 )
 
 # Create tables
-SQLModel.metadata.create_all(engine)
+# SQLModel.metadata.create_all(engine)
 
 # Include routers
 app.include_router(v1_router)
