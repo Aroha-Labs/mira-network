@@ -8,6 +8,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import ProfileImage from "./ProfileImage";
 import { PlusIcon } from "@heroicons/react/24/outline";
 
+let USDollar = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 2,
+});
+
 interface User {
   id: string;
   user_metadata: {
@@ -110,7 +116,7 @@ const UserCard = ({ user }: { user: User }) => {
               </span>
             ) : (
               <span className="text-gray-500 text-sm">
-                Credits: {userCredits}
+                Credits: {USDollar.format(userCredits)}
               </span>
             )}
           </div>
