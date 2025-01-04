@@ -1,6 +1,11 @@
 import redis
+import os
 
-redis_client = redis.Redis(host="127.0.0.1", port=6379, db=0)
+redis_client = redis.Redis(
+    host=os.getenv("REDIS_HOST"),
+    port=int(os.getenv("REDIS_PORT", 6379)),
+    db=int(os.getenv("REDIS_DB", 0)),
+)
 
 
 def get_online_machines() -> list[str]:
