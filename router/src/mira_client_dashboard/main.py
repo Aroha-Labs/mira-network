@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from src.mira_client_dashboard.api.v1 import router as v1_router
+from src.mira_client_dashboard.api.admin import router as admin_router
 from src.mira_client_dashboard.db.base import engine
 from sqlmodel import SQLModel
 import uvicorn
@@ -24,6 +25,9 @@ SQLModel.metadata.create_all(engine)
 
 # Include routers
 app.include_router(v1_router)
+
+# Include admin routers
+app.include_router(admin_router, prefix="/admin")
 
 
 @app.get("/")
