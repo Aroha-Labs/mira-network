@@ -54,11 +54,15 @@ const Root = ({ children }: RootProps) => {
               <h3 className="text-lg">playground</h3>
             </Link>
             {/* Tailwind's text-lg sets the font size to 18px */}
-            <Link
-              href="/chat"
-              className="ml-auto text-blue-500 hover:underline"
-            >
+            <div className="flex-1"></div>
+            <Link href="/chat" className="flex text-blue-500 hover:underline">
               Generate
+            </Link>
+            <Link
+              href="/admin"
+              className="flex text-blue-500 hover:underline ml-4"
+            >
+              Admin
             </Link>
           </header>
           {!isOnline && (
