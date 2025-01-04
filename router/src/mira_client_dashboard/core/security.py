@@ -20,7 +20,7 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
         if response.user is not None:
             return response.user
         else:
-            raise HTTPException(status_code=401, detail="Unauthorized access 1")
+            raise HTTPException(status_code=401, detail="Unauthorized access")
 
     session = next(get_session())
     api_token = session.exec(
@@ -28,10 +28,10 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     ).first()
 
     if api_token is None:
-        raise HTTPException(status_code=401, detail="Unauthorized access 2")
+        raise HTTPException(status_code=401, detail="Unauthorized access")
 
     user_response = supabase.auth.admin.get_user_by_id(api_token.user_id)
     if user_response.user is None:
-        raise HTTPException(status_code=401, detail="Unauthorized access 3")
+        raise HTTPException(status_code=401, detail="Unauthorized access")
 
     return user_response.user
