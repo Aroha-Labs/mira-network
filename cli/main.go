@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 
 	"github.com/cqroot/prompt"
@@ -21,6 +22,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// var balancer_base_url = "http://localhost:8000"
 var balancer_base_url = "https://mira-client-balancer.alts.dev"
 var miraClientNetworkId = "a84ac5c10a5b4a1a"
 
@@ -31,9 +33,26 @@ var serviceCmd = &cobra.Command{
 	Long:  `Manage the mira-client-service Docker container with start, stop, and remove commands`,
 }
 
+func execWithSudoIfNeeded(command string, args ...string) *exec.Cmd {
+	c := command
+	a := args
+
+	// FIX: check if the command is required to run with sudo
+	if runtime.GOOS != "darwin" && c == "zerotier-cli" {
+		c = "sudo"
+		a = append([]string{command}, args...)
+	}
+
+	return exec.Command(c, a...)
+}
+
+func cmdOutput(command string, args ...string) ([]byte, error) {
+	cmd := execWithSudoIfNeeded(command, args...)
+	return cmd.Output()
+}
+
 func getMachineID() (string, error) {
-	cmd := exec.Command("sudo", "zerotier-cli", "info", "-j")
-	output, err := cmd.Output()
+	output, err := cmdOutput("zerotier-cli", "info", "-j")
 	if err != nil {
 		return "", err
 	}
@@ -50,8 +69,7 @@ func getMachineID() (string, error) {
 }
 
 func getNetworkIP() (string, error) {
-	cmd := exec.Command("sudo", "zerotier-cli", "listnetworks", "-j")
-	output, err := cmd.Output()
+	output, err := cmdOutput("zerotier-cli", "listnetworks", "-j")
 	if err != nil {
 		return "", err
 	}
@@ -632,8 +650,7 @@ var joinNetworkCmd = &cobra.Command{
 		return nil
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		checkCmd := exec.Command("sudo", "zerotier-cli", "listnetworks", "-j")
-		output, err := checkCmd.Output()
+		output, err := cmdOutput("zerotier-cli", "listnetworks", "-j")
 		if err != nil {
 			return fmt.Errorf("failed to check ZeroTier networks: %w", err)
 		}
@@ -671,6 +688,9 @@ func checkCommandExists(cmd string) bool {
 }
 
 func main() {
+	// print os
+	fmt.Println("OS:", runtime.GOOS)
+
 	rootCmd := &cobra.Command{Use: "app"}
 
 	rootCmd.AddCommand(serviceCmd)
