@@ -9,6 +9,7 @@ import os
 
 router = APIRouter()
 
+
 @router.post("/api-tokens")
 def create_api_token(
     request: ApiTokenRequest,
@@ -16,15 +17,25 @@ def create_api_token(
     user=Depends(verify_token),
 ):
     token = f"sk-mira-{os.urandom(24).hex()}"
-    api_token = ApiToken(user_id=user.id, token=token, description=request.description)
-    db.add(api_token)
-    db.commit()
-    db.refresh(api_token)
+    try:
+        api_token = ApiToken(
+            user_id=user.id,
+            token=token,
+            description=request.description,
+        )
+        db.add(api_token)
+        db.commit()
+        db.refresh(api_token)
+    except Exception as e:
+        db.rollback()
+        print(e)
+        raise HTTPException(status_code=500, detail=str(e))
     return {
         "token": api_token.token,
         "description": api_token.description,
         "created_at": api_token.created_at,
     }
+
 
 @router.get("/api-tokens")
 def list_api_tokens(db: Session = Depends(get_session), user=Depends(verify_token)):
@@ -41,6 +52,7 @@ def list_api_tokens(db: Session = Depends(get_session), user=Depends(verify_toke
         }
         for token in tokens
     ]
+
 
 @router.delete("/api-tokens/{token}")
 def delete_api_token(
