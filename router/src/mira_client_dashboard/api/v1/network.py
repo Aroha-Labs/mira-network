@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, Response, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
 from src.mira_client_dashboard.models.logs import ApiLogs
 from src.mira_client_dashboard.db.session import get_session
@@ -82,56 +83,67 @@ async def generate(
     user=Depends(verify_token),
     db: Session = Depends(get_session),
 ) -> Response:
-    start_time = time.time()
+    timeStart = time.time()
 
     machine = get_random_machines(1)[0]
     proxy_url = f"http://{machine.network_ip}:{PROXY_PORT}/v1/chat/completions"
+    llmres = requests.post(proxy_url, json=req.model_dump(), stream=req.stream)
 
-    response = requests.post(proxy_url, json=req.model_dump())
+    def generate():
+        usage = {}
+        result_text = ""
+        for line in llmres.iter_lines():
+            l = line.decode("utf-8")
+            if l.startswith("data: "):
+                l = l[6:]
+            try:
+                json_line = json.loads(l)
+                if "choices" in json_line:
+                    choice = json_line["choices"][0]
+                    if "delta" in choice:
+                        delta = choice["delta"]
+                        if "content" in delta:
+                            result_text += delta["content"]
+                if "usage" in json_line:
+                    usage = json_line["usage"]
+            except json.JSONDecodeError as e:
+                print(e)
+            yield line
 
-    end_time = time.time()
-    total_response_time = end_time - start_time
-
-    # Calculate tokens
-    total_tokens = 30  # Default value
-    prompt_tokens = 10
-    completion_tokens = 20
-
-    # Log the API call
-    api_log = ApiLogs(
-        user_id=user.id,
-        payload=str(req.model_dump()),
-        response=response.text,
-        prompt_tokens=prompt_tokens,
-        completion_tokens=completion_tokens,
-        total_tokens=total_tokens,
-        total_response_time=total_response_time,
-        model=req.model,
-    )
-    db.add(api_log)
-
-    # Update user credits
-    cost = total_tokens * 0.0003
-    user_credits = db.exec(
-        select(UserCredits).where(UserCredits.user_id == user.id)
-    ).first()
-
-    if user_credits:
-        user_credits.credits -= cost
-        db.add(user_credits)
-
-        # Update user credit history
-        user_credits_history = UserCreditsHistory(
+        # Log the request
+        api_log = ApiLogs(
             user_id=user.id,
-            amount=-cost,
-            description=f"Used {total_tokens} tokens",
+            payload=req.model_dump_json(),
+            response=result_text,
+            prompt_tokens=usage.get("prompt_tokens", 0),
+            completion_tokens=usage.get("completion_tokens", 0),
+            total_tokens=usage.get("total_tokens", 0),
+            total_response_time=time.time() - timeStart,
+            model=req.model,
         )
-        db.add(user_credits_history)
 
-    db.commit()
+        db.add(api_log)
 
-    return Response(
-        content=response.text,
-        status_code=response.status_code,
-        headers=dict(response.headers),
-    )
+        # Calculate cost and reduce user credits
+        total_tokens = usage.get("total_tokens", 0)
+        cost = total_tokens * 0.0003
+        user_credits = db.exec(
+            select(UserCredits).where(UserCredits.user_id == user.id)
+        ).first()
+        if user_credits:
+            user_credits.credits -= cost
+            db.add(user_credits)
+
+            # Update user credit history
+            user_credits_history = UserCreditsHistory(
+                user_id=user.id,
+                amount=-cost,
+                description=f"Used {total_tokens} tokens",
+            )
+            db.add(user_credits_history)
+
+        db.commit()
+
+    res = StreamingResponse(generate(), media_type="text/event-stream")
+
+    return res
