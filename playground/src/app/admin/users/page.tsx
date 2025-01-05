@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import axios from "axios";
 import { useSession } from "src/hooks/useSession";
 import { API_BASE_URL } from "src/config";
