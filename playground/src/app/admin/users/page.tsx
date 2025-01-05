@@ -5,7 +5,8 @@ import axios from "axios";
 import { useSession } from "src/hooks/useSession";
 import { API_BASE_URL } from "src/config";
 import UserCard from "src/components/UserCard";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
+import Loading from "src/components/Loading";
 
 interface User {
   id: string;
@@ -16,13 +17,19 @@ interface User {
   };
 }
 
-const fetchUsers = async (token: string, page: number) => {
+const fetchUsers = async ({
+  pageParam = 1,
+  token,
+}: {
+  pageParam: number;
+  token: string;
+}) => {
   const response = await axios.get<User[]>(`${API_BASE_URL}/admin/users`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
     params: {
-      page,
+      page: pageParam,
     },
   });
   return response.data;
@@ -30,24 +37,47 @@ const fetchUsers = async (token: string, page: number) => {
 
 const AdminUsers = () => {
   const { data: userSession } = useSession();
-  const [page, setPage] = useState(1);
 
   const {
-    data: users,
+    data,
     error,
     isLoading,
-  } = useQuery({
-    queryKey: ["users", page],
-    queryFn: () => fetchUsers(userSession?.access_token || "", page),
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ["users"],
+    queryFn: ({ pageParam }) => {
+      if (!userSession?.access_token) {
+        return Promise.reject("No user session");
+      }
+
+      return fetchUsers({
+        pageParam,
+        token: userSession.access_token,
+      });
+    },
     enabled: !!userSession?.access_token,
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, pages) => {
+      return lastPage.length ? pages.length + 1 : undefined;
+    },
   });
 
   if (!userSession?.access_token) {
-    return <div>Please log in to view users.</div>;
+    return (
+      <div className="flex items-center justify-center h-64">
+        Please log in to view users.
+      </div>
+    );
   }
 
   if (isLoading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loading />
+      </div>
+    );
   }
 
   if (error) {
@@ -55,27 +85,27 @@ const AdminUsers = () => {
   }
 
   return (
-    <div className="p-6 bg-white rounded shadow-md">
-      <h1 className="text-3xl font-bold mb-4">Admin Users</h1>
+    <div className="p-6 pb-32 bg-white rounded shadow-md">
+      <h1 className="text-3xl font-bold mb-4">Users</h1>
       <p className="text-gray-700 mb-4">Manage users here.</p>
       <ul className="space-y-2">
-        {users?.map((user) => (
-          <UserCard key={user.id} user={user} />
-        ))}
+        {data?.pages.flatMap((page) =>
+          page.map((user) => <UserCard key={user.id} user={user} />)
+        )}
       </ul>
-      <div className="flex justify-between mt-4">
+      <div className="flex justify-center mt-4">
         <button
-          onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
-          className="bg-gray-300 text-gray-700 p-2 rounded hover:bg-gray-400"
-          disabled={page === 1}
+          onClick={() => fetchNextPage()}
+          className={`bg-gray-300 text-gray-700 p-2 px-6 rounded ${
+            !hasNextPage || isFetchingNextPage ? "" : "hover:bg-gray-400"
+          }`}
+          disabled={!hasNextPage || isFetchingNextPage}
         >
-          Previous
-        </button>
-        <button
-          onClick={() => setPage((prev) => prev + 1)}
-          className="bg-gray-300 text-gray-700 p-2 rounded hover:bg-gray-400"
-        >
-          Next
+          {isFetchingNextPage
+            ? "Loading..."
+            : hasNextPage
+            ? "Load More"
+            : "No More Users"}
         </button>
       </div>
     </div>
