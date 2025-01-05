@@ -3,15 +3,16 @@ from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
 from src.mira_client_dashboard.models.logs import ApiLogs
 from src.mira_client_dashboard.db.session import get_session
-from src.mira_client_dashboard.core.security import verify_token
+from src.mira_client_dashboard.core.security import verify_user
 from src.mira_client_dashboard.utils.network import get_random_machines, PROXY_PORT
-from src.mira_client_dashboard.models.credits import UserCredits, UserCreditsHistory
+from src.mira_client_dashboard.models.user import UserCredits, UserCreditsHistory
 from src.mira_client_dashboard.schemas.ai import AiRequest, VerifyRequest
 import requests
 import time
 import httpx
 import os
 import json
+from gotrue.types import User
 
 router = APIRouter()
 
@@ -80,7 +81,7 @@ async def list_models():
 @router.post("/v1/chat/completions")
 async def generate(
     req: AiRequest,
-    user=Depends(verify_token),
+    user: User = Depends(verify_user),
     db: Session = Depends(get_session),
 ) -> Response:
     timeStart = time.time()
