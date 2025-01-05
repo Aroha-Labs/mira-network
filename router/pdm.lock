@@ -5,7 +5,7 @@
 groups = ["default"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:9410356b39083cbff9e5bab9279543fdc60623b37ffca055beb67949a58e96ad"
+content_hash = "sha256:44a07bee340983a48306c393ec95ab11955ac26421904fc2b7a0050f0fa61dc5"
 
 [[metadata.targets]]
 requires_python = "==3.11.*"
@@ -576,6 +576,17 @@ files = [
     {file = "pydantic_core-2.27.0-cp311-none-win_amd64.whl", hash = "sha256:68950bc08f9735306322bfc16a18391fcaac99ded2509e1cc41d03ccb6013cfe"},
     {file = "pydantic_core-2.27.0-cp311-none-win_arm64.whl", hash = "sha256:3eb8849445c26b41c5a474061032c53e14fe92a11a5db969f722a2716cd12206"},
     {file = "pydantic_core-2.27.0.tar.gz", hash = "sha256:f57783fbaf648205ac50ae7d646f27582fc706be3977e87c3c124e7a92407b10"},
+]
+
+[[package]]
+name = "pyjwt"
+version = "2.10.1"
+requires_python = ">=3.9"
+summary = "JSON Web Token implementation in Python"
+groups = ["default"]
+files = [
+    {file = "PyJWT-2.10.1-py3-none-any.whl", hash = "sha256:dcdd193e30abefd5debf142f9adfcdd2b58004e644f25406ffaebd50bd98dacb"},
+    {file = "pyjwt-2.10.1.tar.gz", hash = "sha256:3cc5772eb20009233caf06e9d8a0577824723b44e6648ee0a2aedb6cf9381953"},
 ]
 
 [[package]]
