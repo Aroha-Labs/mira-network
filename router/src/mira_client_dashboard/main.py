@@ -6,6 +6,7 @@ from src.mira_client_dashboard.db.base import engine
 from sqlmodel import SQLModel
 import uvicorn
 from prometheus_fastapi_instrumentator import Instrumentator
+from scalar_fastapi import get_scalar_api_reference
 
 
 app = FastAPI(
@@ -20,7 +21,7 @@ app = FastAPI(
         {"name": "flows", "description": "Flow management"},
     ],
     openapi_url="/openapi.json",
-    docs_url="/docs",
+    docs_url=None,
     redoc_url="/redoc",
     swagger_ui_oauth2_redirect_url="/docs/oauth2-redirect",
     swagger_ui_init_oauth={
@@ -62,6 +63,14 @@ def read_root():
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+
+@app.get("/docs", include_in_schema=False)
+def docs():
+    return get_scalar_api_reference(
+        openapi_url="/openapi.json",
+        title=app.title,
+    )
 
 
 if __name__ == "__main__":
