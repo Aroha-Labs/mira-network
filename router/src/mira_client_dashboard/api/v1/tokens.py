@@ -3,7 +3,7 @@ from sqlmodel import Session, select
 from src.mira_client_dashboard.models.tokens import ApiToken
 from src.mira_client_dashboard.schemas.tokens import ApiTokenRequest
 from src.mira_client_dashboard.db.session import get_session
-from src.mira_client_dashboard.core.security import verify_token
+from src.mira_client_dashboard.core.security import verify_user
 from datetime import datetime
 import os
 
@@ -14,7 +14,7 @@ router = APIRouter()
 def create_api_token(
     request: ApiTokenRequest,
     db: Session = Depends(get_session),
-    user=Depends(verify_token),
+    user=Depends(verify_user),
 ):
     token = f"sk-mira-{os.urandom(24).hex()}"
     try:
@@ -38,7 +38,7 @@ def create_api_token(
 
 
 @router.get("/api-tokens")
-def list_api_tokens(db: Session = Depends(get_session), user=Depends(verify_token)):
+def list_api_tokens(db: Session = Depends(get_session), user=Depends(verify_user)):
     tokens = (
         db.query(ApiToken)
         .filter(ApiToken.user_id == user.id, ApiToken.deleted_at.is_(None))
@@ -56,7 +56,7 @@ def list_api_tokens(db: Session = Depends(get_session), user=Depends(verify_toke
 
 @router.delete("/api-tokens/{token}")
 def delete_api_token(
-    token: str, db: Session = Depends(get_session), user=Depends(verify_token)
+    token: str, db: Session = Depends(get_session), user=Depends(verify_user)
 ):
     api_token = (
         db.query(ApiToken)

@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
-from src.mira_client_dashboard.models.credits import UserCredits, UserCreditsHistory
+from src.mira_client_dashboard.models.user import UserCredits, UserCreditsHistory
 from src.mira_client_dashboard.schemas.credits import AddCreditRequest
 from src.mira_client_dashboard.db.session import get_session
-from src.mira_client_dashboard.core.security import verify_token
+from src.mira_client_dashboard.core.security import verify_user
 
 router = APIRouter()
 
@@ -32,7 +32,7 @@ def add_credit(request: AddCreditRequest, db: Session = Depends(get_session)):
 
 
 @router.get("/user-credits")
-def get_user_credits(db: Session = Depends(get_session), user=Depends(verify_token)):
+def get_user_credits(db: Session = Depends(get_session), user=Depends(verify_user)):
     user_credits = db.exec(
         select(UserCredits).where(UserCredits.user_id == user.id)
     ).first()
@@ -41,7 +41,7 @@ def get_user_credits(db: Session = Depends(get_session), user=Depends(verify_tok
 
 @router.get("/user-credits-history")
 def get_user_credits_history(
-    db: Session = Depends(get_session), user=Depends(verify_token)
+    db: Session = Depends(get_session), user=Depends(verify_user)
 ):
     history = db.exec(
         select(UserCreditsHistory)
