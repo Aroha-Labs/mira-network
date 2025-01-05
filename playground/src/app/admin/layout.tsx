@@ -68,7 +68,7 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
           </button>
           {/* <h1 className="text-xl font-bold">Admin Panel</h1> */}
         </header>
-        <main className="">{children}</main>
+        <main className="container mx-auto">{children}</main>
       </div>
     </div>
   );
