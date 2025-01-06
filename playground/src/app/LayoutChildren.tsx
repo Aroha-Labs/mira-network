@@ -27,7 +27,7 @@ const LayoutChildren = ({ children }: LayoutChildrenProps) => {
           role="alert"
         >
           <strong className="font-bold">Error: </strong>
-          <div>You don't have permission to access this page</div>
+          <div>You don&apos;t have permission to access this page</div>
           <button
             onClick={() => logoutMutation.mutate()}
             className={`mt-4 px-4 py-2 rounded text-white ${

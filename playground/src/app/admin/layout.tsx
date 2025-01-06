@@ -22,7 +22,7 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
           role="alert"
         >
           <strong className="font-bold">Error: </strong>
-          <div>You don't have permission to access this page</div>
+          <div>You don&apos;t have permission to access this page</div>
         </div>
       </div>
     );
