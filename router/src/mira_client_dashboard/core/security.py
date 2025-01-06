@@ -2,12 +2,12 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi import HTTPException, Depends
 from sqlmodel import select
 from supabase import create_client, Client
+from src.mira_client_dashboard.core.types import User
 from src.mira_client_dashboard.models.user import UserCustomClaim
 from src.mira_client_dashboard.models.tokens import ApiToken
 from src.mira_client_dashboard.db.session import get_session
 from src.mira_client_dashboard.core.config import SUPABASE_URL, SUPABASE_KEY
 import jwt
-from gotrue.types import User
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -39,11 +39,12 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
             )
         ).first()
 
-        custom_claims = user_response.user.user_metadata.get("custom_claims", {})
-        custom_claims.update(user_custom_claims.claim)
-        user_response.user.user_metadata.update({"custom_claims": custom_claims})
+        if user_custom_claims is None:
+            user_roles = []
+        else:
+            user_roles = user_custom_claims.claim.get("roles", [])
 
-        return user_response.user
+        return User(**user_response.user.model_dump(), roles=user_roles)
 
     # Verify if token is a JWT token (supabase token)
     decodedToken: dict = None
@@ -74,24 +75,27 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     except:
         raise HTTPException(status_code=401, detail="Unknown error")
 
-    userRes = supabase.auth.get_user(token)
-    if userRes.user is not None:
-        token_custom_claims = decodedToken.get("user_metadata", {}).get(
-            "custom_claims", {}
+    try:
+        userRes = supabase.auth.get_user(token)
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=str(e))
+
+    if userRes is None:
+        raise HTTPException(
+            status_code=401, detail="Unauthorized access - user not found"
         )
-        userRes.user.user_metadata.get("custom_claims").update(token_custom_claims)
-        return userRes.user
-    else:
-        raise HTTPException(status_code=401, detail="Unauthorized access")
+
+    user_roles = decodedToken.get("user_roles", [])
+    return User(**userRes.user.model_dump(), roles=user_roles)
 
 
 def verify_user(user: User = Depends(verify_token)):
-    if "user" not in user.user_metadata.get("custom_claims", {}).get("roles", []):
-        raise HTTPException(status_code=401, detail="Unauthorized access")
+    if "user" not in user.roles:
+        raise HTTPException(status_code=401, detail="Unauthorized user access")
     return user
 
 
 def verify_admin(user: User = Depends(verify_token)):
-    if "admin" not in user.user_metadata.get("custom_claims", {}).get("roles", []):
-        raise HTTPException(status_code=401, detail="Unauthorized access")
+    if "admin" not in user.roles:
+        raise HTTPException(status_code=401, detail="Unauthorized admin access")
     return user
