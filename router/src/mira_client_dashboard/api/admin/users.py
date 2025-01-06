@@ -68,24 +68,14 @@ async def add_or_update_user_claim(
     #     payload=body.decode("utf-8"), signature=signature
     # )
 
-    claims = req.claims
-    user_metadata = claims.get("user_metadata")
-    custom_claims = user_metadata.get("custom_claims")
-
     user_claim = db.exec(
         select(UserCustomClaim).where(UserCustomClaim.user_id == req.user_id)
     ).first()
 
     if user_claim:
-        custom_claims.update(user_claim.claim)
-    else:
-        # Don't login the user if they don't have any roles
-        raise HTTPException(status_code=401, detail="User doesn't have any roles yet")
+        req.claims.update({"user_roles": user_claim.claim.get("roles", [])})
 
-    user_metadata.update({"custom_claims": custom_claims})
-    claims.update({"user_metadata": user_metadata})
-
-    data = {"user_id": req.user_id, "claims": claims}
+    data = {"user_id": req.user_id, "claims": req.claims}
     return data
 
 
