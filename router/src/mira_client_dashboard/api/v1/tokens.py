@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
+from src.mira_client_dashboard.core.types import User
 from src.mira_client_dashboard.models.tokens import ApiToken
 from src.mira_client_dashboard.schemas.tokens import ApiTokenRequest
 from src.mira_client_dashboard.db.session import get_session
@@ -14,7 +15,7 @@ router = APIRouter()
 def create_api_token(
     request: ApiTokenRequest,
     db: Session = Depends(get_session),
-    user=Depends(verify_user),
+    user: User = Depends(verify_user),
 ):
     token = f"sk-mira-{os.urandom(24).hex()}"
     try:
@@ -38,7 +39,9 @@ def create_api_token(
 
 
 @router.get("/api-tokens")
-def list_api_tokens(db: Session = Depends(get_session), user=Depends(verify_user)):
+def list_api_tokens(
+    db: Session = Depends(get_session), user: User = Depends(verify_user)
+):
     tokens = (
         db.query(ApiToken)
         .filter(ApiToken.user_id == user.id, ApiToken.deleted_at.is_(None))
@@ -56,7 +59,7 @@ def list_api_tokens(db: Session = Depends(get_session), user=Depends(verify_user
 
 @router.delete("/api-tokens/{token}")
 def delete_api_token(
-    token: str, db: Session = Depends(get_session), user=Depends(verify_user)
+    token: str, db: Session = Depends(get_session), user: User = Depends(verify_user)
 ):
     api_token = (
         db.query(ApiToken)

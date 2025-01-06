@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, Response, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
+from src.mira_client_dashboard.core.types import User
 from src.mira_client_dashboard.models.logs import ApiLogs
 from src.mira_client_dashboard.db.session import get_session
 from src.mira_client_dashboard.core.security import verify_user
@@ -12,7 +13,6 @@ import time
 import httpx
 import os
 import json
-from gotrue.types import User
 
 router = APIRouter()
 
