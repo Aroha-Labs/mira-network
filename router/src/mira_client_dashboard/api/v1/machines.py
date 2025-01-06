@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
+from src.mira_client_dashboard.core.security import verify_user
+from src.mira_client_dashboard.core.types import User
 from src.mira_client_dashboard.db.session import get_session
 from src.mira_client_dashboard.utils.redis import redis_client
-from src.mira_client_dashboard.utils.network import get_random_machines
 import time
 from src.mira_client_dashboard.schemas.machine import RegisterMachineRequest
 from src.mira_client_dashboard.models.machines import Machine
@@ -12,6 +13,7 @@ from src.mira_client_dashboard.utils.redis import redis_client, get_online_machi
 router = APIRouter()
 
 SessionDep = Annotated[Session, Depends(get_session)]
+
 
 @router.post("/register/{machine_uid}")
 def register_machine(
@@ -84,7 +86,7 @@ def set_liveness(machine_uid: str, session: SessionDep):
 
 
 @router.get("/machines")
-def list_all_machines(session: SessionDep):
+def list_all_machines(session: SessionDep, user: User = Depends(verify_user)):
     machines = session.exec(select(Machine)).all()
     online_machines = get_online_machines()
 
@@ -103,6 +105,6 @@ def list_all_machines(session: SessionDep):
 
 
 @router.get("/machines/online")
-def list_online_machines():
+def list_online_machines(user: User = Depends(verify_user)):
     online_machines = get_online_machines()
     return [{"machine_uid": key} for key in online_machines]
