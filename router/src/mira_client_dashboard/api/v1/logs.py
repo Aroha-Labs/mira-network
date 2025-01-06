@@ -1,6 +1,7 @@
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
+from src.mira_client_dashboard.core.types import User
 from src.mira_client_dashboard.models.logs import ApiLogs
 from src.mira_client_dashboard.db.session import get_session
 from src.mira_client_dashboard.core.security import verify_user
@@ -12,7 +13,7 @@ router = APIRouter()
 @router.get("/api-logs")
 def list_all_logs(
     db: Session = Depends(get_session),
-    user=Depends(verify_user),
+    user: User = Depends(verify_user),
     page: int = 1,
     page_size: int = 10,
     start_date: Optional[str] = None,
@@ -49,7 +50,7 @@ def list_all_logs(
 @router.get("/total-inference-calls")
 def total_inference_calls(
     db: Session = Depends(get_session),
-    user=Depends(verify_user),
+    user: User = Depends(verify_user),
 ):
     total = db.exec(
         select(func.count()).select_from(ApiLogs).where(ApiLogs.user_id == user.id)
