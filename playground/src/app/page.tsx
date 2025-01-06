@@ -9,6 +9,7 @@ import { useSession } from "src/hooks/useSession";
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { API_BASE_URL } from "src/config";
+import { USDollar } from "src/utils/currency";
 
 const fetchUserCredits = async (token: string) => {
   const response = await axios.get(`${API_BASE_URL}/user-credits`, {
@@ -64,8 +65,11 @@ export default function Home() {
               {isCreditsLoading ? (
                 <div className="animate-pulse bg-gray-300 h-6 w-12 rounded mt-1"></div>
               ) : userSession?.user ? (
-                <Link href="/credit-history">
-                  {`$${userCredits?.credits.toFixed(2)}`}
+                <Link
+                  href="/credit-history"
+                  className="text-blue-600 underline decoration-dotted hover:decoration-solid"
+                >
+                  {USDollar.format(userCredits.credits)}
                 </Link>
               ) : (
                 "$---"
