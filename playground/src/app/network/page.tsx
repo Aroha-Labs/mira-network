@@ -7,13 +7,19 @@ import { API_BASE_URL } from "src/config";
 import { useSession } from "src/hooks/useSession";
 import CopyToClipboardIcon from "src/components/CopyToClipboardIcon";
 
+interface Machine {
+  machine_uid: string;
+  network_ip: string;
+  status: "online" | "offline";
+}
+
 const NetworkPage = () => {
   const { data: userSession } = useSession();
   const {
     data: machines,
     isLoading,
     error,
-  } = useQuery({
+  } = useQuery<Machine[]>({
     queryKey: ["machines"],
     queryFn: async () => {
       if (!userSession?.access_token) throw new Error("User session not found");
@@ -44,7 +50,7 @@ const NetworkPage = () => {
     <div className="flex justify-center flex-1 bg-gray-100">
       <div className="w-full max-w-lg m-4 p-4 bg-white shadow rounded">
         <h2 className="text-xl font-semibold mb-4">Network Machines</h2>
-        {machines?.map((m: any) => (
+        {machines?.map((m) => (
           <div
             key={m.machine_uid}
             className="border rounded p-4 mb-4 flex items-center justify-between"
