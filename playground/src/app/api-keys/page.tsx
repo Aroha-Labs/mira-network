@@ -15,7 +15,7 @@ import {
   PlusIcon,
 } from "@heroicons/react/24/outline"; // Import ClipboardIcon, EllipsisVerticalIcon, and PlusIcon
 import { Menu, MenuItem, MenuItems, Transition } from "@headlessui/react"; // Import Menu and Transition from @headlessui/react
-import Loading from "src/components/Loading";
+import Loading from "src/components/PageLoading";
 
 interface ApiKey {
   token: string;

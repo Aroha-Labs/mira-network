@@ -8,7 +8,7 @@ import ApiLogRow from "src/components/ApiLogRow";
 import { useState } from "react";
 import Modal from "src/components/Modal";
 import { createPortal } from "react-dom";
-import Loading from "src/components/Loading";
+import Loading from "src/components/PageLoading";
 
 interface ApiLog {
   user_id: string;

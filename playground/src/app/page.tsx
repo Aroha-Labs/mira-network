@@ -4,7 +4,7 @@ import Link from "next/link";
 import LinkBox from "src/components/LinkBox";
 import UserInfo from "src/components/UserInfo";
 import AnalyticsSection from "src/components/AnalyticsSection";
-import Loading from "src/components/Loading";
+import Loading from "src/components/PageLoading";
 import { useSession } from "src/hooks/useSession";
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";

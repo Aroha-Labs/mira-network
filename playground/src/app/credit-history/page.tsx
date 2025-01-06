@@ -5,7 +5,7 @@ import axios from "axios";
 import { API_BASE_URL } from "src/config";
 import { useSession } from "src/hooks/useSession";
 import { format } from "date-fns";
-import Loading from "src/components/Loading";
+import Loading from "src/components/PageLoading";
 
 interface CreditHistory {
   id: number;
