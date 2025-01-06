@@ -4,10 +4,29 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Bars4Icon, XMarkIcon } from "@heroicons/react/24/outline";
+import { useStore } from "@tanstack/react-store";
+import { userRolesState } from "src/state/userRolesState";
 
 const AdminLayout = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const userRoles = useStore(userRolesState, (state) => state);
+
+  const isAdmin = userRoles.includes("admin");
+
+  if (!isAdmin) {
+    return (
+      <div className="flex items-center justify-center flex-1 bg-gray-100">
+        <div
+          className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative"
+          role="alert"
+        >
+          <strong className="font-bold">Error: </strong>
+          <div>You don't have permission to access this page</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-1 bg-gray-100">
