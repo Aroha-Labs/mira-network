@@ -23,9 +23,9 @@ export const Spinner = () => (
   </svg>
 );
 
-export default function Loading() {
+export default function PageLoading() {
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
+    <div className="flex items-center justify-center flex-1 bg-gray-100">
       <div className="flex items-center space-x-2">
         <svg
           className="animate-spin h-5 w-5 text-gray-700"

@@ -8,7 +8,7 @@ import {
   ChatBubbleBottomCenterIcon,
   StopIcon,
 } from "@heroicons/react/24/outline";
-import Loading, { Spinner } from "src/components/Loading";
+import Loading, { Spinner } from "src/components/PageLoading";
 import AutoGrowTextarea from "src/components/AutoGrowTextarea";
 import ConfirmModal from "src/components/ConfirmModal";
 import { LLM_BASE_URL } from "src/config";

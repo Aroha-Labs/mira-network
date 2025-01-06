@@ -5,7 +5,7 @@ import { useSession } from "src/hooks/useSession";
 import { API_BASE_URL } from "src/config";
 import UserCard from "src/components/UserCard";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import Loading from "src/components/Loading";
+import Loading from "src/components/PageLoading";
 
 interface User {
   id: string;
