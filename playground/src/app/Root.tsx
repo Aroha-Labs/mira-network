@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link"; // Import Link from next/link
+import LayoutChildren from "./LayoutChildren";
 
 const queryClient = new QueryClient();
 
@@ -74,7 +75,7 @@ const Root = ({ children }: RootProps) => {
               </span>
             </div>
           )}
-          {children}
+          <LayoutChildren>{children}</LayoutChildren>
         </QueryClientProvider>
       </body>
     </html>
