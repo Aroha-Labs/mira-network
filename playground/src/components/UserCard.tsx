@@ -82,7 +82,7 @@ const UserCard = ({ user }: { user: User }) => {
       if (!userSession?.access_token) return;
 
       await axios.post(
-        `${API_BASE_URL}/add-credit`,
+        `${API_BASE_URL}/admin/add-credit`,
         {
           user_id: user.id,
           amount,

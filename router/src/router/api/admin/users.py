@@ -1,9 +1,10 @@
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlmodel import Session, select
+from src.router.schemas.credits import AddCreditRequest
 from src.router.core.security import supabase, verify_admin
-from src.router.models.user import UserCustomClaim, UserCredits
+from src.router.models.user import UserCreditsHistory, UserCustomClaim, UserCredits
 from src.router.db.session import get_session
 from enum import Enum
 from gotrue.types import User
@@ -151,4 +152,31 @@ def get_user_credits_by_id(
     ).first()
     if not user_credits:
         return {"credits": 0}
+    return {"credits": user_credits.credits}
+
+
+@router.post("/add-credit")
+def add_credit(
+    request: AddCreditRequest,
+    db: Session = Depends(get_session),
+    user=Depends(verify_admin),
+):
+    user_credits = db.exec(
+        select(UserCredits).where(UserCredits.user_id == request.user_id)
+    ).first()
+
+    if user_credits:
+        user_credits.credits += request.amount
+    else:
+        user_credits = UserCredits(user_id=request.user_id, credits=request.amount)
+        db.add(user_credits)
+
+    credit_history = UserCreditsHistory(
+        user_id=request.user_id,
+        amount=request.amount,
+        description=request.description,
+    )
+    db.add(credit_history)
+    db.commit()
+
     return {"credits": user_credits.credits}
