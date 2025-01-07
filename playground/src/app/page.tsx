@@ -108,6 +108,13 @@ export default function Home() {
         label="Network"
         isDisabled={!userSession?.user}
       />
+      <Link
+        href="/privacy-policy.html"
+        target="_blank"
+        className="text-blue-400 underline decoration-dotted hover:decoration-solid mt-4 text-xs"
+      >
+        Privacy Policy
+      </Link>
     </div>
   );
 }
