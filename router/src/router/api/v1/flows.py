@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlmodel import Session, select
-from src.mira_client_dashboard.models.flows import Flows
-from src.mira_client_dashboard.schemas.flows import FlowRequest, FlowChatCompletion
-from src.mira_client_dashboard.db.session import get_session
-from src.mira_client_dashboard.utils.helpers import extract_variables
-from src.mira_client_dashboard.utils.network import get_random_machines, PROXY_PORT
+from src.router.models.flows import Flows
+from src.router.schemas.flows import FlowRequest, FlowChatCompletion
+from src.router.db.session import get_session
+from src.router.utils.helpers import extract_variables
+from src.router.utils.network import get_random_machines, PROXY_PORT
 import requests
 
 router = APIRouter()

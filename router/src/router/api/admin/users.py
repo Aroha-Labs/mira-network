@@ -2,9 +2,9 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlmodel import Session, select
-from src.mira_client_dashboard.core.security import supabase, verify_admin
-from src.mira_client_dashboard.models.user import UserCustomClaim, UserCredits
-from src.mira_client_dashboard.db.session import get_session
+from src.router.core.security import supabase, verify_admin
+from src.router.models.user import UserCustomClaim, UserCredits
+from src.router.db.session import get_session
 from enum import Enum
 from gotrue.types import User
 

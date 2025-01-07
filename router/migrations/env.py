@@ -7,7 +7,7 @@ from sqlalchemy import pool
 from alembic import context
 from sqlmodel import SQLModel
 
-from src.mira_client_dashboard.models import *
+from src.router.models import *
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
