@@ -1,35 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlmodel import Session, select
 from src.router.core.types import User
 from src.router.models.user import UserCredits, UserCreditsHistory
-from src.router.schemas.credits import AddCreditRequest
 from src.router.db.session import get_session
 from src.router.core.security import verify_user
 
 router = APIRouter()
-
-
-@router.post("/add-credit")
-def add_credit(request: AddCreditRequest, db: Session = Depends(get_session)):
-    user_credits = db.exec(
-        select(UserCredits).where(UserCredits.user_id == request.user_id)
-    ).first()
-
-    if user_credits:
-        user_credits.credits += request.amount
-    else:
-        user_credits = UserCredits(user_id=request.user_id, credits=request.amount)
-        db.add(user_credits)
-
-    credit_history = UserCreditsHistory(
-        user_id=request.user_id,
-        amount=request.amount,
-        description=request.description,
-    )
-    db.add(credit_history)
-    db.commit()
-
-    return {"credits": user_credits.credits}
 
 
 @router.get("/user-credits")
