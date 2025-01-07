@@ -2,8 +2,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from src.mira_client_dashboard.api.v1 import router as v1_router
 from src.mira_client_dashboard.api.admin import router as admin_router
-from src.mira_client_dashboard.db.base import engine
-from sqlmodel import SQLModel
 import uvicorn
 from prometheus_fastapi_instrumentator import Instrumentator
 from scalar_fastapi import get_scalar_api_reference
@@ -44,9 +42,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Create tables
-# SQLModel.metadata.create_all(engine)
 
 # Include routers
 app.include_router(v1_router)
