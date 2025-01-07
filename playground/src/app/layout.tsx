@@ -3,8 +3,8 @@ import "./globals.css";
 import Root from "./Root";
 
 export const metadata: Metadata = {
-  title: "Playground | Mira Network",
-  description: "A playground for Mira Network",
+  title: "Console | Mira Network",
+  description: "Mira Network Console",
 };
 
 export default function RootLayout({

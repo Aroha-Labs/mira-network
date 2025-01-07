@@ -36,7 +36,7 @@ const UserInfo: React.FC<UserInfoProps> = ({ user, children }) => {
               <p className="font-bold">
                 {isLoggedIn
                   ? user.user_metadata.full_name
-                  : "Welcome to Playground"}
+                  : "Welcome to Console"}
               </p>
               <p className="text-sm text-gray-600">
                 {isLoggedIn ? user.email : "Sign in to access your console"}

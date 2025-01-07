@@ -52,12 +52,12 @@ const Root = ({ children }: RootProps) => {
           <header className="sticky top-0 flex items-center justify-center border-b border-gray-300 p-4 gap-2 bg-white z-10">
             <Link href="/" className="flex items-center gap-2">
               <img src="/img/logo.svg" alt="Mira" />
-              <h3 className="text-lg">playground</h3>
+              <h3 className="text-lg">console</h3>
             </Link>
             {/* Tailwind's text-lg sets the font size to 18px */}
             <div className="flex-1"></div>
             <Link href="/chat" className="flex text-blue-500 hover:underline">
-              Generate
+              Playground
             </Link>
             <Link
               href="/admin"
