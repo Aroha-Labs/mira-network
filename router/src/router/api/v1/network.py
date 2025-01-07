@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, Response, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
-from src.mira_client_dashboard.core.types import User
-from src.mira_client_dashboard.models.logs import ApiLogs
-from src.mira_client_dashboard.db.session import get_session
-from src.mira_client_dashboard.core.security import verify_user
-from src.mira_client_dashboard.utils.network import get_random_machines, PROXY_PORT
-from src.mira_client_dashboard.models.user import UserCredits, UserCreditsHistory
-from src.mira_client_dashboard.schemas.ai import AiRequest, VerifyRequest
+from src.router.core.types import User
+from src.router.models.logs import ApiLogs
+from src.router.db.session import get_session
+from src.router.core.security import verify_user
+from src.router.utils.network import get_random_machines, PROXY_PORT
+from src.router.models.user import UserCredits, UserCreditsHistory
+from src.router.schemas.ai import AiRequest, VerifyRequest
 import requests
 import time
 import httpx

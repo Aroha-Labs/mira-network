@@ -1,8 +1,8 @@
 import random
 
 from fastapi import HTTPException
-from src.mira_client_dashboard.schemas.machine import MachineInfo
-from src.mira_client_dashboard.utils.redis import get_online_machines, redis_client
+from src.router.schemas.machine import MachineInfo
+from src.router.utils.redis import get_online_machines, redis_client
 
 PROXY_PORT = 34523
 

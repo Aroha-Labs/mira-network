@@ -1,10 +1,10 @@
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
-from src.mira_client_dashboard.core.types import User
-from src.mira_client_dashboard.models.logs import ApiLogs
-from src.mira_client_dashboard.db.session import get_session
-from src.mira_client_dashboard.core.security import verify_user
+from src.router.core.types import User
+from src.router.models.logs import ApiLogs
+from src.router.db.session import get_session
+from src.router.core.security import verify_user
 from sqlalchemy import func
 
 router = APIRouter()

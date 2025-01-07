@@ -16,7 +16,7 @@ distribution = false
 
 [tool.pdm.scripts]
 _.env_file = ".env"
-dev = "uvicorn src.mira_client_dashboard.main:app --host 0.0.0.0 --reload"
-prod = "newrelic-admin run-python -m uvicorn src.mira_client_dashboard.main:app --host 0.0.0.0"
+dev = "uvicorn src.router.main:app --host 0.0.0.0 --reload"
+prod = "newrelic-admin run-python -m uvicorn src.router.main:app --host 0.0.0.0"
 migration-generate = "alembic revision --autogenerate -m"
 migration-upgrade = "alembic upgrade head"
