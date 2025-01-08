@@ -86,6 +86,18 @@ async def generate(
 ) -> Response:
     timeStart = time.time()
 
+    user_credits = db.exec(
+        select(UserCredits).where(UserCredits.user_id == user.id)
+    ).first()
+
+    if user_credits is None:
+        user_credits = UserCredits(user_id=user.id, credits=0)
+        db.add(user_credits)
+        db.commit()
+
+    if user_credits.credits <= 0:
+        raise HTTPException(status_code=402, detail="Insufficient credits")
+
     machine = get_random_machines(1)[0]
     proxy_url = f"http://{machine.network_ip}:{PROXY_PORT}/v1/chat/completions"
     llmres = requests.post(proxy_url, json=req.model_dump(), stream=req.stream)
@@ -128,9 +140,11 @@ async def generate(
         # Calculate cost and reduce user credits
         total_tokens = usage.get("total_tokens", 0)
         cost = total_tokens * 0.0003
+
         user_credits = db.exec(
             select(UserCredits).where(UserCredits.user_id == user.id)
         ).first()
+
         if user_credits:
             user_credits.credits -= cost
             db.add(user_credits)
