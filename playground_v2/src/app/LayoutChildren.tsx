@@ -1,7 +1,7 @@
 import { useStore } from "@tanstack/react-store";
-import Loading from "src/components/PageLoading";
 import { useLogout } from "src/hooks/useLogout";
 import { usePermissions } from "src/hooks/usePermissions";
+import Loading from "src/pageLoading/dashboard";
 import { userRolesState } from "src/state/userRolesState";
 
 interface LayoutChildrenProps {
@@ -21,7 +21,7 @@ const LayoutChildren = ({ children }: LayoutChildrenProps) => {
 
   if (session && !hasPermission) {
     return (
-      <div className="flex items-center justify-center flex-1 bg-gray-100">
+      <div className="flex items-center justify-center flex-1">
         <div
           className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative"
           role="alert"
