@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import Link from "next/link";
 import ChatBubble from "src/components/ChatBubble";
 // import SystemPromptInput from "src/components/SystemPromptInput";
@@ -116,7 +116,7 @@ export default function Chat() {
     data: supportedModelsData,
     error: supportedModelsError,
     isLoading: isModelsLoading,
-  } = useQuery({
+  } = useQuery<string[]>({
     queryKey: ["supportedModels"],
     queryFn: fetchSupportedModels,
   });
@@ -130,6 +130,14 @@ export default function Chat() {
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
   };
+
+  const supportedModelsOptions = useMemo(() => {
+    if (!supportedModelsData) return [];
+    return supportedModelsData.map((m) => {
+      const s = m.split("/");
+      return { value: m, label: s[s.length - 1] };
+    });
+  }, [supportedModelsData]);
 
   // const handleSystemPromptChange = (v: string) => {
   //   setSystemPrompt(v);
@@ -333,15 +341,15 @@ export default function Chat() {
 
   return (
     <div className="flex flex-col items-center bg-gray-100 flex-1">
-      <div className="w-full p-4 bg-white border-b border-gray-300 flex justify-center">
+      <div className="m-1 p-1 bg-white flex justify-center self-start">
         <select
           value={selectedModel}
           onChange={handleModelChange}
-          className="border border-gray-300 p-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="border border-gray-300 p-1 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 "
         >
-          {supportedModelsData.map((model: string) => (
-            <option key={model} value={model}>
-              {model}
+          {supportedModelsOptions.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
             </option>
           ))}
         </select>
