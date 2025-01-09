@@ -54,6 +54,19 @@ export default function Home() {
 
   return (
     <div className="flex flex-col items-center justify-center flex-1 bg-gray-100 p-4 space-y-4">
+      <img
+        src="/img/logo.svg"
+        alt="Mira Network Logo"
+        className="h-12 w-auto"
+      />
+      <h1 className="text-sm font-bold text-gray-800">
+        Console | Mira Network
+      </h1>
+      <p className="text-sm text-gray-600 text-center max-w-md">
+        A distributed system for managing and interacting with various LLM
+        providers through a unified interface
+      </p>
+      <div className="h-0.5 "></div>
       <UserInfo user={userSession?.user}>
         <AnalyticsSection userSession={userSession} />
       </UserInfo>
@@ -111,7 +124,7 @@ export default function Home() {
       <Link
         href="/privacy-policy.html"
         target="_blank"
-        className="text-blue-400 underline decoration-dotted hover:decoration-solid mt-4 text-xs"
+        className="text-blue-400 underline decoration-dotted hover:decoration-solid mt-4 text-xs pb-16"
       >
         Privacy Policy
       </Link>
