@@ -2,13 +2,16 @@
 
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
+import { useState } from "react";
+import { createPortal } from "react-dom";
+import { Header } from "src/components/apiLogs";
+import ApiLogsTable from "src/components/ApiLogsTable";
+import DateFilter from "src/components/DateFilter";
+import LogDetailsModal from "src/components/LogDetailsModal";
+import Loading from "src/components/PageLoading";
+import PaginationControls from "src/components/PaginationControls";
 import { API_BASE_URL } from "src/config";
 import { useSession } from "src/hooks/useSession";
-import ApiLogRow from "src/components/ApiLogRow";
-import { useState } from "react";
-import Modal from "src/components/Modal";
-import { createPortal } from "react-dom";
-import Loading from "src/components/PageLoading";
 
 interface ApiLog {
   user_id: string;
@@ -65,7 +68,7 @@ const ApiLogsPage = () => {
   const [startDate, setStartDate] = useState<string | undefined>(undefined);
   const [endDate, setEndDate] = useState<string | undefined>(undefined);
   const [orderBy, setOrderBy] = useState<string>("created_at");
-  const [order, setOrder] = useState<string>("desc");
+  const [order] = useState<string>("desc");
 
   const { data, error, isLoading } = useQuery({
     queryKey: ["apiLogs", page, startDate, endDate, orderBy, order],
@@ -93,42 +96,6 @@ const ApiLogsPage = () => {
     setSelectedLog(null);
   };
 
-  const handleNextPage = () => {
-    if (data && page < Math.ceil(data.total / pageSize)) {
-      setPage(page + 1);
-    }
-  };
-
-  const handlePreviousPage = () => {
-    if (page > 1) {
-      setPage(page - 1);
-    }
-  };
-
-  const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setStartDate(e.target.value);
-  };
-
-  const handleEndDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setEndDate(e.target.value);
-  };
-
-  const handleOrderByChange = (field: string) => {
-    if (orderBy === field) {
-      setOrder(order === "asc" ? "desc" : "asc");
-    } else {
-      setOrderBy(field);
-      setOrder("asc");
-    }
-  };
-
-  const getOrderIcon = (field: string) => {
-    if (orderBy === field) {
-      return order === "asc" ? "▲" : "▼";
-    }
-    return "";
-  };
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -143,142 +110,35 @@ const ApiLogsPage = () => {
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">API Logs</h1>
-      <div className="mb-4 flex space-x-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            Start Date
-          </label>
-          <input
-            type="date"
-            value={startDate || ""}
-            onChange={handleStartDateChange}
-            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            End Date
-          </label>
-          <input
-            type="date"
-            value={endDate || ""}
-            onChange={handleEndDateChange}
-            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-          />
-        </div>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="min-w-full bg-white border border-gray-200">
-          <thead>
-            <tr>
-              <th
-                className="px-4 py-2 text-left border-b cursor-pointer"
-                onClick={() => handleOrderByChange("created_at")}
-              >
-                Timestamp {getOrderIcon("created_at")}
-              </th>
-              <th
-                className="px-4 py-2 text-left border-b cursor-pointer"
-                onClick={() => handleOrderByChange("total_tokens")}
-              >
-                Tokens {getOrderIcon("total_tokens")}
-              </th>
-              <th className="px-4 py-2 text-left border-b">Provider</th>
-              <th className="px-4 py-2 text-left border-b">Model</th>
-              <th
-                className="px-4 py-2 text-left border-b cursor-pointer"
-                onClick={() => handleOrderByChange("total_response_time")}
-              >
-                Cost {getOrderIcon("total_response_time")}
-              </th>
-              <th className="px-4 py-2 text-left border-b"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {data?.logs?.map((log) => {
-              const [provider, ...modelName] = log.model.split("/");
-              return (
-                <ApiLogRow
-                  key={log.id}
-                  log={{ ...log, model: modelName.join("/"), provider }}
-                  onClick={() => handleRowClick(log)}
-                />
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      <div className="flex justify-between mt-4">
-        <button
-          className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md"
-          onClick={handlePreviousPage}
-          disabled={page === 1}
-        >
-          Previous
-        </button>
-        <button
-          className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md"
-          onClick={handleNextPage}
-          disabled={data && page >= Math.ceil(data.total / pageSize)}
-        >
-          Next
-        </button>
-      </div>
+      <Header />
+      <DateFilter
+        startDate={startDate}
+        endDate={endDate}
+        onStartDateChange={setStartDate}
+        onEndDateChange={setEndDate}
+      />
+      <ApiLogsTable
+        logs={data?.logs}
+        orderBy={orderBy}
+        order={order}
+        onOrderByChange={setOrderBy}
+        onRowClick={handleRowClick}
+      />
+      <PaginationControls
+        page={page}
+        pageSize={pageSize}
+        total={data?.total}
+        onNextPage={() => setPage(page + 1)}
+        onPreviousPage={() => setPage(page - 1)}
+      />
       {selectedLog &&
         createPortal(
-          <Modal onClose={handleCloseModal} title="API Log Details">
-            <div className="mb-4">
-              <button
-                className={`px-4 py-2 ${
-                  activeTab === "messages"
-                    ? "bg-blue-500 text-white"
-                    : "bg-gray-200 text-gray-800"
-                } rounded-l-md`}
-                onClick={() => setActiveTab("messages")}
-              >
-                Messages
-              </button>
-              <button
-                className={`px-4 py-2 ${
-                  activeTab === "raw"
-                    ? "bg-blue-500 text-white"
-                    : "bg-gray-200 text-gray-800"
-                } rounded-r-md`}
-                onClick={() => setActiveTab("raw")}
-              >
-                Raw
-              </button>
-            </div>
-            {activeTab === "messages" ? (
-              <div className="space-y-4">
-                {JSON.parse(selectedLog.payload).messages.map(
-                  (
-                    message: { role: string; content: string },
-                    index: number
-                  ) => (
-                    <div
-                      key={index}
-                      className={`p-2 rounded-md ${
-                        message.role === "user"
-                          ? "bg-blue-100 text-blue-800"
-                          : "bg-gray-100 text-gray-800"
-                      }`}
-                    >
-                      <strong>{message.role}:</strong> {message.content}
-                    </div>
-                  )
-                )}
-                <div className="p-2 rounded-md bg-green-100 text-green-800">
-                  <strong>Response:</strong> {selectedLog.response}
-                </div>
-              </div>
-            ) : (
-              <pre className="whitespace-pre-wrap bg-gray-100 p-4 rounded-md">
-                {JSON.stringify(JSON.parse(selectedLog.payload), null, 2)}
-              </pre>
-            )}
-          </Modal>,
+          <LogDetailsModal
+            log={selectedLog}
+            activeTab={activeTab}
+            onClose={handleCloseModal}
+            onTabChange={setActiveTab}
+          />,
           document.body
         )}
     </div>
