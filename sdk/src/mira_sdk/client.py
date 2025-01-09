@@ -1,6 +1,6 @@
 from typing import Optional, List, Dict, AsyncGenerator, Union
 import httpx
-from src.mira_sdk.models import (
+from mira_sdk.models import (
     Message,
     ModelProvider,
     AiRequest,

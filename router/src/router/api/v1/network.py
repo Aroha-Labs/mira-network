@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, Response, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
-from src.mira_client_dashboard.core.types import User
-from src.mira_client_dashboard.models.logs import ApiLogs
-from src.mira_client_dashboard.db.session import get_session
-from src.mira_client_dashboard.core.security import verify_user
-from src.mira_client_dashboard.utils.network import get_random_machines, PROXY_PORT
-from src.mira_client_dashboard.models.user import UserCredits, UserCreditsHistory
-from src.mira_client_dashboard.schemas.ai import AiRequest, VerifyRequest
+from src.router.core.types import User
+from src.router.models.logs import ApiLogs
+from src.router.db.session import get_session
+from src.router.core.security import verify_user
+from src.router.utils.network import get_random_machines, PROXY_PORT
+from src.router.models.user import UserCredits, UserCreditsHistory
+from src.router.schemas.ai import AiRequest, VerifyRequest
 import requests
 import time
 import httpx
@@ -86,6 +86,18 @@ async def generate(
 ) -> Response:
     timeStart = time.time()
 
+    user_credits = db.exec(
+        select(UserCredits).where(UserCredits.user_id == user.id)
+    ).first()
+
+    if user_credits is None:
+        user_credits = UserCredits(user_id=user.id, credits=0)
+        db.add(user_credits)
+        db.commit()
+
+    if user_credits.credits <= 0:
+        raise HTTPException(status_code=402, detail="Insufficient credits")
+
     machine = get_random_machines(1)[0]
     proxy_url = f"http://{machine.network_ip}:{PROXY_PORT}/v1/chat/completions"
     llmres = requests.post(proxy_url, json=req.model_dump(), stream=req.stream)
@@ -128,9 +140,11 @@ async def generate(
         # Calculate cost and reduce user credits
         total_tokens = usage.get("total_tokens", 0)
         cost = total_tokens * 0.0003
+
         user_credits = db.exec(
             select(UserCredits).where(UserCredits.user_id == user.id)
         ).first()
+
         if user_credits:
             user_credits.credits -= cost
             db.add(user_credits)

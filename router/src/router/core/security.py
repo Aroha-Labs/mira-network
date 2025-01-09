@@ -2,11 +2,11 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi import HTTPException, Depends
 from sqlmodel import select
 from supabase import create_client, Client
-from src.mira_client_dashboard.core.types import User
-from src.mira_client_dashboard.models.user import UserCustomClaim
-from src.mira_client_dashboard.models.tokens import ApiToken
-from src.mira_client_dashboard.db.session import get_session
-from src.mira_client_dashboard.core.config import SUPABASE_URL, SUPABASE_KEY
+from src.router.core.types import User
+from src.router.models.user import UserCustomClaim
+from src.router.models.tokens import ApiToken
+from src.router.db.session import get_session
+from src.router.core.config import SUPABASE_URL, SUPABASE_KEY
 import jwt
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)

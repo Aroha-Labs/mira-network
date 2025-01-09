@@ -15,12 +15,7 @@ import {
 } from "@headlessui/react";
 import { ChevronDownIcon as MenuIcon } from "@heroicons/react/24/outline";
 import ManageUserRoles from "src/components/ManageUserRoles";
-
-const USDollar = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  minimumFractionDigits: 2,
-});
+import { USDollar } from "src/utils/currency";
 
 interface User {
   id: string;
@@ -87,7 +82,7 @@ const UserCard = ({ user }: { user: User }) => {
       if (!userSession?.access_token) return;
 
       await axios.post(
-        `${API_BASE_URL}/add-credit`,
+        `${API_BASE_URL}/admin/add-credit`,
         {
           user_id: user.id,
           amount,
