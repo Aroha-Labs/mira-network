@@ -12,22 +12,20 @@ interface LoggedinStateProps {
 }
 
 const LoggedinState = ({ userSession }: LoggedinStateProps) => (
-  <div className="flex flex-col items-center justify-center flex-1 p-4 space-y-4">
-    <div className="max-w-[710px] w-full">
-      <UserInfo user={userSession?.user} />
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-4">
-          <Analytics userSession={userSession} />
-          <Footer className="hidden md:block col-span-2" />
-        </div>
-        <div className="space-y-4">
-          <Credit />
-          <ManageApiKey />
-          <ApiLogs />
-          <Network />
-        </div>
-        <Footer className="block md:hidden" />
+  <div className="max-w-[710px] w-full">
+    <UserInfo user={userSession?.user} />
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="space-y-4">
+        <Analytics userSession={userSession} />
+        <Footer className="hidden md:block col-span-2" />
       </div>
+      <div className="space-y-4">
+        <Credit />
+        <ManageApiKey />
+        <ApiLogs />
+        <Network />
+      </div>
+      <Footer className="block md:hidden" />
     </div>
   </div>
 );

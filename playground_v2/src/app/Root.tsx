@@ -33,7 +33,7 @@ const Root = ({ children }: RootProps) => {
       <body
         className={c(
           jetBrainsMono.className,
-          "antialiased text-base flex flex-col"
+          "antialiased text-base flex flex-col items-center justify-center flex-1 p-4 space-y-4"
         )}
       >
         <QueryClientProvider client={queryClient}>

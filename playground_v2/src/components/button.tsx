@@ -75,7 +75,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     return (
       <Comp
         className={cn(
-          "relative group",
+          "relative group cursor-pointer",
           jetBrainsMono.className,
           buttonVariants({ variant, size, className }),
           {
