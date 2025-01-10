@@ -43,9 +43,9 @@ const TableBody = React.forwardRef<HTMLTableSectionElement, TableBodyProps>(
             className
           )}
         >
-          {Array.from({ length: rows }).map((_, index) => (
+          {Array.from({ length: rows }).map(() => (
             <TableRow key={uuidv4()}>
-              {Array.from({ length: columns }).map((_, index) => (
+              {Array.from({ length: columns }).map(() => (
                 <TableCell key={uuidv4()}>
                   <Skeleton className="h-6" />
                 </TableCell>
