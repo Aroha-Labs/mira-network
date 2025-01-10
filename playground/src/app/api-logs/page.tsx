@@ -8,20 +8,8 @@ import ApiLogRow from "src/components/ApiLogRow";
 import { useState } from "react";
 import Modal from "src/components/Modal";
 import { createPortal } from "react-dom";
-import Loading from "src/components/PageLoading";
-
-interface ApiLog {
-  user_id: string;
-  payload: string;
-  prompt_tokens: number;
-  total_tokens: number;
-  model: string;
-  id: number;
-  response: string;
-  completion_tokens: number;
-  total_response_time: number;
-  created_at: string;
-}
+import { ApiLog } from "src/types/api-log";
+import TableLoadingRow from "src/components/TableLoadingRow";
 
 interface ApiLogsResponse {
   logs: ApiLog[];
@@ -36,6 +24,8 @@ const fetchApiLogs = async (
   pageSize: number = 100,
   startDate?: string,
   endDate?: string,
+  machineId?: string,
+  model?: string,
   orderBy: string = "created_at",
   order: string = "desc"
 ): Promise<ApiLogsResponse> => {
@@ -51,6 +41,8 @@ const fetchApiLogs = async (
       page_size: pageSize,
       start_date: startDate,
       end_date: endDate,
+      machine_id: machineId,
+      model,
       order_by: orderBy,
       order,
     },
@@ -64,11 +56,22 @@ const ApiLogsPage = () => {
   const [pageSize] = useState(100);
   const [startDate, setStartDate] = useState<string | undefined>(undefined);
   const [endDate, setEndDate] = useState<string | undefined>(undefined);
+  const [machineId, setMachineId] = useState<string | undefined>(undefined);
+  const [modelFilter, setModelFilter] = useState<string | undefined>(undefined);
   const [orderBy, setOrderBy] = useState<string>("created_at");
   const [order, setOrder] = useState<string>("desc");
 
   const { data, error, isLoading } = useQuery({
-    queryKey: ["apiLogs", page, startDate, endDate, orderBy, order],
+    queryKey: [
+      "apiLogs",
+      page,
+      startDate,
+      endDate,
+      machineId,
+      modelFilter,
+      orderBy,
+      order,
+    ],
     queryFn: () =>
       fetchApiLogs(
         userSession?.access_token,
@@ -76,6 +79,8 @@ const ApiLogsPage = () => {
         pageSize,
         startDate,
         endDate,
+        machineId,
+        modelFilter,
         orderBy,
         order
       ),
@@ -129,14 +134,6 @@ const ApiLogsPage = () => {
     return "";
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <Loading />
-      </div>
-    );
-  }
-
   if (error) {
     return <div>Error loading API logs</div>;
   }
@@ -167,6 +164,30 @@ const ApiLogsPage = () => {
             className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
           />
         </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            Machine ID
+          </label>
+          <input
+            type="text"
+            value={machineId || ""}
+            onChange={(e) => setMachineId(e.target.value || undefined)}
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            placeholder="Filter by machine ID"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            Model
+          </label>
+          <input
+            type="text"
+            value={modelFilter || ""}
+            onChange={(e) => setModelFilter(e.target.value || undefined)}
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            placeholder="Filter by model"
+          />
+        </div>
       </div>
       <div className="overflow-x-auto">
         <table className="min-w-full bg-white border border-gray-200">
@@ -184,28 +205,43 @@ const ApiLogsPage = () => {
               >
                 Tokens {getOrderIcon("total_tokens")}
               </th>
-              <th className="px-4 py-2 text-left border-b">Provider</th>
-              <th className="px-4 py-2 text-left border-b">Model</th>
+              <th
+                className="px-4 py-2 text-left border-b cursor-pointer"
+                onClick={() => handleOrderByChange("ttfs")}
+              >
+                TTFS {getOrderIcon("ttfs")}
+              </th>
               <th
                 className="px-4 py-2 text-left border-b cursor-pointer"
                 onClick={() => handleOrderByChange("total_response_time")}
               >
-                Cost {getOrderIcon("total_response_time")}
+                Response Time {getOrderIcon("total_response_time")}
               </th>
+              <th className="px-4 py-2 text-left border-b">Provider</th>
+              <th className="px-4 py-2 text-left border-b">Model</th>
+              <th className="px-4 py-2 text-left border-b">Machine ID</th>
+              <th className="px-4 py-2 text-left border-b">Cost</th>
               <th className="px-4 py-2 text-left border-b"></th>
             </tr>
           </thead>
           <tbody>
-            {data?.logs?.map((log) => {
-              const [provider, ...modelName] = log.model.split("/");
-              return (
+            {isLoading ? (
+              <>
+                <TableLoadingRow />
+                <TableLoadingRow />
+                <TableLoadingRow />
+                <TableLoadingRow />
+                <TableLoadingRow />
+              </>
+            ) : (
+              data?.logs?.map((log) => (
                 <ApiLogRow
                   key={log.id}
-                  log={{ ...log, model: modelName.join("/"), provider }}
+                  log={log}
                   onClick={() => handleRowClick(log)}
                 />
-              );
-            })}
+              ))
+            )}
           </tbody>
         </table>
       </div>
@@ -252,30 +288,34 @@ const ApiLogsPage = () => {
             </div>
             {activeTab === "messages" ? (
               <div className="space-y-4">
-                {JSON.parse(selectedLog.payload).messages.map(
-                  (
-                    message: { role: string; content: string },
-                    index: number
-                  ) => (
-                    <div
-                      key={index}
-                      className={`p-2 rounded-md ${
-                        message.role === "user"
-                          ? "bg-blue-100 text-blue-800"
-                          : "bg-gray-100 text-gray-800"
-                      }`}
-                    >
-                      <strong>{message.role}:</strong> {message.content}
-                    </div>
-                  )
-                )}
+                {selectedLog.payload
+                  ? JSON.parse(selectedLog.payload).messages.map(
+                      (
+                        message: { role: string; content: string },
+                        index: number
+                      ) => (
+                        <div
+                          key={index}
+                          className={`p-2 rounded-md ${
+                            message.role === "user"
+                              ? "bg-blue-100 text-blue-800"
+                              : "bg-gray-100 text-gray-800"
+                          }`}
+                        >
+                          <strong>{message.role}:</strong> {message.content}
+                        </div>
+                      )
+                    )
+                  : ""}
                 <div className="p-2 rounded-md bg-green-100 text-green-800">
                   <strong>Response:</strong> {selectedLog.response}
                 </div>
               </div>
             ) : (
               <pre className="whitespace-pre-wrap bg-gray-100 p-4 rounded-md">
-                {JSON.stringify(JSON.parse(selectedLog.payload), null, 2)}
+                {selectedLog.payload
+                  ? JSON.stringify(JSON.parse(selectedLog.payload), null, 2)
+                  : ""}
               </pre>
             )}
           </Modal>,

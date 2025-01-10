@@ -18,6 +18,8 @@ def list_all_logs(
     page_size: int = 10,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
+    machine_id: Optional[str] = None,
+    model: Optional[str] = None,
     order_by: Optional[str] = "created_at",
     order: Optional[str] = "desc",
 ):
@@ -28,6 +30,10 @@ def list_all_logs(
         query = query.filter(ApiLogs.created_at >= start_date)
     if end_date:
         query = query.filter(ApiLogs.created_at <= end_date)
+    if machine_id:
+        query = query.filter(ApiLogs.machine_id == machine_id)
+    if model:
+        query = query.filter(ApiLogs.model == model)
 
     if order_by not in ["created_at", "total_response_time", "total_tokens"]:
         raise HTTPException(status_code=400, detail="Invalid order_by field")
