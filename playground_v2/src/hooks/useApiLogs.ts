@@ -15,6 +15,7 @@ export interface ApiLog {
   total_response_time: number;
   total_tokens: number;
   user_id: string;
+  machine_id: string;
 }
 
 interface ApiLogsResponse {
