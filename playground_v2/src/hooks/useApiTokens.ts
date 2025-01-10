@@ -1,10 +1,9 @@
-import axios from "axios";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import axios, { AxiosError } from "axios";
 import { API_BASE_URL } from "src/config";
 import { useSession } from "./useSession";
 
-import { useQuery } from "@tanstack/react-query";
-
-interface ApiKey {
+export interface ApiKey {
   token: string;
   description: string;
   created_at: string;
@@ -20,13 +19,49 @@ const fetchApiKeys = async (token?: string): Promise<ApiKey[]> => {
   return response.data;
 };
 
+const addApiKey = async (token: string, description: string) => {
+  try {
+    if (!description || description.length === 0) {
+      return;
+    }
+    const response = await axios.post(
+      `${API_BASE_URL}/api-tokens`,
+      { description },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    return response.data;
+  } catch (e) {
+    const error = e as AxiosError<{ detail: string }>;
+    throw new Error(error.response?.data?.detail ?? error.message);
+  }
+};
+
 const useApiTokens = () => {
   const { data: userSession } = useSession();
-  return useQuery<ApiKey[]>({
+  const queryClient = useQueryClient();
+
+  const query = useQuery<ApiKey[]>({
     queryKey: ["apiKeys"],
     queryFn: () => fetchApiKeys(userSession?.access_token),
     enabled: !!userSession?.access_token,
   });
+
+  const mutation = useMutation({
+    mutationFn: (description: string) => {
+      if (!userSession?.access_token) {
+        throw new Error("User session not found");
+      }
+      return addApiKey(userSession.access_token, description);
+    },
+    onSuccess: () => {
+      // Refetch the 'apiKeys' query after a successful mutation
+      queryClient.invalidateQueries({
+        queryKey: ["apiKeys"],
+      });
+    },
+  });
+
+  return { ...query, addApiKey: mutation };
 };
 
 export default useApiTokens;
