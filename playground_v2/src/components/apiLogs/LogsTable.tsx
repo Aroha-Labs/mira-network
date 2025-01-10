@@ -8,7 +8,7 @@ import {
   TableRow,
 } from "src/components/Table";
 import Card from "src/components/card";
-import useApiLogs from "src/hooks/useApiLogs";
+import useApiLogs, { ApiLog } from "src/hooks/useApiLogs";
 
 const LogsTable = ({ onRowClick }: { onRowClick: (log: ApiLog) => void }) => {
   const { data, isLoading, error } = useApiLogs();
