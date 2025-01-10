@@ -3,6 +3,8 @@ import { format } from "date-fns";
 import { ApiLog } from "src/types/api-log";
 import CostCell from "./CostCell";
 import TokenCell from "./TokenCell";
+import TTFSCell from "./TTFSCell";
+import ResponseTimeCell from "./ResponseTimeCell";
 
 const ApiLogRow = ({ log, onClick }: { log: ApiLog; onClick: () => void }) => {
   const [provider, ...modelName] = log.model.split("/");
@@ -16,6 +18,12 @@ const ApiLogRow = ({ log, onClick }: { log: ApiLog; onClick: () => void }) => {
       <td className="px-4 py-2">{format(new Date(log.created_at), "PPp")}</td>
       <td>
         <TokenCell log={log} />
+      </td>
+      <td>
+        <TTFSCell log={log} />
+      </td>
+      <td>
+        <ResponseTimeCell log={log} />
       </td>
       <td className="px-4 py-2">{provider}</td>
       <td className="px-4 py-2">{modelName.join("/")}</td>

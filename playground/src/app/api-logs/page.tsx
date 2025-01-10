@@ -172,6 +172,18 @@ const ApiLogsPage = () => {
               >
                 Tokens {getOrderIcon("total_tokens")}
               </th>
+              <th
+                className="px-4 py-2 text-left border-b cursor-pointer"
+                onClick={() => handleOrderByChange("ttfs")}
+              >
+                TTFS {getOrderIcon("ttfs")}
+              </th>
+              <th
+                className="px-4 py-2 text-left border-b cursor-pointer"
+                onClick={() => handleOrderByChange("total_response_time")}
+              >
+                Response Time {getOrderIcon("total_response_time")}
+              </th>
               <th className="px-4 py-2 text-left border-b">Provider</th>
               <th className="px-4 py-2 text-left border-b">Model</th>
               <th className="px-4 py-2 text-left border-b">Cost</th>

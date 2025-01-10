@@ -9,6 +9,7 @@ export interface ApiLog {
   user_id: string;
   payload?: string;
   request_payload?: Record<string, unknown>;
+  ttft: number;
   response: string;
   prompt_tokens: number;
   completion_tokens: number;
