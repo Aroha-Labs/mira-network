@@ -26,6 +26,7 @@ class ApiLogs(SQLModel, table=True):
     user_id: str = Field(index=True)
     payload: Optional[str] = Field()
     request_payload: Optional[dict] = Field(sa_column=Column(JSONB))
+    ttft: Optional[float] = Field(description="Time to first token")
     response: str
     prompt_tokens: int
     completion_tokens: int
