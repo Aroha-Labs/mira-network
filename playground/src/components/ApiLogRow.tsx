@@ -27,6 +27,7 @@ const ApiLogRow = ({ log, onClick }: { log: ApiLog; onClick: () => void }) => {
       </td>
       <td className="px-4 py-2">{provider}</td>
       <td className="px-4 py-2">{modelName.join("/")}</td>
+      <td className="px-4 py-2">{log.machine_id || "-"}</td>
       <td>
         <CostCell log={log} />
       </td>
