@@ -8,8 +8,8 @@ import ApiLogRow from "src/components/ApiLogRow";
 import { useState } from "react";
 import Modal from "src/components/Modal";
 import { createPortal } from "react-dom";
-import Loading from "src/components/PageLoading";
 import { ApiLog } from "src/types/api-log";
+import TableLoadingRow from "src/components/TableLoadingRow";
 
 interface ApiLogsResponse {
   logs: ApiLog[];
@@ -24,6 +24,8 @@ const fetchApiLogs = async (
   pageSize: number = 100,
   startDate?: string,
   endDate?: string,
+  machineId?: string,
+  model?: string,
   orderBy: string = "created_at",
   order: string = "desc"
 ): Promise<ApiLogsResponse> => {
@@ -39,6 +41,8 @@ const fetchApiLogs = async (
       page_size: pageSize,
       start_date: startDate,
       end_date: endDate,
+      machine_id: machineId,
+      model,
       order_by: orderBy,
       order,
     },
@@ -52,11 +56,22 @@ const ApiLogsPage = () => {
   const [pageSize] = useState(100);
   const [startDate, setStartDate] = useState<string | undefined>(undefined);
   const [endDate, setEndDate] = useState<string | undefined>(undefined);
+  const [machineId, setMachineId] = useState<string | undefined>(undefined);
+  const [modelFilter, setModelFilter] = useState<string | undefined>(undefined);
   const [orderBy, setOrderBy] = useState<string>("created_at");
   const [order, setOrder] = useState<string>("desc");
 
   const { data, error, isLoading } = useQuery({
-    queryKey: ["apiLogs", page, startDate, endDate, orderBy, order],
+    queryKey: [
+      "apiLogs",
+      page,
+      startDate,
+      endDate,
+      machineId,
+      modelFilter,
+      orderBy,
+      order,
+    ],
     queryFn: () =>
       fetchApiLogs(
         userSession?.access_token,
@@ -64,6 +79,8 @@ const ApiLogsPage = () => {
         pageSize,
         startDate,
         endDate,
+        machineId,
+        modelFilter,
         orderBy,
         order
       ),
@@ -117,14 +134,6 @@ const ApiLogsPage = () => {
     return "";
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <Loading />
-      </div>
-    );
-  }
-
   if (error) {
     return <div>Error loading API logs</div>;
   }
@@ -153,6 +162,30 @@ const ApiLogsPage = () => {
             value={endDate || ""}
             onChange={handleEndDateChange}
             className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            Machine ID
+          </label>
+          <input
+            type="text"
+            value={machineId || ""}
+            onChange={(e) => setMachineId(e.target.value || undefined)}
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            placeholder="Filter by machine ID"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            Model
+          </label>
+          <input
+            type="text"
+            value={modelFilter || ""}
+            onChange={(e) => setModelFilter(e.target.value || undefined)}
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            placeholder="Filter by model"
           />
         </div>
       </div>
@@ -186,18 +219,29 @@ const ApiLogsPage = () => {
               </th>
               <th className="px-4 py-2 text-left border-b">Provider</th>
               <th className="px-4 py-2 text-left border-b">Model</th>
+              <th className="px-4 py-2 text-left border-b">Machine ID</th>
               <th className="px-4 py-2 text-left border-b">Cost</th>
               <th className="px-4 py-2 text-left border-b"></th>
             </tr>
           </thead>
           <tbody>
-            {data?.logs?.map((log) => (
-              <ApiLogRow
-                key={log.id}
-                log={log}
-                onClick={() => handleRowClick(log)}
-              />
-            ))}
+            {isLoading ? (
+              <>
+                <TableLoadingRow />
+                <TableLoadingRow />
+                <TableLoadingRow />
+                <TableLoadingRow />
+                <TableLoadingRow />
+              </>
+            ) : (
+              data?.logs?.map((log) => (
+                <ApiLogRow
+                  key={log.id}
+                  log={log}
+                  onClick={() => handleRowClick(log)}
+                />
+              ))
+            )}
           </tbody>
         </table>
       </div>
