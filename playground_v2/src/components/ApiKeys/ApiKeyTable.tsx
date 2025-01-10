@@ -12,8 +12,8 @@ const getTokenDisplay = (token: string) => {
   return `${token.slice(0, 4)}...${token.slice(-4)}`;
 };
 
-const ApiKeyTable = ({ onRowClick }: { onRowClick: (log: ApiKey) => void }) => {
-  const { data, isLoading, error, deleteMutation } = useApiTokens();
+const ApiKeyTable = () => {
+  const { data, isLoading, error } = useApiTokens();
   const [isCopied, setIsCopied] = useState(false);
 
   const handleCopyToClipboard = async (token: string) => {
@@ -54,11 +54,7 @@ const ApiKeyTable = ({ onRowClick }: { onRowClick: (log: ApiKey) => void }) => {
         <TableBody>
           {data?.map((key: ApiKey) => {
             return (
-              <TableRow
-                key={key?.token}
-                onClick={() => onRowClick(key)}
-                className="cursor-pointer"
-              >
+              <TableRow key={key?.token} className="cursor-pointer">
                 <TableCell>{key.description}</TableCell>
                 <TableCell className="opacity-40 min-w-[300px]">
                   {getTokenDisplay(key.token)}

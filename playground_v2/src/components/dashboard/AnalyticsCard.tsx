@@ -1,43 +1,12 @@
-import { Session } from "@supabase/supabase-js";
-import { useQuery } from "@tanstack/react-query";
-import axios from "axios";
 import Link from "next/link";
 import { Button } from "src/components/button";
 import Card from "src/components/card";
-import { API_BASE_URL } from "src/config";
+import useTotalInferenceCalls from "src/hooks/useTotalInferenceCalls";
 import { cn } from "src/lib/utils";
 import AnalyticsChart from "./AnalyticsChart";
 
-const fetchInferenceCalls = async (token: string) => {
-  const response = await axios.get(`${API_BASE_URL}/total-inference-calls`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-  return response.data;
-};
-
-const AnalyticsCard = ({
-  userSession,
-  className,
-}: {
-  userSession?: Session | null;
-  className?: string;
-}) => {
-  const {
-    data: inferenceCalls,
-    error,
-    isLoading,
-  } = useQuery({
-    queryKey: ["inferenceCalls"],
-    queryFn: () => {
-      if (!userSession?.access_token) {
-        throw new Error("User session not found");
-      }
-      return fetchInferenceCalls(userSession.access_token);
-    },
-    enabled: !!userSession?.access_token,
-  });
+const AnalyticsCard = ({ className }: { className?: string }) => {
+  const { data: inferenceCalls, error, isLoading } = useTotalInferenceCalls();
 
   return (
     <Card className={cn(className, "relative")}>

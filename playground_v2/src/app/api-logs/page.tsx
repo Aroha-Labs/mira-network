@@ -85,7 +85,6 @@ const ApiLogsPage = () => {
   });
 
   const [selectedLog, setSelectedLog] = useState<ApiLog | null>(null);
-  const [activeTab, setActiveTab] = useState<"messages" | "raw">("messages");
 
   const handleRowClick = (log: ApiLog) => {
     setSelectedLog(log);
@@ -120,12 +119,7 @@ const ApiLogsPage = () => {
       /> */}
       {selectedLog &&
         createPortal(
-          <LogDetailsModal
-            log={selectedLog}
-            activeTab={activeTab}
-            onClose={handleCloseModal}
-            onTabChange={setActiveTab}
-          />,
+          <LogDetailsModal log={selectedLog} onClose={handleCloseModal} />,
           document.body
         )}
       <Footer />
