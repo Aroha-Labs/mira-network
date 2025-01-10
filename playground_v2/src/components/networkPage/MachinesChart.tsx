@@ -1,5 +1,6 @@
 import Card from "src/components/card";
 import MachinesHeader from "./MachinesHeader";
+import UsageByMachine from "./UsageByMachine";
 
 interface MachinesChartProps {
   activeMachine: string;
@@ -17,6 +18,7 @@ const MachinesChart = ({
           activeMachine={activeMachine}
           changeActiveMachine={changeActiveMachine}
         />
+        <UsageByMachine activeMachine={activeMachine} />
       </div>
     </Card>
   );
