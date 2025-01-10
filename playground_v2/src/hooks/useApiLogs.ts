@@ -61,11 +61,17 @@ const useApiLogs = () => {
     total_tokens: log.total_tokens,
   }));
 
+  const totalTokens = data?.logs?.reduce(
+    (acc, log) => acc + log.total_tokens,
+    0
+  );
+
   return {
     chartDataByDay,
     isLoading,
     error,
     data,
+    totalTokens,
   };
 };
 
