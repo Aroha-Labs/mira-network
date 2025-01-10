@@ -1,3 +1,4 @@
+from typing import Optional
 from fastapi import APIRouter, Depends, Response, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
@@ -106,6 +107,10 @@ async def generate(
     def generate():
         usage = {}
         result_text = ""
+
+        # Time to first token
+        ttfs: Optional[float] = None
+
         for line in llmres.iter_lines():
             l = line.decode("utf-8")
             if l.startswith("data: "):
@@ -123,6 +128,9 @@ async def generate(
             except json.JSONDecodeError as e:
                 # print(e)
                 pass
+
+            if ttfs is None:
+                ttfs = time.time() - timeStart
             yield line
 
         mp = db.exec(
@@ -130,7 +138,6 @@ async def generate(
         ).first()
 
         if mp is None:
-            # throw an error
             raise HTTPException(
                 status_code=500, detail="MODEL_PRICING not set in system settings"
             )
@@ -149,6 +156,7 @@ async def generate(
             user_id=user.id,
             payload=req.model_dump_json(),
             request_payload=req.model_dump(),
+            ttft=ttfs,
             response=result_text,
             prompt_tokens=usage.get("prompt_tokens", 0),
             completion_tokens=usage.get("completion_tokens", 0),
