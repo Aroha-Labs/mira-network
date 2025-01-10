@@ -1,8 +1,10 @@
+from typing import Optional
 from fastapi import APIRouter, Depends, Response, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
-from src.router.core.types import User
+from src.router.core.types import ModelPricing, User
 from src.router.models.logs import ApiLogs
+from src.router.models.system_settings import SystemSettings
 from src.router.db.session import get_session
 from src.router.core.security import verify_user
 from src.router.utils.network import get_random_machines, PROXY_PORT
@@ -105,6 +107,10 @@ async def generate(
     def generate():
         usage = {}
         result_text = ""
+
+        # Time to first token
+        ttfs: Optional[float] = None
+
         for line in llmres.iter_lines():
             l = line.decode("utf-8")
             if l.startswith("data: "):
@@ -120,19 +126,45 @@ async def generate(
                 if "usage" in json_line:
                     usage = json_line["usage"]
             except json.JSONDecodeError as e:
-                print(e)
+                # print(e)
+                pass
+
+            if ttfs is None:
+                ttfs = time.time() - timeStart
             yield line
+
+        mp = db.exec(
+            select(SystemSettings).where(SystemSettings.name == "MODEL_PRICING")
+        ).first()
+
+        if mp is None:
+            raise HTTPException(
+                status_code=500, detail="MODEL_PRICING not set in system settings"
+            )
+
+        model_p = mp.value.get(req.model)
+
+        if model_p is None:
+            raise HTTPException(
+                status_code=500, detail="Model pricing not set in system settings"
+            )
+
+        model_pricing = ModelPricing(**model_p)
 
         # Log the request
         api_log = ApiLogs(
             user_id=user.id,
             payload=req.model_dump_json(),
+            request_payload=req.model_dump(),
+            ttft=ttfs,
             response=result_text,
             prompt_tokens=usage.get("prompt_tokens", 0),
             completion_tokens=usage.get("completion_tokens", 0),
             total_tokens=usage.get("total_tokens", 0),
             total_response_time=time.time() - timeStart,
             model=req.model,
+            model_pricing=model_pricing,
+            machine_id=machine.machine_uid,
         )
 
         db.add(api_log)
