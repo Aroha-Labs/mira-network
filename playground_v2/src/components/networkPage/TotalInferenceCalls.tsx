@@ -4,7 +4,7 @@ const TotalInferenceCalls = () => {
   const { data: inferenceCalls, error, isLoading } = useTotalInferenceCalls();
 
   return (
-    <div className="flex gap-1 items-center">
+    <div className="flex gap-4 md:gap-1 items-center">
       <p className="text-sm">
         {isLoading || error ? "_ _ " : inferenceCalls ?? 0}
       </p>

@@ -1,12 +1,13 @@
 import Link from "next/link";
 import ActiveMachines from "./ActiveMachines";
+import NetworkPopover from "./NetworkPopover";
 import TotalInferenceCalls from "./TotalInferenceCalls";
 import TotalTokens from "./TotalTokens";
 
 const Header = () => {
   return (
-    <div className="flex flex-wrap items-center justify-between mb-8">
-      <div className="flex items-center gap-3">
+    <div className="flex flex-wrap items-center justify-between mb-8 gap-8">
+      <div className="flex items-center gap-3 w-full md:w-auto">
         <Link
           href="/"
           className="font-medium text-md underline leading-[22px] tracking-[-0.013em] opacity-40"
@@ -14,13 +15,20 @@ const Header = () => {
           console
         </Link>
 
-        <span className="text-md">&gt;</span>
+        <span className="text-md hidden md:block">&gt;</span>
 
-        <p className="text-md leading-[22px] tracking-[-0.013em]">NETWORK</p>
+        <p className="text-md leading-[22px] tracking-[-0.013em] hidden md:block">
+          NETWORK
+        </p>
+        <div className="w-full border-t border-dashed border-[#9CB9AE] mx-4 h-[2px] block md:hidden" />
+
+        <div className="block md:hidden">
+          <NetworkPopover />
+        </div>
       </div>
-      <div className="flex-grow border-t border-dashed border-[#9CB9AE] mx-4 flex-1 h-[2px]" />
+      <div className="hidden md:flex-grow md:border-t md:border-dashed md:border-[#9CB9AE] md:mx-4 md:flex-1 md:h-[2px]" />
 
-      <div className="flex gap-4 items-center">
+      <div className="md:flex gap-4 items-center hidden">
         <TotalInferenceCalls />
         <TotalTokens />
         <ActiveMachines />

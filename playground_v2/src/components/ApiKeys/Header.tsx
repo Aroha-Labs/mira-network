@@ -2,7 +2,7 @@ import Link from "next/link";
 
 const Header = () => {
   return (
-    <div className="flex flex-wrap items-center justify-between mb-8">
+    <div className="flex flex-wrap items-center justify-between mb-8 gap-[52px]">
       <div className="flex items-center gap-3">
         <Link
           href="/"
