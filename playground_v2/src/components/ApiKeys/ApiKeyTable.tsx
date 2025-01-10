@@ -6,13 +6,14 @@ import { Button } from "src/components/button";
 import Card from "src/components/card";
 import useApiTokens, { ApiKey } from "src/hooks/useApiTokens";
 import AddApiKey from "./AddApiKey";
+import DeleteApiKey from "./DeleteApiKey";
 
 const getTokenDisplay = (token: string) => {
   return `${token.slice(0, 4)}...${token.slice(-4)}`;
 };
 
-const LogsTable = ({ onRowClick }: { onRowClick: (log: ApiKey) => void }) => {
-  const { data, isLoading, error } = useApiTokens();
+const ApiKeyTable = ({ onRowClick }: { onRowClick: (log: ApiKey) => void }) => {
+  const { data, isLoading, error, deleteMutation } = useApiTokens();
   const [isCopied, setIsCopied] = useState(false);
 
   const handleCopyToClipboard = async (token: string) => {
@@ -51,7 +52,7 @@ const LogsTable = ({ onRowClick }: { onRowClick: (log: ApiKey) => void }) => {
       </div>
       <Table className="mt-10 mb-10">
         <TableBody>
-          {data?.map((key) => {
+          {data?.map((key: ApiKey) => {
             return (
               <TableRow
                 key={key?.token}
@@ -75,9 +76,7 @@ const LogsTable = ({ onRowClick }: { onRowClick: (log: ApiKey) => void }) => {
                   </Button>
                 </TableCell>
                 <TableCell>
-                  <Button tooltip="Delete" variant="link" className="p-0">
-                    Delete
-                  </Button>
+                  <DeleteApiKey token={key.token} />
                 </TableCell>
               </TableRow>
             );
@@ -88,4 +87,4 @@ const LogsTable = ({ onRowClick }: { onRowClick: (log: ApiKey) => void }) => {
   );
 };
 
-export default LogsTable;
+export default ApiKeyTable;
