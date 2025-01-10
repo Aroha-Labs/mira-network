@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link"; // Import Link from next/link
 import LayoutChildren from "./LayoutChildren";
+import { Toaster } from "react-hot-toast";
 
 const queryClient = new QueryClient();
 
@@ -87,6 +88,7 @@ const Root = ({ children }: RootProps) => {
           >
             Feedback
           </a>
+          <Toaster />
         </QueryClientProvider>
       </body>
     </html>
