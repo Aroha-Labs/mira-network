@@ -8,7 +8,7 @@ const Header = () => {
           href="/"
           className="font-medium text-md underline leading-[22px] tracking-[-0.013em] opacity-40"
         >
-          playground
+          console
         </Link>
 
         <span className="text-md">&gt;</span>
