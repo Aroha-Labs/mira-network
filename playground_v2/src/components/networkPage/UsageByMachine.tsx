@@ -16,10 +16,6 @@ const UsageByMachine = ({ activeMachine }: UsageByMachineProps) => {
     total_tokens: log.total_tokens,
   }));
 
-  console.log("API Logs Data:", data);
-  console.log("Filtered Data:", filteredData);
-  console.log("Active Machine:", activeMachine);
-  console.log("Chart Data:", chartData);
   return <ChartsLayout data={chartData} title="" />;
 };
 
