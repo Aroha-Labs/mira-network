@@ -6,6 +6,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "src/components/Chart";
+import EmptyChart from "./EmptyChart";
 
 const ChartsLayout = ({
   data,
@@ -14,6 +15,10 @@ const ChartsLayout = ({
   data: { date: string; [key: string]: string | number }[];
   title: string;
 }) => {
+  if (data.length === 0) {
+    return <EmptyChart />;
+  }
+
   // Extract the key for the bar from the first data entry
   const dataKey =
     Object.keys(data[0] || {})?.find((key) => key !== "date") ?? "";
