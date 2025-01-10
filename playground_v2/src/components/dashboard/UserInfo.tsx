@@ -1,7 +1,9 @@
 import { User } from "@supabase/supabase-js";
 import cn from "clsx";
+import { useState } from "react";
 import jetBrainsMono from "src/app/fonts/jetBrainsMono";
 import { useLogout } from "src/hooks/useLogout";
+import { Button } from "../button";
 
 interface UserInfoProps {
   user?: User;
@@ -9,9 +11,14 @@ interface UserInfoProps {
 
 const UserInfo = ({ user }: UserInfoProps) => {
   const logoutMutation = useLogout();
+  const [loggedOutClicked, setLoggedOutClicked] = useState(false);
 
   const handleLogout = async () => {
     logoutMutation.mutate();
+  };
+
+  const handleLoggedOutClicked = () => {
+    setLoggedOutClicked(true);
   };
 
   return (
@@ -31,15 +38,42 @@ const UserInfo = ({ user }: UserInfoProps) => {
         </p>
       </div>
       <div className="flex-grow border-t border-dashed border-[#9CB9AE] mx-4 flex-1 h-[2px]" />
-      <button
-        className={cn(
-          jetBrainsMono.className,
-          "text-md font-medium leading-[22px] tracking-[-0.013em] text-left underline decoration-solid underline-from-font decoration-skip-ink-auto opacity-60"
-        )}
-        onClick={handleLogout}
-      >
-        Logout
-      </button>
+      {!loggedOutClicked && (
+        <button
+          className={cn(
+            jetBrainsMono.className,
+            "text-md font-medium leading-[22px] tracking-[-0.013em] text-left underline decoration-solid underline-from-font decoration-skip-ink-auto opacity-60"
+          )}
+          onClick={handleLoggedOutClicked}
+        >
+          Logout
+        </button>
+      )}
+      {loggedOutClicked && (
+        <div className="flex items-center justify-center">
+          <p className="text-md font-medium leading-[22px] tracking-[-0.013em] text-left opacity-60">
+            Confirm logout
+          </p>
+          <div className="border-t border-dashed border-[#9CB9AE] w-[10px] h-[2px] mx-[10px]" />
+
+          <Button
+            variant="link"
+            className="underline m-0 p-0"
+            onClick={handleLogout}
+          >
+            Yes
+          </Button>
+          <div className="border-t border-dashed border-[#9CB9AE] w-[10px] h-[2px] mx-[10px]" />
+
+          <Button
+            variant="link"
+            className="underline m-0 p-0"
+            onClick={() => setLoggedOutClicked(false)}
+          >
+            No
+          </Button>
+        </div>
+      )}
     </div>
   );
 };
