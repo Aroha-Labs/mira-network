@@ -73,7 +73,7 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
           onClick={() => setIsSidebarOpen(false)}
         ></div>
       )}
-      <div className="flex-1">
+      <div className="flex flex-col flex-1">
         <header className="bg-white shadow-md p-4 flex items-center justify-between lg:hidden">
           <button
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -87,7 +87,9 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
           </button>
           {/* <h1 className="text-xl font-bold">Admin Panel</h1> */}
         </header>
-        <main className="container mx-auto">{children}</main>
+        <main className="container mx-auto flex flex-1 flex-col">
+          {children}
+        </main>
       </div>
     </div>
   );
