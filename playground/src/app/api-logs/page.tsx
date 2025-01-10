@@ -117,16 +117,6 @@ const ApiLogsPage = () => {
     return "";
   };
 
-  const calculateCost = (log: ApiLog) => {
-    if (!log.model_pricing) {
-      return log.total_tokens * 0.0003;
-    }
-    return (
-      log.prompt_tokens * log.model_pricing.prompt_token +
-      log.completion_tokens * log.model_pricing.completion_token
-    );
-  };
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
