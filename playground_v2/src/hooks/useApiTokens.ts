@@ -19,6 +19,15 @@ const fetchApiKeys = async (token?: string): Promise<ApiKey[]> => {
   return response.data;
 };
 
+const deleteApiKey = async (token: string, tokenId: string) => {
+  const response = await axios.delete(`${API_BASE_URL}/api-tokens/${tokenId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  return response.data;
+};
+
 const addApiKey = async (token: string, description: string) => {
   try {
     if (!description || description.length === 0) {
@@ -61,7 +70,21 @@ const useApiTokens = () => {
     },
   });
 
-  return { ...query, addApiKey: mutation };
+  const deleteMutation = useMutation({
+    mutationFn: (tokenId: string) => {
+      if (!userSession?.access_token) {
+        throw new Error("User session not found");
+      }
+      return deleteApiKey(userSession.access_token, tokenId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["apiKeys"],
+      });
+    },
+  });
+
+  return { ...query, addApiKey: mutation, deleteMutation };
 };
 
 export default useApiTokens;

@@ -40,9 +40,9 @@ const AddApiKey = () => {
             placeholder="secret-key-1"
             className="mt-1 block w-full px-3 py-2 border border-[#D7E2DE] shadow-sm focus:outline-none focus:border-[#308F6A] focus:border-blue-500 sm:text-sm"
           />
-          {addApiKey.isError && (
+          {addApiKey?.isError && (
             <div className="text-red-600 mb-4 font-light text-sm mt-2">
-              Error adding API key: {addApiKey.error.message}
+              {addApiKey?.error?.message}
             </div>
           )}
 
