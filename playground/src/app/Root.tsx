@@ -61,7 +61,7 @@ const Root = ({ children }: RootProps) => {
             {/* Tailwind's text-lg sets the font size to 18px */}
             <div className="flex-1"></div>
             <Link href="/chat" className="flex text-blue-500 hover:underline">
-              Playground
+              Console
             </Link>
             <Link
               href="/admin"
