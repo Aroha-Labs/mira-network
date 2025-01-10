@@ -22,18 +22,18 @@ const UserInfo = ({ user }: UserInfoProps) => {
   };
 
   return (
-    <div className="flex flex-wrap items-center justify-between mb-8">
+    <div className="flex flex-wrap items-center justify-between mb-8 gap-4 md:gap-0">
       <div className="flex items-center gap-2">
-        <span className="text-md">&gt;</span>
+        <span className="text-xs md:text-md">&gt;</span>
         <p
           className={cn(
-            "font-medium text-md leading-[22px] tracking-[-0.013em] opacity-60"
+            "font-medium text-xs md:text-md leading-[22px] tracking-[-0.013em] opacity-60"
           )}
         >
           {user?.user_metadata?.full_name}
         </p>
 
-        <p className="text-md leading-[22px] tracking-[-0.013em] list-item opacity-40 ml-4">
+        <p className="text-xs md:text-md leading-[22px] tracking-[-0.013em] list-item opacity-40 ml-4">
           {user?.user_metadata?.email}
         </p>
       </div>
