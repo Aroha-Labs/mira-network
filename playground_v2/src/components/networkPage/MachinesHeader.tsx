@@ -20,7 +20,7 @@ const MachinesHeader = ({
 
   return (
     <div className="flex justify-between items-center p-4">
-      <p className="text-md">{firstName}'s Network</p>
+      <p className="text-md">{firstName}&apos;s Network</p>
       <MachinesList
         activeMachine={activeMachine}
         changeActiveMachine={changeActiveMachine}
