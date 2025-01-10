@@ -9,19 +9,7 @@ import { useState } from "react";
 import Modal from "src/components/Modal";
 import { createPortal } from "react-dom";
 import Loading from "src/components/PageLoading";
-
-interface ApiLog {
-  user_id: string;
-  payload: string;
-  prompt_tokens: number;
-  total_tokens: number;
-  model: string;
-  id: number;
-  response: string;
-  completion_tokens: number;
-  total_response_time: number;
-  created_at: string;
-}
+import { ApiLog } from "src/types/api-log";
 
 interface ApiLogsResponse {
   logs: ApiLog[];
@@ -129,6 +117,16 @@ const ApiLogsPage = () => {
     return "";
   };
 
+  const calculateCost = (log: ApiLog) => {
+    if (!log.model_pricing) {
+      return log.total_tokens * 0.0003;
+    }
+    return (
+      log.prompt_tokens * log.model_pricing.prompt_token +
+      log.completion_tokens * log.model_pricing.completion_token
+    );
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -186,26 +184,18 @@ const ApiLogsPage = () => {
               </th>
               <th className="px-4 py-2 text-left border-b">Provider</th>
               <th className="px-4 py-2 text-left border-b">Model</th>
-              <th
-                className="px-4 py-2 text-left border-b cursor-pointer"
-                onClick={() => handleOrderByChange("total_response_time")}
-              >
-                Cost {getOrderIcon("total_response_time")}
-              </th>
+              <th className="px-4 py-2 text-left border-b">Cost</th>
               <th className="px-4 py-2 text-left border-b"></th>
             </tr>
           </thead>
           <tbody>
-            {data?.logs?.map((log) => {
-              const [provider, ...modelName] = log.model.split("/");
-              return (
-                <ApiLogRow
-                  key={log.id}
-                  log={{ ...log, model: modelName.join("/"), provider }}
-                  onClick={() => handleRowClick(log)}
-                />
-              );
-            })}
+            {data?.logs?.map((log) => (
+              <ApiLogRow
+                key={log.id}
+                log={log}
+                onClick={() => handleRowClick(log)}
+              />
+            ))}
           </tbody>
         </table>
       </div>
@@ -252,30 +242,34 @@ const ApiLogsPage = () => {
             </div>
             {activeTab === "messages" ? (
               <div className="space-y-4">
-                {JSON.parse(selectedLog.payload).messages.map(
-                  (
-                    message: { role: string; content: string },
-                    index: number
-                  ) => (
-                    <div
-                      key={index}
-                      className={`p-2 rounded-md ${
-                        message.role === "user"
-                          ? "bg-blue-100 text-blue-800"
-                          : "bg-gray-100 text-gray-800"
-                      }`}
-                    >
-                      <strong>{message.role}:</strong> {message.content}
-                    </div>
-                  )
-                )}
+                {selectedLog.payload
+                  ? JSON.parse(selectedLog.payload).messages.map(
+                      (
+                        message: { role: string; content: string },
+                        index: number
+                      ) => (
+                        <div
+                          key={index}
+                          className={`p-2 rounded-md ${
+                            message.role === "user"
+                              ? "bg-blue-100 text-blue-800"
+                              : "bg-gray-100 text-gray-800"
+                          }`}
+                        >
+                          <strong>{message.role}:</strong> {message.content}
+                        </div>
+                      )
+                    )
+                  : ""}
                 <div className="p-2 rounded-md bg-green-100 text-green-800">
                   <strong>Response:</strong> {selectedLog.response}
                 </div>
               </div>
             ) : (
               <pre className="whitespace-pre-wrap bg-gray-100 p-4 rounded-md">
-                {JSON.stringify(JSON.parse(selectedLog.payload), null, 2)}
+                {selectedLog.payload
+                  ? JSON.stringify(JSON.parse(selectedLog.payload), null, 2)
+                  : ""}
               </pre>
             )}
           </Modal>,
