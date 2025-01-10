@@ -4,10 +4,17 @@ import { addDays, format, subDays } from "date-fns";
 import { API_BASE_URL } from "src/config";
 import { useSession } from "./useSession";
 
-interface ApiLog {
+export interface ApiLog {
+  completion_tokens: number;
   created_at: string;
-  total_tokens: number;
+  id: number;
   model: string;
+  payload: string;
+  prompt_tokens: number;
+  response: string;
+  total_response_time: number;
+  total_tokens: number;
+  user_id: string;
 }
 
 interface ApiLogsResponse {
@@ -58,7 +65,7 @@ const useApiLogs = () => {
     chartDataByDay,
     isLoading,
     error,
-    rawData: data,
+    data,
   };
 };
 

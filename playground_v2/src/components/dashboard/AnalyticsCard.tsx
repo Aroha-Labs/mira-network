@@ -24,7 +24,6 @@ const AnalyticsCard = ({
   userSession?: Session | null;
   className?: string;
 }) => {
-  console.log(userSession);
   const {
     data: inferenceCalls,
     error,
