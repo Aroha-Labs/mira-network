@@ -55,7 +55,7 @@ const DatePickerWithRange = ({
   const handleDateChange = (date?: DateRange) => {
     setDate(date);
     if (onChange) {
-      onChange(date as any);
+      onChange(date as never);
     }
   };
 
