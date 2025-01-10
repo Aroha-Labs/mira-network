@@ -5,11 +5,10 @@ import axios from "axios";
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { Header } from "src/components/apiLogs";
-import ApiLogsTable from "src/components/ApiLogsTable";
-import DateFilter from "src/components/DateFilter";
-import LogDetailsModal from "src/components/LogDetailsModal";
+import LogDetailsModal from "src/components/apiLogs/LogDetailsModal";
+import LogsTable from "src/components/apiLogs/LogsTable";
+import Footer from "src/components/Footer";
 import Loading from "src/components/PageLoading";
-import PaginationControls from "src/components/PaginationControls";
 import { API_BASE_URL } from "src/config";
 import { useSession } from "src/hooks/useSession";
 
@@ -109,28 +108,16 @@ const ApiLogsPage = () => {
   }
 
   return (
-    <div className="container mx-auto p-4">
+    <div className="container mx-auto p-4 max-w-fit">
       <Header />
-      <DateFilter
-        startDate={startDate}
-        endDate={endDate}
-        onStartDateChange={setStartDate}
-        onEndDateChange={setEndDate}
-      />
-      <ApiLogsTable
-        logs={data?.logs}
-        orderBy={orderBy}
-        order={order}
-        onOrderByChange={setOrderBy}
-        onRowClick={handleRowClick}
-      />
-      <PaginationControls
+      <LogsTable onRowClick={handleRowClick} />
+      {/* <PaginationControls
         page={page}
         pageSize={pageSize}
         total={data?.total}
         onNextPage={() => setPage(page + 1)}
         onPreviousPage={() => setPage(page - 1)}
-      />
+      /> */}
       {selectedLog &&
         createPortal(
           <LogDetailsModal
@@ -141,6 +128,7 @@ const ApiLogsPage = () => {
           />,
           document.body
         )}
+      <Footer />
     </div>
   );
 };
