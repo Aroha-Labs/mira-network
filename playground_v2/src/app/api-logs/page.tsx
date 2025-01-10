@@ -62,14 +62,14 @@ const fetchApiLogs = async (
 
 const ApiLogsPage = () => {
   const { data: userSession } = useSession();
-  const [page, setPage] = useState(1);
+  const [page] = useState(1);
   const [pageSize] = useState(100);
-  const [startDate, setStartDate] = useState<string | undefined>(undefined);
-  const [endDate, setEndDate] = useState<string | undefined>(undefined);
-  const [orderBy, setOrderBy] = useState<string>("created_at");
+  const [startDate] = useState<string | undefined>(undefined);
+  const [endDate] = useState<string | undefined>(undefined);
+  const [orderBy] = useState<string>("created_at");
   const [order] = useState<string>("desc");
 
-  const { data, error, isLoading } = useQuery({
+  const { error, isLoading } = useQuery({
     queryKey: ["apiLogs", page, startDate, endDate, orderBy, order],
     queryFn: () =>
       fetchApiLogs(
