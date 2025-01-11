@@ -1,9 +1,17 @@
 import { Button } from "src/components/button";
 import Card from "src/components/card";
-import useUserCredits from "src/hooks/useUserCredits";
+import useUserCredits, {
+  useUserCreditsHistory,
+} from "src/hooks/useUserCredits";
+import Progress from "../Progress";
+import calculatePercentageUsed from "./calculateCreditsUsed";
 
 const Credit = () => {
   const { userCredits, isCreditsLoading } = useUserCredits();
+  const { userCreditsHistory } = useUserCreditsHistory();
+
+  const percentageUsed = calculatePercentageUsed(userCreditsHistory ?? []);
+
   return (
     <Card>
       <div className="flex justify-between items-center p-4">
@@ -19,6 +27,9 @@ const Credit = () => {
         <Button disabled variant="disabled">
           Buy more
         </Button>
+      </div>
+      <div className="p-4">
+        <Progress value={percentageUsed} />
       </div>
     </Card>
   );
