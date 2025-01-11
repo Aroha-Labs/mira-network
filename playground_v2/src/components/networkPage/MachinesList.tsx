@@ -24,7 +24,7 @@ const MachinesList = ({
   }
 
   return (
-    <div className="flex gap-2">
+    <div className="flex gap-2 overflow-x-auto">
       {machines?.map((machine) => (
         <div key={machine.machine_uid} className="flex items-center gap-1">
           <Button

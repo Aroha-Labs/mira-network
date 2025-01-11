@@ -1,11 +1,12 @@
 "use client";
 
-import { Bar, BarChart } from "recharts";
+import { Bar, BarChart, Cell } from "recharts";
 import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
 } from "src/components/Chart";
+import { v4 as uuidv4 } from "uuid";
 import EmptyChart from "./EmptyChart";
 
 const ChartsLayout = ({
@@ -45,7 +46,22 @@ const ChartsLayout = ({
         <BarChart accessibilityLayer data={data}>
           <ChartTooltip content={<ChartTooltipContent />} />
           {dataKey && (
-            <Bar dataKey={dataKey} fill={`var(--color-${dataKey})`} />
+            <Bar
+              dataKey={dataKey}
+              fill={`var(--color-${dataKey})`}
+              minPointSize={10}
+            >
+              {data.map((entry, index) => (
+                <Cell
+                  key={uuidv4()}
+                  fill={
+                    Number(entry[dataKey]) > 0
+                      ? `var(--color-${dataKey})`
+                      : "#308f6a66"
+                  }
+                />
+              ))}
+            </Bar>
           )}
         </BarChart>
       </ChartContainer>
