@@ -10,6 +10,18 @@ import {
 import Card from "src/components/card";
 import { ApiLog, ApiLogsResponse } from "src/hooks/useApiLogs";
 
+const calculateCosts = (log: ApiLog) => {
+  if (!log.model_pricing) {
+    const totalCost = log.total_tokens * 0.0003;
+    return totalCost;
+  }
+
+  const promptCost = log.prompt_tokens * log.model_pricing.prompt_token;
+  const completionCost =
+    log.completion_tokens * log.model_pricing.completion_token;
+  return promptCost + completionCost;
+};
+
 const LogsTable = ({
   onRowClick,
   data,
@@ -44,7 +56,7 @@ const LogsTable = ({
           <TableRow>
             <TableHead>Timestamp</TableHead>
             <TableHead>Tokens</TableHead>
-            <TableHead>Provider</TableHead>
+            <TableHead>Node</TableHead>
             <TableHead>Model</TableHead>
             <TableHead>Cost</TableHead>
             <TableHead></TableHead>
@@ -52,7 +64,6 @@ const LogsTable = ({
         </TableHeader>
         <TableBody>
           {data?.logs?.map((log) => {
-            const [provider, ...modelName] = log.model.split("/");
             return (
               <TableRow
                 key={log?.id}
@@ -63,9 +74,9 @@ const LogsTable = ({
                   {new Date(log.created_at).toLocaleString()}
                 </TableCell>
                 <TableCell>{log.total_tokens}</TableCell>
-                <TableCell>{provider}</TableCell>
-                <TableCell>{modelName.join("/")}</TableCell>
-                <TableCell>${(log.total_tokens * 0.0003).toFixed(3)}</TableCell>
+                <TableCell>{log?.machine_id}</TableCell>
+                <TableCell>{log?.model}</TableCell>
+                <TableCell>${calculateCosts(log)?.toFixed(3)}</TableCell>
                 <TableCell>
                   <CaretRight className="h-5 w-5 inline-block" />
                 </TableCell>
