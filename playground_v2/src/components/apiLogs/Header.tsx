@@ -1,7 +1,13 @@
 import Link from "next/link";
 import { DatePickerWithRange } from "src/components/Calendar";
 
-const Header = () => {
+const Header = ({
+  startDate,
+  endDate,
+}: {
+  startDate: string;
+  endDate: string;
+}) => {
   return (
     <div className="flex flex-wrap items-center justify-between mb-8">
       <div className="flex items-center gap-3">
@@ -18,12 +24,7 @@ const Header = () => {
       </div>
       <div className="flex-grow border-t border-dashed border-[#9CB9AE] mx-4 flex-1 h-[2px]" />
 
-      <DatePickerWithRange
-        dateFrom={new Date(
-          new Date().setDate(new Date().getDate() - 30)
-        ).toISOString()}
-        dateTo={new Date().toISOString()}
-      />
+      <DatePickerWithRange dateFrom={startDate} dateTo={endDate} />
     </div>
   );
 };
