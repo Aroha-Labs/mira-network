@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "src/components/button";
 import {
   Popover,
@@ -11,12 +11,24 @@ import Card from "../card";
 const AddApiKey = () => {
   const { addApiKey } = useApiTokens();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [description, setDescription] = useState<"success" | "error" | "">("");
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const description = (e.target as HTMLFormElement).description.value;
     addApiKey.mutate(description);
   };
+
+  useEffect(() => {
+    if (addApiKey.isSuccess) {
+      setDescription("success");
+      setTimeout(() => setDescription(""), 2000);
+    }
+    if (addApiKey.isError) {
+      setDescription("error");
+      setTimeout(() => setDescription(""), 2000);
+    }
+  }, [addApiKey.isSuccess, addApiKey.isError]);
 
   return (
     <Popover open={isModalOpen} onOpenChange={setIsModalOpen}>
@@ -45,13 +57,13 @@ const AddApiKey = () => {
               placeholder="secret-key-1"
               className="mt-1 block w-full px-3 py-2 border border-[#D7E2DE] shadow-sm focus:outline-none focus:border-[#308F6A] focus:border-blue-500 sm:text-sm"
             />
-            {addApiKey?.isError && (
+            {description === "error" && (
               <div className="text-red-600 mb-4 font-light text-sm mt-2">
                 {addApiKey?.error?.message}
               </div>
             )}
 
-            {addApiKey.isSuccess && (
+            {description === "success" && (
               <div className="text-green-600 mb-4 font-light text-sm mt-2">
                 API key created successfully
               </div>
