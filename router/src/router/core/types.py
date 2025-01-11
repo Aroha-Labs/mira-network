@@ -8,6 +8,6 @@ class User(GoUser):
 
 
 class ModelPricing(BaseModel):
-    label: str
+    model: str
     prompt_token: float
     completion_token: float
