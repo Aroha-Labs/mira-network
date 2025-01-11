@@ -64,19 +64,25 @@ async def verify(req: VerifyRequest):
     else:
         return {"result": "no", "results": results}
 
+class ModelListResItem(BaseModel):
+    id: str
+    object: str
+
+
+class ModelListRes(BaseModel):
+    object: str
+    data: list[ModelListResItem]
+
 
 @router.get("/v1/models", tags=["network"])
-async def list_models():
-    file_path = os.path.join(
-        os.path.dirname(__file__), "../../../../supported-models.json"
-    )
-
-    with open(file_path, "r") as f:
-        supported_models: list[str] = json.load(f)
-
+async def list_models(db: Session = Depends(get_session)) -> ModelListRes:
+    supported_models = get_supported_models(db)
     return {
         "object": "list",
-        "data": [{"id": model, "object": "model"} for model in supported_models],
+        "data": [
+            {"id": model_id, "object": "model"}
+            for model_id, _ in supported_models.items()
+        ],
     }
 
 
