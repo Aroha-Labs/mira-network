@@ -1,3 +1,4 @@
+import { format } from "date-fns";
 import { useEffect } from "react";
 import useApiLogs from "src/hooks/useApiLogs";
 import {
@@ -21,7 +22,7 @@ const UsageByMachine = ({ activeMachine }: UsageByMachineProps) => {
     data?.logs?.filter((log) => log.machine_id === activeMachine) || [];
 
   const chartData = filteredData.map((log) => ({
-    date: log.created_at,
+    date: format(new Date(log.created_at), "yyyy-MM-dd"),
     total_tokens: log.total_tokens,
   }));
 
