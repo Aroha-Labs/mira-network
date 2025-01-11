@@ -65,7 +65,7 @@ const DatePickerWithRange = ({
         <PopoverTrigger asChild>
           <Button
             id="date"
-            variant={"outline"}
+            variant="ghost"
             className={cn(
               "w-[300px] justify-start text-left font-normal rounded-sm",
               !date && "text-muted-foreground"
