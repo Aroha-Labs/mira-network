@@ -27,7 +27,7 @@ async def main():
     
     # Generate text
     request = AiRequest(
-        model="mira/llama3.1",
+        model="gpt-4o",
         messages=[
             Message(role="system", content="You are a helpful assistant."),
             Message(role="user", content="Hello!")
