@@ -6,6 +6,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "src/components/Chart";
+import EmptyChart from "./EmptyChart";
 
 const ChartsLayout = ({
   data,
@@ -14,6 +15,10 @@ const ChartsLayout = ({
   data: { date: string; [key: string]: string | number }[];
   title: string;
 }) => {
+  if (data.length === 0) {
+    return <EmptyChart />;
+  }
+
   // Extract the key for the bar from the first data entry
   const dataKey =
     Object.keys(data[0] || {})?.find((key) => key !== "date") ?? "";
@@ -30,7 +35,9 @@ const ChartsLayout = ({
 
   return (
     <div className="flex flex-col gap-10 p-4 w-full">
-      <p className="text-xl text-slate-900">{title}</p>
+      {title && title !== "" && (
+        <p className="text-xl text-slate-900">{title}</p>
+      )}
       <ChartContainer
         config={dynamicChartConfig}
         className="min-h-[200px] w-full"
@@ -38,11 +45,7 @@ const ChartsLayout = ({
         <BarChart accessibilityLayer data={data}>
           <ChartTooltip content={<ChartTooltipContent />} />
           {dataKey && (
-            <Bar
-              dataKey={dataKey}
-              fill={`var(--color-${dataKey})`}
-              radius={4}
-            />
+            <Bar dataKey={dataKey} fill={`var(--color-${dataKey})`} />
           )}
         </BarChart>
       </ChartContainer>

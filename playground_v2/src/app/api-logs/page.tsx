@@ -23,6 +23,7 @@ interface ApiLog {
   completion_tokens: number;
   total_response_time: number;
   created_at: string;
+  machine_id: string;
 }
 
 interface ApiLogsResponse {
