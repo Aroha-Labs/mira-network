@@ -9,18 +9,7 @@ import {
 } from "src/components/Table";
 import Card from "src/components/card";
 import { ApiLog, ApiLogsResponse } from "src/hooks/useApiLogs";
-
-const calculateCosts = (log: ApiLog) => {
-  if (!log.model_pricing) {
-    const totalCost = log.total_tokens * 0.0003;
-    return totalCost;
-  }
-
-  const promptCost = log.prompt_tokens * log.model_pricing.prompt_token;
-  const completionCost =
-    log.completion_tokens * log.model_pricing.completion_token;
-  return promptCost + completionCost;
-};
+import calculateCosts from "./calculateCost";
 
 const LogsTable = ({
   onRowClick,
