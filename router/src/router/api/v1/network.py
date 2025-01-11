@@ -1,10 +1,11 @@
 from typing import Optional
 from fastapi import APIRouter, Depends, Response, HTTPException
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 from sqlmodel import Session, select
+from src.router.core.settings_types import SETTINGS_MODELS
 from src.router.core.types import ModelPricing, User
 from src.router.models.logs import ApiLogs
-from src.router.models.system_settings import SystemSettings
 from src.router.db.session import get_session
 from src.router.core.security import verify_user
 from src.router.utils.network import get_random_machines, PROXY_PORT
@@ -13,8 +14,9 @@ from src.router.schemas.ai import AiRequest, VerifyRequest
 import requests
 import time
 import httpx
-import os
 import json
+from src.router.utils.settings import get_setting_value
+from src.router.utils.settings import get_supported_models
 
 router = APIRouter()
 
@@ -64,6 +66,7 @@ async def verify(req: VerifyRequest):
     else:
         return {"result": "no", "results": results}
 
+
 class ModelListResItem(BaseModel):
     id: str
     object: str
@@ -106,6 +109,14 @@ async def generate(
     if user_credits.credits <= 0:
         raise HTTPException(status_code=402, detail="Insufficient credits")
 
+    supported_models = get_supported_models(db)
+    if req.model not in supported_models:
+        raise HTTPException(status_code=400, detail="Unsupported model")
+
+    model_config = supported_models[req.model]
+    original_req_model = req.model
+    req.model = model_config.id
+
     machine = get_random_machines(1)[0]
     proxy_url = f"http://{machine.network_ip}:{PROXY_PORT}/v1/chat/completions"
     llmres = requests.post(proxy_url, json=req.model_dump(), stream=req.stream)
@@ -139,23 +150,26 @@ async def generate(
                 ttfs = time.time() - timeStart
             yield line
 
-        mp = db.exec(
-            select(SystemSettings).where(SystemSettings.name == "MODEL_PRICING")
-        ).first()
+        sm = get_setting_value(
+            db,
+            "SUPPORTED_MODELS",
+            SETTINGS_MODELS["SUPPORTED_MODELS"],
+        )
 
-        if mp is None:
-            raise HTTPException(
-                status_code=500, detail="MODEL_PRICING not set in system settings"
-            )
-
-        model_p = mp.value.get(req.model)
+        model_p = sm.root.get(original_req_model)
 
         if model_p is None:
             raise HTTPException(
-                status_code=500, detail="Model pricing not set in system settings"
+                status_code=500, detail="Supported model not found in settings"
             )
 
-        model_pricing = ModelPricing(**model_p)
+        model_pricing = ModelPricing(
+            model=req.model,
+            prompt_token=model_p.prompt_token,
+            completion_token=model_p.completion_token,
+        )
+
+        req.model = original_req_model
 
         # Log the request
         api_log = ApiLogs(
