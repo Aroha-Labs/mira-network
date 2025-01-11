@@ -27,13 +27,13 @@ const UserInfo = ({ user }: UserInfoProps) => {
         <span className="text-xs md:text-md">&gt;</span>
         <p
           className={cn(
-            "font-medium text-xs md:text-md leading-[22px] tracking-[-0.013em] opacity-60"
+            "font-medium text-xs md:text-base leading-[22px] tracking-[-0.013em] opacity-60"
           )}
         >
           {user?.user_metadata?.full_name}
         </p>
 
-        <p className="text-xs md:text-md leading-[22px] tracking-[-0.013em] list-item opacity-40 ml-4">
+        <p className="text-xs md:text-base leading-[22px] tracking-[-0.013em] list-item opacity-40 ml-4">
           {user?.user_metadata?.email}
         </p>
       </div>

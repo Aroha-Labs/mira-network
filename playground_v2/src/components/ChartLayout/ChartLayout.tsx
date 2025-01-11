@@ -1,6 +1,6 @@
 "use client";
 
-import { Bar, BarChart, Cell } from "recharts";
+import { Bar, BarChart, Cell, XAxis } from "recharts";
 import {
   ChartContainer,
   ChartTooltip,
@@ -45,6 +45,7 @@ const ChartsLayout = ({
       >
         <BarChart accessibilityLayer data={data}>
           <ChartTooltip content={<ChartTooltipContent />} />
+          <XAxis dataKey="date" hide />
           {dataKey && (
             <Bar
               dataKey={dataKey}

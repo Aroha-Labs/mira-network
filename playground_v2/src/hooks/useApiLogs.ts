@@ -1,21 +1,36 @@
 import { useQuery } from "@tanstack/react-query";
 import { useStore } from "@tanstack/react-store";
 import axios from "axios";
+import { format } from "date-fns";
 import { API_BASE_URL } from "src/config";
 import { apiLogsParamsState } from "src/state/apiLogsParamsState";
 import { useSession } from "./useSession";
 
 export interface ApiLog {
-  completion_tokens: number;
-  created_at: string;
   id: number;
-  model: string;
+  request_payload: {
+    model: string;
+    stream: boolean;
+    messages: {
+      role: string;
+      content: string;
+    }[];
+    model_provider: string | null;
+  };
+  response: string;
+  completion_tokens: number;
+  total_response_time: number;
+  model_pricing: {
+    prompt_token: number;
+    completion_token: number;
+  };
+  created_at: string;
+  ttft: number;
+  user_id: string;
   payload: string;
   prompt_tokens: number;
-  response: string;
-  total_response_time: number;
   total_tokens: number;
-  user_id: string;
+  model: string;
   machine_id: string;
 }
 
@@ -87,7 +102,7 @@ const useApiLogs = () => {
   });
 
   const chartDataByDay = data?.logs?.map((log) => ({
-    date: log.created_at,
+    date: format(new Date(log.created_at), "yyyy-MM-dd"),
     total_tokens: log.total_tokens,
   }));
 

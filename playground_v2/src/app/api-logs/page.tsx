@@ -1,7 +1,7 @@
 "use client";
 
 import { useStore } from "@tanstack/react-store";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Header } from "src/components/apiLogs";
 import LogDetailsModal from "src/components/apiLogs/LogDetailsModal";
@@ -9,22 +9,11 @@ import LogsTable from "src/components/apiLogs/LogsTable";
 import Footer from "src/components/Footer";
 import Loading from "src/components/PageLoading";
 import Pagination from "src/components/Pagination";
-import useApiLogs from "src/hooks/useApiLogs";
-import { apiLogsParamsState } from "src/state/apiLogsParamsState";
-
-interface ApiLog {
-  user_id: string;
-  payload: string;
-  prompt_tokens: number;
-  total_tokens: number;
-  model: string;
-  id: number;
-  response: string;
-  completion_tokens: number;
-  total_response_time: number;
-  created_at: string;
-  machine_id: string;
-}
+import useApiLogs, { ApiLog } from "src/hooks/useApiLogs";
+import {
+  apiLogsParamsState,
+  DEFAULT_PARAMS,
+} from "src/state/apiLogsParamsState";
 
 const ApiLogsPage = () => {
   const params = useStore(apiLogsParamsState, (state) => state);
@@ -38,6 +27,10 @@ const ApiLogsPage = () => {
   const handleCloseModal = () => {
     setSelectedLog(null);
   };
+
+  useEffect(() => {
+    apiLogsParamsState.setState(() => DEFAULT_PARAMS);
+  }, []);
 
   if (isLoading) {
     return (
