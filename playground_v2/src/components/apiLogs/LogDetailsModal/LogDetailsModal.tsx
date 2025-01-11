@@ -17,7 +17,7 @@ const LogDetailsModal = ({ log, onClose }: LogDetailsModalProps) => {
       onClose={onClose}
       title=""
       showCloseIcon={false}
-      className="bg-transparent"
+      className="bg-transparent top-[-100px]"
     >
       <Header onClose={onClose} />
 
