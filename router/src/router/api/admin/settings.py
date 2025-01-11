@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from src.router.core.security import verify_admin
 from src.router.models.system_settings import SystemSettings
 from src.router.db.session import get_session
+from src.router.utils.settings import update_setting_value
 from typing import List, Dict, Any
 
 router = APIRouter()
@@ -31,11 +32,7 @@ def create_setting(
     db: Session = Depends(get_session),
     user=Depends(verify_admin),
 ):
-    db_setting = SystemSettings(**setting.model_dump())
-    db.add(db_setting)
-    db.commit()
-    db.refresh(db_setting)
-    return db_setting
+    return update_setting_value(db, setting.name, setting.value, setting.description)
 
 
 @router.put("/settings/{name}", response_model=SystemSettings)
@@ -45,16 +42,4 @@ def update_setting(
     db: Session = Depends(get_session),
     user=Depends(verify_admin),
 ):
-    db_setting = db.exec(
-        select(SystemSettings).where(SystemSettings.name == name)
-    ).first()
-    if not db_setting:
-        raise HTTPException(status_code=404, detail="Setting not found")
-
-    for key, value in setting.model_dump().items():
-        setattr(db_setting, key, value)
-
-    db.add(db_setting)
-    db.commit()
-    db.refresh(db_setting)
-    return db_setting
+    return update_setting_value(db, name, setting.value, setting.description)
