@@ -50,7 +50,7 @@ const Root = ({ children }: RootProps) => {
         )} // Tailwind's text-base sets the font size to 14px
       >
         <QueryClientProvider client={queryClient}>
-          <header className="sticky top-0 flex items-center justify-center border-b border-gray-300 p-4 gap-2 bg-white z-10">
+          <header className="sticky top-0 z-10 flex items-center justify-center gap-2 p-4 bg-white border-b border-gray-300">
             <Link href="/" className="flex items-center gap-2">
               <img src="/img/logo.svg" alt="Mira" />
               <h3 className="text-lg">console</h3>
@@ -64,14 +64,20 @@ const Root = ({ children }: RootProps) => {
               Console
             </Link>
             <Link
+              href="/terminal"
+              className="flex text-blue-500 hover:underline"
+            >
+              Terminal
+            </Link>
+            <Link
               href="/admin"
-              className="flex text-blue-500 hover:underline ml-4"
+              className="flex ml-4 text-blue-500 hover:underline"
             >
               Admin
             </Link>
           </header>
           {!isOnline && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative text-center">
+            <div className="relative px-4 py-3 text-center text-red-700 bg-red-100 border border-red-400 rounded">
               <span className="font-medium">No internet connection.</span>
               <span className="block sm:inline">
                 {" "}
@@ -84,7 +90,7 @@ const Root = ({ children }: RootProps) => {
             href="https://console-feedback.arohalabs.tech"
             target="_blank"
             rel="noopener noreferrer"
-            className="fixed bottom-4 right-4 bg-blue-500 text-white px-3 py-1 rounded-full shadow-lg text-sm hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300"
+            className="fixed px-3 py-1 text-sm text-white bg-blue-500 rounded-full shadow-lg bottom-4 right-4 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300"
           >
             Feedback
           </a>
