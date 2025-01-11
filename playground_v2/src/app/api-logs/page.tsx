@@ -7,7 +7,6 @@ import { Header } from "src/components/apiLogs";
 import LogDetailsModal from "src/components/apiLogs/LogDetailsModal";
 import LogsTable from "src/components/apiLogs/LogsTable";
 import Footer from "src/components/Footer";
-import Loading from "src/components/PageLoading";
 import Pagination from "src/components/Pagination";
 import useApiLogs, { ApiLog } from "src/hooks/useApiLogs";
 import {
@@ -31,14 +30,6 @@ const ApiLogsPage = () => {
   useEffect(() => {
     apiLogsParamsState.setState(() => DEFAULT_PARAMS);
   }, []);
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <Loading />
-      </div>
-    );
-  }
 
   if (error) {
     return <div>Error loading API logs</div>;
