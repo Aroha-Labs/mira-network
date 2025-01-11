@@ -166,7 +166,7 @@ const ApiLogsPage = () => {
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700">
-            Machine ID
+            Node
           </label>
           <input
             type="text"
@@ -217,9 +217,8 @@ const ApiLogsPage = () => {
               >
                 Response Time {getOrderIcon("total_response_time")}
               </th>
-              <th className="px-4 py-2 text-left border-b">Provider</th>
+              <th className="px-4 py-2 text-left border-b">Node</th>
               <th className="px-4 py-2 text-left border-b">Model</th>
-              <th className="px-4 py-2 text-left border-b">Machine ID</th>
               <th className="px-4 py-2 text-left border-b">Cost</th>
               <th className="px-4 py-2 text-left border-b"></th>
             </tr>

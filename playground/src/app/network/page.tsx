@@ -5,21 +5,18 @@ import axios from "axios";
 import PageLoading from "src/components/PageLoading";
 import { API_BASE_URL } from "src/config";
 import { useSession } from "src/hooks/useSession";
-import CopyToClipboardIcon from "src/components/CopyToClipboardIcon";
-
-interface Machine {
-  machine_uid: string;
-  network_ip: string;
-  status: "online" | "offline";
-}
+import MachineList from "src/components/MachineList";
 
 const NetworkPage = () => {
   const { data: userSession } = useSession();
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
   const {
     data: machines,
-    isLoading,
-    error,
-  } = useQuery<Machine[]>({
+    isLoading: isLoadingMachines,
+    error: machinesError,
+  } = useQuery({
     queryKey: ["machines"],
     queryFn: async () => {
       if (!userSession?.access_token) throw new Error("User session not found");
@@ -31,8 +28,8 @@ const NetworkPage = () => {
     enabled: !!userSession?.access_token,
   });
 
-  if (isLoading) return <PageLoading />;
-  if (error) {
+  if (isLoadingMachines) return <PageLoading />;
+  if (machinesError) {
     return (
       <div className="flex items-center justify-center flex-1 bg-gray-100">
         <div
@@ -48,30 +45,7 @@ const NetworkPage = () => {
 
   return (
     <div className="flex justify-center flex-1 bg-gray-100">
-      <div className="w-full max-w-lg m-4 p-4 bg-white shadow rounded">
-        <h2 className="text-xl font-semibold mb-4">Network Machines</h2>
-        {machines?.map((m) => (
-          <div
-            key={m.machine_uid}
-            className="border rounded p-4 mb-4 flex items-center justify-between"
-          >
-            <div>
-              <div className="flex items-center">
-                <p className="font-bold mr-2">{m.machine_uid}</p>
-                <CopyToClipboardIcon text={m.machine_uid} />
-              </div>
-              <p>{m.status}</p>
-            </div>
-            <div
-              className={`w-2 h-2 rounded-full ml-2 ${
-                m.status === "online"
-                  ? "bg-green-500 animate-pulse"
-                  : "bg-gray-400"
-              }`}
-            />
-          </div>
-        ))}
-      </div>
+      <MachineList machines={machines} />
     </div>
   );
 };

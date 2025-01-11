@@ -7,8 +7,6 @@ import TTFSCell from "./TTFSCell";
 import ResponseTimeCell from "./ResponseTimeCell";
 
 const ApiLogRow = ({ log, onClick }: { log: ApiLog; onClick: () => void }) => {
-  const [provider, ...modelName] = log.model.split("/");
-
   return (
     <tr
       key={log.id}
@@ -25,9 +23,8 @@ const ApiLogRow = ({ log, onClick }: { log: ApiLog; onClick: () => void }) => {
       <td>
         <ResponseTimeCell log={log} />
       </td>
-      <td className="px-4 py-2">{provider}</td>
-      <td className="px-4 py-2">{modelName.join("/")}</td>
       <td className="px-4 py-2">{log.machine_id || "-"}</td>
+      <td className="px-4 py-2">{log.model}</td>
       <td>
         <CostCell log={log} />
       </td>
