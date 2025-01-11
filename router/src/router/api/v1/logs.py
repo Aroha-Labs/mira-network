@@ -45,8 +45,24 @@ def list_all_logs(
         raise HTTPException(status_code=400, detail="Invalid order direction")
     logs = query.offset(offset).limit(page_size).all()
     total_logs = query.count()
+
+    def exclude_model_from_pricing(log):
+        l = log.dict()
+        model_pricing = l.get("model_pricing")
+
+        if model_pricing is None:
+            return l
+
+        if model_pricing.get("model") is not None:
+            model_pricing.pop("model")
+
+        l["model_pricing"] = model_pricing
+        return l
+
+    filtered_logs = list(map(exclude_model_from_pricing, logs))
+
     return {
-        "logs": logs,
+        "logs": filtered_logs,
         "total": total_logs,
         "page": page,
         "page_size": page_size,
