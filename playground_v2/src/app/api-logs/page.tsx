@@ -109,7 +109,7 @@ const ApiLogsPage = () => {
 
   return (
     <div className="container mx-auto p-4 max-w-fit">
-      <Header />
+      <Header startDate={startDate} endDate={endDate} />
       <LogsTable onRowClick={handleRowClick} />
       {/* <PaginationControls
         page={page}
