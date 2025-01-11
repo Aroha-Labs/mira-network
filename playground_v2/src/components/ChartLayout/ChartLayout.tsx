@@ -51,7 +51,7 @@ const ChartsLayout = ({
               fill={`var(--color-${dataKey})`}
               minPointSize={10}
             >
-              {data.map((entry, index) => (
+              {data.map((entry) => (
                 <Cell
                   key={uuidv4()}
                   fill={
