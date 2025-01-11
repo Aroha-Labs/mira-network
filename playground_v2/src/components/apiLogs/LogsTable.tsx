@@ -8,11 +8,19 @@ import {
   TableRow,
 } from "src/components/Table";
 import Card from "src/components/card";
-import useApiLogs, { ApiLog } from "src/hooks/useApiLogs";
+import { ApiLog, ApiLogsResponse } from "src/hooks/useApiLogs";
 
-const LogsTable = ({ onRowClick }: { onRowClick: (log: ApiLog) => void }) => {
-  const { data, isLoading, error } = useApiLogs();
-
+const LogsTable = ({
+  onRowClick,
+  data,
+  isLoading,
+  error,
+}: {
+  onRowClick: (log: ApiLog) => void;
+  data?: ApiLogsResponse;
+  isLoading: boolean;
+  error: Error | null;
+}) => {
   if (isLoading) {
     return (
       <Card className="w-[720px] h-[400px] flex justify-center items-center">
