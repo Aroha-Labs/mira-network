@@ -13,7 +13,7 @@ const LoggedoutCardContent = () => {
             now as an api
           </h3>
         </div>
-        <div className="flex justify-center">
+        <div className="flex">
           <LoginWithGoogle />
         </div>
       </div>
