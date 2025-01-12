@@ -24,6 +24,7 @@ class ModelPricingType(TypeDecorator):
 class ApiLogs(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     user_id: str = Field(index=True)
+    api_key_id: Optional[int] = Field(index=True)
     payload: Optional[str] = Field()
     request_payload: Optional[dict] = Field(sa_column=Column(JSONB))
     ttft: Optional[float] = Field(description="Time to first token")
