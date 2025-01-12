@@ -9,6 +9,8 @@ from src.router.db.session import get_session
 from src.router.core.config import SUPABASE_URL, SUPABASE_KEY
 import jwt
 
+DEFAULT_JWT_API_KEY_ID = -1  # Using -1 to indicate JWT authentication
+
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 security = HTTPBearer()
@@ -44,7 +46,9 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
         else:
             user_roles = user_custom_claims.claim.get("roles", [])
 
-        return User(**user_response.user.model_dump(), roles=user_roles)
+        return User(
+            **user_response.user.model_dump(), roles=user_roles, api_key_id=api_token.id
+        )
 
     # Verify if token is a JWT token (supabase token)
     decodedToken: dict = None
@@ -86,7 +90,9 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
         )
 
     user_roles = decodedToken.get("user_roles", [])
-    return User(**userRes.user.model_dump(), roles=user_roles)
+    return User(
+        **userRes.user.model_dump(), roles=user_roles, api_key_id=DEFAULT_JWT_API_KEY_ID
+    )
 
 
 def verify_user(user: User = Depends(verify_token)):
