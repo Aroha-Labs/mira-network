@@ -1,4 +1,4 @@
-name: \[Service\] Build and Publish Docker Image
+name: Service - Build and Publish Docker Image
 
 on:
   push:
