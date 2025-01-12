@@ -4,6 +4,14 @@ export interface Machine {
   status: "online" | "offline";
 }
 
+export interface ModelsResponse {
+  object: string;
+  data: Array<{
+    id: string;
+    object: string;
+  }>;
+}
+
 export interface MachineMetrics {
   total_calls: number;
   total_tokens: number;
