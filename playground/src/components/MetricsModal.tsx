@@ -49,6 +49,11 @@ interface MetricsModalProps {
   machineId?: string;
   apiKeyId?: number;
   userId?: string;
+  modelFilter?: string;
+  dateRange?: {
+    startDate?: string;
+    endDate?: string;
+  };
 }
 
 const Shimmer = () => (
@@ -69,9 +74,11 @@ const MetricsModal = ({
   machineId,
   apiKeyId,
   userId,
+  modelFilter,
+  dateRange,
 }: MetricsModalProps) => {
   const { data: userSession } = useSession();
-  const [dateRange, setDateRange] = useState("7");
+  const [dateRangeState, setDateRangeState] = useState("7");
 
   const chartOptions = useMemo(
     () => ({
@@ -98,7 +105,7 @@ const MetricsModal = ({
 
   const getStartDate = useCallback(() => {
     const date = new Date();
-    switch (dateRange) {
+    switch (dateRangeState) {
       case "1":
         date.setDate(date.getDate() - 1);
         break;
@@ -113,17 +120,26 @@ const MetricsModal = ({
         break;
     }
     return date;
-  }, [dateRange]);
+  }, [dateRangeState]);
 
   const { data, isLoading, error } = useQuery<{ logs: ApiLog[] }>({
-    queryKey: ["metrics-logs", machineId, apiKeyId, userId, dateRange],
+    queryKey: [
+      "metrics-logs",
+      machineId,
+      apiKeyId,
+      userId,
+      modelFilter,
+      dateRange,
+    ],
     queryFn: async () => {
       const resp = await api.get("/api-logs", {
         params: {
           ...(machineId && { machine_id: machineId }),
           ...(apiKeyId && { api_key_id: apiKeyId }),
           ...(userId && { user_id: userId }),
-          start_date: getStartDate().toISOString().split("T")[0],
+          ...(modelFilter && { model: modelFilter }),
+          ...(dateRange?.startDate && { start_date: dateRange.startDate }),
+          ...(dateRange?.endDate && { end_date: dateRange.endDate }),
           page_size: 10000,
         },
       });
@@ -178,7 +194,7 @@ const MetricsModal = ({
 
         while (isBefore(current, endDate)) {
           let key = "";
-          switch (dateRange) {
+          switch (dateRangeState) {
             case "1":
               const hour = startOfHour(current).getHours();
               const fourHourBlock = Math.floor(hour / 4);
@@ -228,7 +244,7 @@ const MetricsModal = ({
       });
 
       const getGroupLabel = (date: Date) => {
-        switch (dateRange) {
+        switch (dateRangeState) {
           case "1":
             const hour = startOfHour(date).getHours();
             const hourBlock = Math.floor(hour / 4) * 4;
@@ -250,7 +266,7 @@ const MetricsModal = ({
         data: timeSlots.map(({ key }) => groups.get(key) || []),
       };
     },
-    [dateRange, getStartDate]
+    [dateRangeState, getStartDate]
   );
 
   const chartData = useMemo(() => {
@@ -580,9 +596,9 @@ const MetricsModal = ({
           ].map(({ value, label }) => (
             <button
               key={value}
-              onClick={() => setDateRange(value)}
+              onClick={() => setDateRangeState(value)}
               className={`px-3 py-1 rounded-md text-sm font-medium transition-colors duration-200 ${
-                dateRange === value
+                dateRangeState === value
                   ? "bg-blue-500 text-white shadow-sm"
                   : "bg-gray-50 text-gray-600 hover:bg-gray-100"
               }`}
