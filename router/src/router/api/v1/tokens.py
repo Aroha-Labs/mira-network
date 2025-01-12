@@ -32,6 +32,7 @@ def create_api_token(
         print(e)
         raise HTTPException(status_code=500, detail=str(e))
     return {
+        "id": api_token.id,
         "token": api_token.token,
         "description": api_token.description,
         "created_at": api_token.created_at,
@@ -49,6 +50,7 @@ def list_api_tokens(
     )
     return [
         {
+            "id": token.id,
             "token": token.token,
             "description": token.description,
             "created_at": token.created_at,
