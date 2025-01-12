@@ -12,7 +12,8 @@ pip install mira-network
 
 ```python
 import asyncio
-from mira_sdk import MiraClient, Message, AiRequest
+from mira_sdk.client import MiraClient
+from mira_sdk.models import AiRequest, Message
 
 async def main():
     # Initialize client
@@ -21,22 +22,19 @@ async def main():
         api_token="your-api-token"
     )
     
-    # List available models
-    models = await client.list_models()
-    print("Available models:", models)
-    
-    # Generate text
+    # Generate text with streaming enabled
     request = AiRequest(
         model="gpt-4o",
         messages=[
             Message(role="system", content="You are a helpful assistant."),
             Message(role="user", content="Hello!")
         ],
-        model_provider=None
+        stream=True  # Enable streaming for chunk-by-chunk responses
     )
     
-    response = await client.generate(request)
-    print("Response:", response)
+    # Process streaming response
+    async for chunk in await client.generate(request):
+        print(chunk)
 
 if __name__ == "__main__":
     asyncio.run(main())
@@ -55,15 +53,24 @@ if __name__ == "__main__":
 
 ## API Reference
 
+### Authentication
+
+Initialize the client with your API token:
+```python
+client = MiraClient(
+    base_url="https://api.mira.example.com",
+    api_token="your-api-token"
+)
+```
+
 ### Models
 
-- `Message`: Represents a chat message
-- `ModelProvider`: Configuration for custom model providers
-- `AiRequest`: Request for model inference
-- `FlowChatCompletion`: Request for flow-based chat completion
-- `FlowRequest`: Request for creating/updating flows
-- `ApiTokenRequest`: Request for creating API tokens
-- `AddCreditRequest`: Request for adding credits
+- `Message`: Represents a chat message with `role` and `content`
+- `AiRequest`: Configuration for model inference
+  - `model`: Model identifier (e.g., "gpt-4o")
+  - `messages`: List of Message objects
+  - `stream`: Boolean to enable streaming responses
+  - `model_provider`: Optional custom provider settings
 
 ### Client Methods
 
@@ -88,6 +95,7 @@ if __name__ == "__main__":
 - `get_user_credits()`: Get credit information
 - `add_credit(request: AddCreditRequest)`: Add credits
 - `get_credits_history()`: Get credit history
+
 
 ## License
 
