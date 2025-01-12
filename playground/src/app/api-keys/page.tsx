@@ -137,7 +137,7 @@ const ApiKeyPage = () => {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 divide-y divide-gray-200">
           {/* API Keys header */}
           <div className="p-6">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-wrap sm:flex-nowrap justify-between items-center gap-4">
               <div>
                 <h1 className="text-xl font-semibold text-gray-900">
                   API Keys
@@ -147,7 +147,7 @@ const ApiKeyPage = () => {
                 </p>
               </div>
               <button
-                className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
+                className="shrink-0 inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
                 onClick={() => setIsModalOpen(true)}
               >
                 <PlusIcon className="h-4 w-4 mr-1.5" />
@@ -160,11 +160,11 @@ const ApiKeyPage = () => {
           <div className="p-6 bg-gray-50">
             <div className="sm:flex sm:justify-between sm:items-start">
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <h3 className="text-base font-medium text-gray-900">
                     Web Authentication Usage
                   </h3>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                  <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
                     Browser Sessions
                   </span>
                 </div>
