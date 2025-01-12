@@ -1,9 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { useStore } from "@tanstack/react-store";
 import axios from "axios";
-import { format } from "date-fns";
 import { API_BASE_URL } from "src/config";
 import { apiLogsParamsState } from "src/state/apiLogsParamsState";
+import getAllDaysBetween from "src/utils/getAllDaysBetween";
 import { useSession } from "./useSession";
 
 export interface ApiLog {
@@ -101,10 +101,11 @@ const useApiLogs = () => {
     enabled: !!userSession?.access_token,
   });
 
-  const chartDataByDay = data?.logs?.map((log) => ({
-    date: format(new Date(log.created_at), "yyyy-MM-dd"),
-    total_tokens: log.total_tokens,
-  }));
+  const chartDataByDay = getAllDaysBetween(
+    params.startDate,
+    params.endDate,
+    data?.logs ?? []
+  );
 
   const totalTokens = data?.logs?.reduce(
     (acc, log) => acc + log.total_tokens,
