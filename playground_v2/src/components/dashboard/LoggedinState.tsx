@@ -14,12 +14,12 @@ interface LoggedinStateProps {
 const LoggedinState = ({ userSession }: LoggedinStateProps) => (
   <div className="max-w-[710px] w-full">
     <UserInfo user={userSession?.user} />
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div className="space-y-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
+      <div className="space-y-[36px]">
         <Analytics />
         <Footer className="hidden md:block col-span-2" />
       </div>
-      <div className="space-y-4">
+      <div className="space-y-1">
         <Credit />
         <ManageApiKey />
         <ApiLogs />

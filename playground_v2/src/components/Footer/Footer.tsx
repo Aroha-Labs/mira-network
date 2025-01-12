@@ -34,7 +34,7 @@ const Footer = ({ className }: { className?: string }) => (
           href={href}
           className={cn(
             jetBrainsMono.className,
-            "text-md text-black font-medium underline decoration-solid decoration-skip-ink-auto opacity-60 leading-[22px] tracking-[-1.3%]"
+            "text-base text-black font-medium opacity-50 leading-[22px] tracking-[-0.013em] text-left underline decoration-solid underline-from-font decoration-skip-ink-auto"
           )}
         >
           {text}
