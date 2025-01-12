@@ -135,6 +135,7 @@ const ApiKeyPage = () => {
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-3xl mx-auto px-4 sm:px-6">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 divide-y divide-gray-200">
+          {/* API Keys header */}
           <div className="p-6">
             <div className="flex justify-between items-center">
               <div>
@@ -155,6 +156,35 @@ const ApiKeyPage = () => {
             </div>
           </div>
 
+          {/* JWT Token section */}
+          <div className="p-6 bg-gray-50">
+            <div className="sm:flex sm:justify-between sm:items-start">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-medium text-gray-900">
+                    Web Authentication Usage
+                  </h3>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                    Browser Sessions
+                  </span>
+                </div>
+                <p className="mt-1 text-sm text-gray-500">
+                  Usage metrics for browser-based authentication
+                </p>
+              </div>
+              <div className="mt-4 sm:mt-0">
+                <button
+                  onClick={() => setSelectedApiKeyId(-1)}
+                  className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                >
+                  <ChartBarIcon className="h-4 w-4 mr-1.5" />
+                  View Usage
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* API keys list */}
           {data?.length === 0 ? (
             <div className="p-6 text-center">
               <KeyIcon className="mx-auto h-10 w-10 text-gray-400" />
@@ -253,7 +283,7 @@ const ApiKeyPage = () => {
       </div>
 
       {/* Modals */}
-      {selectedApiKeyId && (
+      {selectedApiKeyId !== null && (
         <MetricsModal
           apiKeyId={selectedApiKeyId}
           onClose={() => setSelectedApiKeyId(null)}
