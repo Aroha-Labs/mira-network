@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import AutoGrowTextarea from "./AutoGrowTextarea";
 import { XMarkIcon, StopIcon } from "@heroicons/react/24/outline";
 import { useQuery } from "@tanstack/react-query";
+import api from "src/lib/axios";
 
 interface TryFlowModalProps {
   onClose: () => void;
@@ -12,7 +13,6 @@ interface TryFlowModalProps {
     system_prompt: string;
     variables: string[];
   }) => void;
-  token: string;
 }
 
 interface Message {
@@ -20,70 +20,84 @@ interface Message {
   content: string;
 }
 
-const fetchSupportedModels = async (token: string) => {
-  const response = await fetch("http://localhost:8000/v1/models", {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-  if (!response.ok) throw new Error("Failed to fetch models");
-  const data = await response.json();
+const fetchSupportedModels = async () => {
+  const { data } = await api.get("/v1/models");
+  if (!data) throw new Error("Failed to fetch models");
   return data.data.map((model: { id: string }) => model.id);
 };
 
-const processStreamResponse = async (
-  response: Response,
-  onChunk: (chunk: string) => void
+const fetchChatCompletion = async (
+  messages: Message[],
+  onMessage: (chunk: string) => void,
+  controller: AbortController,
+  model: string,
+  variables: Record<string, string>,
+  systemPrompt: string
 ) => {
-  const reader = response.body?.getReader();
-  if (!reader) throw new Error("No reader available");
+  const response = await api.post(
+    "/flows/try",
+    {
+      req: {
+        system_prompt: systemPrompt,
+        name: "Test Flow",
+      },
+      chat: {
+        model,
+        messages,
+        variables,
+        stream: true,
+      },
+    },
+    {
+      signal: controller.signal,
+      responseType: "stream",
+    }
+  );
 
+  if (response.status !== 200) {
+    throw new Error("Failed to send message");
+  }
+
+  const reader = response.data.getReader();
   const decoder = new TextDecoder();
-  let buffer = "";
 
   try {
     while (true) {
-      const { done, value } = await reader.read();
-      console.log("Stream read:", { done, valueLength: value?.length });
+      const { value, done } = await reader.read();
       if (done) break;
 
-      buffer += decoder.decode(value, { stream: true });
-      console.log("Current buffer:", buffer);
-
-      const lines = buffer.split("\n");
-      buffer = lines.pop() || "";
+      const chunk = decoder.decode(value, { stream: true });
+      const lines = chunk.split("\n");
 
       for (const line of lines) {
-        console.log("Processing line:", line);
         if (line.startsWith("data: ")) {
           const data = line.slice(6);
-          console.log("Data after slice:", data);
           if (data === "[DONE]") continue;
+
           try {
             const parsed = JSON.parse(data);
-            console.log("Parsed data:", parsed);
-            const content = parsed.choices?.[0]?.delta?.content || "";
-            console.log("Extracted content:", content);
-            if (content) onChunk(content);
-          } catch (e) {
-            console.warn("Failed to parse chunk:", data, e);
+            if (parsed.choices?.[0]?.delta?.content) {
+              onMessage(parsed.choices[0].delta.content);
+            }
+          } catch (error) {
+            console.log("Error:", error);
+            console.warn("Failed to parse chunk:", data);
           }
         }
       }
     }
   } catch (error) {
-    console.error("Stream processing error:", error);
+    if ((error as Error).name === "AbortError") {
+      throw error;
+    }
+    console.error("Error processing stream:", error);
     throw error;
   } finally {
     reader.releaseLock();
   }
 };
 
-export default function TryFlowModal({
-  onClose,
-  onSave,
-  token,
-}: TryFlowModalProps) {
+export default function TryFlowModal({ onClose, onSave }: TryFlowModalProps) {
   const [name, setName] = useState("");
   const [systemPrompt, setSystemPrompt] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
@@ -94,14 +108,10 @@ export default function TryFlowModal({
   const [extractedVariables, setExtractedVariables] = useState<string[]>([]);
   const [showSaveForm, setShowSaveForm] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const [errorMessage, setErrorMessage] = useState("");
-  const {
-    data: supportedModelsData,
-    error: supportedModelsError,
-    isLoading: isModelsLoading,
-  } = useQuery<string[]>({
+  const [, setErrorMessage] = useState("");
+  const { data: supportedModelsData } = useQuery<string[]>({
     queryKey: ["supportedModels"],
-    queryFn: () => fetchSupportedModels(token),
+    queryFn: fetchSupportedModels,
   });
 
   const handleExtractVariables = (prompt: string) => {
@@ -130,79 +140,20 @@ export default function TryFlowModal({
     abortControllerRef.current = new AbortController();
 
     try {
-      const response = await fetch("http://localhost:8000/flows/try", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+      await fetchChatCompletion(
+        updatedMessages,
+        (chunk) => {
+          assistantMessage.content += chunk;
+          setMessages((prevMessages) => [
+            ...prevMessages.slice(0, -1),
+            { ...assistantMessage },
+          ]);
         },
-        body: JSON.stringify({
-          req: {
-            system_prompt: systemPrompt,
-            name: name || "Test Flow",
-          },
-          chat: {
-            model: selectedModel,
-            messages: updatedMessages,
-            variables: variables,
-            stream: true,
-          },
-        }),
-        signal: abortControllerRef.current.signal,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || "Failed to send message");
-      }
-
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-
-      while (true) {
-        const { value, done: doneReading } = await reader!.read();
-        if (doneReading) break;
-
-        const chunks = decoder
-          .decode(value, { stream: true })
-          .split("\n")
-          .flatMap((c) => c.split("data: "))
-          .filter((c) => {
-            if (!c) return false;
-            const wordsToIgnore = [
-              "[DONE]",
-              "[ERROR]",
-              "OPENROUTER PROCESSING",
-            ];
-            return !wordsToIgnore.some((w) => c.includes(w));
-          });
-
-        for (const chunk of chunks) {
-          try {
-            const data = JSON.parse(chunk);
-            console.log("Parsed chunk:", data);
-
-            if (data.error) {
-              throw new Error(data.error.message);
-            }
-
-            const choice = data.choices[0];
-            const content = choice.delta
-              ? choice.delta.content
-              : choice.message?.content;
-
-            if (content) {
-              assistantMessage.content += content;
-              setMessages((prevMessages) => [
-                ...prevMessages.slice(0, -1),
-                { ...assistantMessage },
-              ]);
-            }
-          } catch (error) {
-            console.error("Failed to parse response:", error);
-          }
-        }
-      }
+        abortControllerRef.current,
+        selectedModel,
+        variables,
+        systemPrompt
+      );
     } catch (error) {
       const err = error as Error;
       if (err.name !== "AbortError") {

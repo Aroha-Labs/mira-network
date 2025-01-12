@@ -8,6 +8,7 @@ import { ChatBubbleBottomCenterIcon } from "@heroicons/react/24/outline";
 import ConfirmModal from "./ConfirmModal";
 import ChatBubble from "./ChatBubble";
 import { Spinner } from "./PageLoading";
+import api from "src/lib/axios";
 
 interface FlowChatProps {
   flow: {
@@ -24,56 +25,115 @@ interface Message {
   content: string;
 }
 
-const fetchSupportedModels = async (token: string) => {
-  const response = await fetch("http://localhost:8000/v1/models", {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-  if (!response.ok) throw new Error("Failed to fetch models");
-  const data = await response.json();
-  return data.data.map((model: { id: string }) => model.id);
+const fetchSupportedModels = async () => {
+  const response = await api.get("/v1/models");
+  if (response.status !== 200) throw new Error("Failed to fetch models");
+  return response.data.data.map((model: { id: string }) => model.id);
 };
 
-const processStreamResponse = async (
-  response: Response,
-  onChunk: (chunk: string) => void
-) => {
-  const reader = response.body?.getReader();
-  if (!reader) throw new Error("No reader available");
+// const processStreamResponse = async (
+//   response: Response,
+//   onChunk: (chunk: string) => void
+// ) => {
+//   const reader = response.body?.getReader();
+//   if (!reader) throw new Error("No reader available");
 
+//   const decoder = new TextDecoder();
+//   let buffer = "";
+
+//   try {
+//     while (true) {
+//       const { done, value } = await reader.read();
+//       if (done) break;
+
+//       // Decode the chunk and add it to buffer
+//       buffer += decoder.decode(value, { stream: true });
+
+//       // Split on double newlines which typically separate SSE messages
+//       const lines = buffer.split("\n\n");
+//       // Keep the last (potentially incomplete) part in the buffer
+//       buffer = lines.pop() || "";
+
+//       for (const line of lines) {
+//         // Skip empty lines
+//         if (!line.trim()) continue;
+
+//         // Handle lines that start with "data: "
+//         if (line.includes("data: ")) {
+//           const data = line.replace(/^data: /, "").trim();
+//           if (data === "[DONE]") continue;
+
+//           try {
+//             const parsed = JSON.parse(data);
+//             // Check for OPENROUTER PROCESSING message
+//             if (parsed.choices?.[0]?.delta?.content) {
+//               onChunk(parsed.choices[0].delta.content);
+//             }
+//           } catch (e) {
+//             console.warn("Failed to parse chunk:", data);
+//           }
+//         }
+//       }
+//     }
+//   } catch (error) {
+//     if ((error as Error).name === "AbortError") {
+//       throw error;
+//     }
+//     console.error("Error processing stream:", error);
+//   } finally {
+//     reader.releaseLock();
+//   }
+// };
+
+const fetchChatCompletion = async (
+  messages: Message[],
+  onMessage: (chunk: string) => void,
+  controller: AbortController,
+  model: string,
+  variables: Record<string, string>,
+  flowId: number
+) => {
+  const response = await api.post(
+    `/v1/flow/${flowId}/chat/completions`,
+    {
+      model,
+      messages,
+      variables,
+      stream: true,
+    },
+    {
+      signal: controller.signal,
+      responseType: "stream",
+    }
+  );
+
+  if (response.status !== 200) {
+    throw new Error("Failed to send message");
+  }
+
+  const reader = response.data.getReader();
   const decoder = new TextDecoder();
-  let buffer = "";
 
   try {
     while (true) {
-      const { done, value } = await reader.read();
+      const { value, done } = await reader.read();
       if (done) break;
 
-      // Decode the chunk and add it to buffer
-      buffer += decoder.decode(value, { stream: true });
-
-      // Split on double newlines which typically separate SSE messages
-      const lines = buffer.split("\n\n");
-      // Keep the last (potentially incomplete) part in the buffer
-      buffer = lines.pop() || "";
+      const chunk = decoder.decode(value, { stream: true });
+      const lines = chunk.split("\n");
 
       for (const line of lines) {
-        // Skip empty lines
-        if (!line.trim()) continue;
-
-        // Handle lines that start with "data: "
-        if (line.includes("data: ")) {
-          const data = line.replace(/^data: /, "").trim();
+        if (line.startsWith("data: ")) {
+          const data = line.slice(6);
           if (data === "[DONE]") continue;
 
           try {
             const parsed = JSON.parse(data);
-            // Check for OPENROUTER PROCESSING message
             if (parsed.choices?.[0]?.delta?.content) {
-              onChunk(parsed.choices[0].delta.content);
+              onMessage(parsed.choices[0].delta.content);
             }
-          } catch (e) {
+          } catch (error) {
+            console.error("error:", error);
             console.warn("Failed to parse chunk:", data);
           }
         }
@@ -84,99 +144,13 @@ const processStreamResponse = async (
       throw error;
     }
     console.error("Error processing stream:", error);
+    throw error;
   } finally {
     reader.releaseLock();
   }
 };
 
-const fetchChatCompletion = async (
-  messages: Message[],
-  onMessage: (chunk: string) => void,
-  controller: AbortController,
-  model: string,
-  token: string,
-  variables: Record<string, string>,
-  flowId: number
-) => {
-  console.log("Sending request with:", { messages, model, variables });
-
-  const response = await fetch(
-    `http://localhost:8000/v1/flow/${flowId}/chat/completions`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        variables,
-        stream: true,
-      }),
-      signal: controller.signal,
-    }
-  );
-
-  console.log("Response status:", response.status);
-
-  if (!response.ok) {
-    try {
-      const data = await response.json();
-      console.error("Error response:", data);
-      throw new Error(
-        data.detail || data.error?.message || "Failed to send message"
-      );
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  const reader = response.body?.getReader();
-  const decoder = new TextDecoder();
-  let done = false;
-
-  while (!done) {
-    const { value, done: doneReading } = await reader!.read();
-    done = doneReading;
-
-    if (doneReading) continue;
-
-    const chunks = decoder
-      .decode(value, { stream: true })
-      .split("\n")
-      .flatMap((c) => c.split("data: "))
-      .filter((c) => {
-        if (!c) return false;
-        const wordsToIgnore = ["[DONE]", "[ERROR]", "OPENROUTER PROCESSING"];
-        return !wordsToIgnore.some((w) => c.includes(w));
-      });
-
-    console.log("Received chunks:", chunks);
-
-    for (const chunk of chunks) {
-      let data;
-      try {
-        data = JSON.parse(chunk);
-        console.log("Parsed chunk:", data);
-
-        if (data.error) {
-          throw new Error(data.error.message);
-        }
-        const choice = data.choices[0];
-        onMessage(choice.delta ? choice.delta.content : choice.message.content);
-      } catch (error) {
-        console.error("Failed to parse response:", error, "Raw chunk:", chunk);
-      }
-    }
-  }
-};
-
-export default function FlowChat({
-  flow,
-  onClose,
-  token,
-}: FlowChatProps & { token: string }) {
+export default function FlowChat({ flow, onClose }: FlowChatProps) {
   const [variables, setVariables] = useState<Record<string, string>>({});
   const [messages, setMessages] = useState<Message[]>([]);
   const [userInput, setUserInput] = useState("");
@@ -186,13 +160,9 @@ export default function FlowChat({
   const [errorMessage, setErrorMessage] = useState("");
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  const {
-    data: supportedModelsData,
-    error: supportedModelsError,
-    isLoading: isModelsLoading,
-  } = useQuery<string[]>({
+  const { data: supportedModelsData } = useQuery<string[]>({
     queryKey: ["supportedModels"],
-    queryFn: () => fetchSupportedModels(token),
+    queryFn: fetchSupportedModels,
   });
 
   const supportedModelsOptions = useMemo(() => {
@@ -230,7 +200,7 @@ export default function FlowChat({
     setIsLoading(true);
     setErrorMessage("");
 
-    const assistantMessage = { role: "assistant", content: "" };
+    const assistantMessage = { role: "assistant", content: "" } as Message;
     const updatedMessages = [...messagesToKeep, assistantMessage];
     setMessages(updatedMessages);
 
@@ -255,7 +225,6 @@ export default function FlowChat({
         },
         abortControllerRef.current,
         selectedModel,
-        token,
         variables,
         flow.id
       );
@@ -305,7 +274,6 @@ export default function FlowChat({
         },
         abortControllerRef.current,
         selectedModel,
-        token,
         variables,
         flow.id
       );
