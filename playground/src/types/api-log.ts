@@ -20,3 +20,10 @@ export interface ApiLog {
   machine_id?: string;
   created_at: string;
 }
+
+export interface ApiLogsResponse {
+  logs: ApiLog[];
+  page: number;
+  page_size: number;
+  total: number;
+}
