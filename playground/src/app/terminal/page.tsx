@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
+import { useState } from "react";
 import { useSession } from "src/hooks/useSession";
 import FlowChat from "src/components/FlowChat";
 import TryFlowModal from "src/components/TryFlowModal";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import api from "src/lib/axios";
 
 interface Flow {
   id: number;
@@ -15,63 +16,52 @@ interface Flow {
   updated_at: string;
 }
 
+const fetchFlows = async () => {
+  const { data } = await api.get("/flows");
+  return data;
+};
+
+const createFlow = async (flow: {
+  name: string;
+  system_prompt: string;
+  variables: string[];
+}) => {
+  return api.post("/flows", {
+    name: flow.name,
+    system_prompt: flow.system_prompt,
+  });
+};
+
 export default function TerminalPage() {
   const { data: userSession, isLoading: isUserLoading } = useSession();
-  const [flows, setFlows] = useState<Flow[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [selectedFlow, setSelectedFlow] = useState<Flow | null>(null);
   const [showTryFlow, setShowTryFlow] = useState(false);
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    const fetchFlows = async () => {
-      if (!userSession?.user) return;
+  const {
+    data: flows,
+    isLoading,
+    error,
+  } = useQuery<Flow[]>({
+    queryKey: ["flows"],
+    queryFn: fetchFlows,
+    enabled: !!userSession?.user,
+  });
 
-      try {
-        setIsLoading(true);
-        const response = await fetch("http://localhost:8000/flows");
-        if (!response.ok) {
-          throw new Error("Failed to fetch flows");
-        }
-        const data = await response.json();
-        setFlows(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to fetch flows");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchFlows();
-  }, [userSession?.user]);
+  const createFlowMutation = useMutation({
+    mutationFn: createFlow,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["flows"] });
+      setShowTryFlow(false);
+    },
+  });
 
   const handleCreateFlow = async (flow: {
     name: string;
     system_prompt: string;
     variables: string[];
   }) => {
-    try {
-      const response = await fetch("http://localhost:8000/flows", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${userSession.access_token}`,
-        },
-        body: JSON.stringify({
-          name: flow.name,
-          system_prompt: flow.system_prompt,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to create flow");
-      }
-
-      fetchFlows();
-      setShowTryFlow(false);
-    } catch (error) {
-      console.error("Error creating flow:", error);
-    }
+    createFlowMutation.mutate(flow);
   };
 
   if (isUserLoading) {
@@ -93,7 +83,10 @@ export default function TerminalPage() {
   if (error) {
     return (
       <div className="container px-4 py-8 mx-auto">
-        <div className="text-center text-red-600">Error: {error}</div>
+        <div className="text-center text-red-600">
+          Error:{" "}
+          {error instanceof Error ? error.message : "Failed to fetch flows"}
+        </div>
       </div>
     );
   }
@@ -111,7 +104,7 @@ export default function TerminalPage() {
       </div>
 
       <div className="grid gap-4">
-        {flows.map((flow) => (
+        {flows?.map((flow) => (
           <div
             key={flow.id}
             className="p-6 transition-colors bg-white border border-gray-200 rounded-lg shadow-sm hover:border-blue-500"
@@ -170,18 +163,13 @@ export default function TerminalPage() {
       </div>
 
       {selectedFlow && (
-        <FlowChat
-          flow={selectedFlow}
-          onClose={() => setSelectedFlow(null)}
-          token={userSession.access_token}
-        />
+        <FlowChat flow={selectedFlow} onClose={() => setSelectedFlow(null)} />
       )}
 
       {showTryFlow && (
         <TryFlowModal
           onClose={() => setShowTryFlow(false)}
           onSave={handleCreateFlow}
-          token={userSession.access_token}
         />
       )}
     </div>
