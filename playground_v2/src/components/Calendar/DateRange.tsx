@@ -1,7 +1,7 @@
 "use client";
 
+import { CaretDown } from "@phosphor-icons/react";
 import { format, isValid } from "date-fns";
-import { CalendarIcon } from "lucide-react";
 import * as React from "react";
 import { DateRange } from "react-day-picker";
 
@@ -68,12 +68,12 @@ const DatePickerWithRange = ({
             id="date"
             variant="ghost"
             className={cn(
-              "w-[300px] justify-start text-left font-normal rounded-sm",
+              "justify-start text-left font-normal text-base leading-[22px] tracking-[-0.013em] rounded-sm p-1 underline opacity-60",
               !date && "text-muted-foreground"
             )}
           >
-            <CalendarIcon />
             {formattedDate()}
+            <CaretDown />
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="start">
