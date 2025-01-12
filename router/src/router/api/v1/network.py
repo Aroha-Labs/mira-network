@@ -174,6 +174,7 @@ async def generate(
         # Log the request
         api_log = ApiLogs(
             user_id=user.id,
+            api_key_id=user.api_key_id,
             payload=req.model_dump_json(),
             request_payload=req.model_dump(),
             ttft=ttfs,
