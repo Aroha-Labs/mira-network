@@ -24,6 +24,7 @@ const eslintConfig = [
         },
       ],
       "no-unused-vars": "off", // Turn off the base rule as it can report incorrect errors
+      "@next/next/no-img-element": "off", // Disable warning for <img> elements
     },
   },
 ];
