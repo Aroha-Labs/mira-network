@@ -1,7 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import axios from "axios";
 import { ApiLog } from "src/types/api-log";
-import { API_BASE_URL } from "src/config";
 import { useSession } from "src/hooks/useSession";
 import Modal from "./Modal";
 import { useState, useMemo, useCallback } from "react";
@@ -31,6 +29,7 @@ import {
   isBefore,
   parseISO,
 } from "date-fns";
+import api from "src/lib/axios";
 
 ChartJS.register(
   CategoryScale,
@@ -46,7 +45,10 @@ ChartJS.register(
 
 interface MetricsModalProps {
   onClose: () => void;
-  machineId: string;
+  title?: string;
+  machineId?: string;
+  apiKeyId?: number;
+  userId?: string;
 }
 
 const Shimmer = () => (
@@ -61,7 +63,13 @@ const ChartShimmer = () => (
   <div className="animate-pulse bg-gray-200/60 rounded-lg h-full w-full" />
 );
 
-const MetricsModal = ({ onClose, machineId }: MetricsModalProps) => {
+const MetricsModal = ({
+  onClose,
+  title,
+  machineId,
+  apiKeyId,
+  userId,
+}: MetricsModalProps) => {
   const { data: userSession } = useSession();
   const [dateRange, setDateRange] = useState("7");
 
@@ -108,15 +116,15 @@ const MetricsModal = ({ onClose, machineId }: MetricsModalProps) => {
   }, [dateRange]);
 
   const { data, isLoading, error } = useQuery<{ logs: ApiLog[] }>({
-    queryKey: ["machine-logs", machineId, dateRange],
+    queryKey: ["metrics-logs", machineId, apiKeyId, userId, dateRange],
     queryFn: async () => {
-      if (!userSession?.access_token) throw new Error("No access token");
-      const resp = await axios.get(`${API_BASE_URL}/api-logs`, {
-        headers: { Authorization: `Bearer ${userSession.access_token}` },
+      const resp = await api.get("/api-logs", {
         params: {
-          machine_id: machineId,
+          ...(machineId && { machine_id: machineId }),
+          ...(apiKeyId && { api_key_id: apiKeyId }),
+          ...(userId && { user_id: userId }),
           start_date: getStartDate().toISOString().split("T")[0],
-          page_size: 1000,
+          page_size: 10000,
         },
       });
       return resp.data;
@@ -678,7 +686,21 @@ const MetricsModal = ({ onClose, machineId }: MetricsModalProps) => {
   };
 
   return (
-    <Modal onClose={onClose} title={`Metrics for ${machineId}`}>
+    <Modal
+      onClose={onClose}
+      title={
+        title ||
+        `Metrics for ${
+          machineId
+            ? `Machine ${machineId}`
+            : apiKeyId
+            ? `API Key ${apiKeyId}`
+            : userId
+            ? `User ${userId}`
+            : "Unknown"
+        }`
+      }
+    >
       {renderContent()}
     </Modal>
   );
