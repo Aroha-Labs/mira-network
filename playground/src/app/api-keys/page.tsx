@@ -2,8 +2,7 @@
 
 import React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import axios, { AxiosError } from "axios";
-import { API_BASE_URL } from "src/config";
+import { AxiosError } from "axios";
 import { useSession } from "src/hooks/useSession";
 import { useState } from "react";
 import Modal from "src/components/Modal";
@@ -13,33 +12,28 @@ import {
   ClipboardIcon,
   EllipsisVerticalIcon,
   PlusIcon,
-} from "@heroicons/react/24/outline"; // Import ClipboardIcon, EllipsisVerticalIcon, and PlusIcon
+  ChartBarIcon,
+} from "@heroicons/react/24/outline"; // Import ClipboardIcon, EllipsisVerticalIcon, PlusIcon, and ChartBarIcon
 import { Menu, MenuItem, MenuItems, Transition } from "@headlessui/react"; // Import Menu and Transition from @headlessui/react
 import Loading from "src/components/PageLoading";
+import MetricsModal from "src/components/MetricsModal";
+import api from "src/lib/axios";
 
 interface ApiKey {
+  id: number;
   token: string;
   description: string;
   created_at: string;
 }
 
-const fetchApiKeys = async (token?: string): Promise<ApiKey[]> => {
-  if (!token) {
-    throw new Error("No token provided");
-  }
-  const response = await axios.get(`${API_BASE_URL}/api-tokens`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+const fetchApiKeys = async (): Promise<ApiKey[]> => {
+  const response = await api.get("/api-tokens");
   return response.data;
 };
 
-const addApiKey = async (token: string, description: string) => {
+const addApiKey = async (description: string) => {
   try {
-    const response = await axios.post(
-      `${API_BASE_URL}/api-tokens`,
-      { description },
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
+    const response = await api.post("/api-tokens", { description });
     return response.data;
   } catch (e) {
     const error = e as AxiosError<{ detail: string }>;
@@ -47,12 +41,8 @@ const addApiKey = async (token: string, description: string) => {
   }
 };
 
-const deleteApiKey = async (token: string, tokenId: string) => {
-  const response = await axios.delete(`${API_BASE_URL}/api-tokens/${tokenId}`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
+const deleteApiKey = async (tokenId: string) => {
+  const response = await api.delete(`/api-tons/${tokenId}`);
   return response.data;
 };
 
@@ -61,21 +51,17 @@ const ApiKeyPage = () => {
   const queryClient = useQueryClient();
   const { data, error, isLoading } = useQuery<ApiKey[]>({
     queryKey: ["apiKeys"],
-    queryFn: () => fetchApiKeys(userSession?.access_token),
+    queryFn: fetchApiKeys,
     enabled: !!userSession?.access_token,
   });
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [description, setDescription] = useState("");
   const [tokenToDelete, setTokenToDelete] = useState<string | null>(null);
+  const [selectedApiKeyId, setSelectedApiKeyId] = useState<number | null>(null);
 
   const addMutation = useMutation({
-    mutationFn: (description: string) => {
-      if (!userSession?.access_token) {
-        throw new Error("User session not found");
-      }
-      return addApiKey(userSession.access_token, description);
-    },
+    mutationFn: addApiKey,
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["apiKeys"],
@@ -86,12 +72,7 @@ const ApiKeyPage = () => {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (tokenId: string) => {
-      if (!userSession?.access_token) {
-        throw new Error("User session not found");
-      }
-      return deleteApiKey(userSession.access_token, tokenId);
-    },
+    mutationFn: deleteApiKey,
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["apiKeys"],
@@ -202,6 +183,20 @@ const ApiKeyPage = () => {
                       {({ active }) => (
                         <button
                           className={`${
+                            active
+                              ? "bg-gray-100 text-gray-900"
+                              : "text-gray-700"
+                          } group flex items-center px-4 py-2 text-sm w-full`}
+                          onClick={() => setSelectedApiKeyId(apiKey.id)}
+                        >
+                          View Metrics
+                        </button>
+                      )}
+                    </MenuItem>
+                    <MenuItem>
+                      {({ active }) => (
+                        <button
+                          className={`${
                             active ? "bg-red-600 text-white" : "text-gray-700"
                           } group flex items-center px-4 py-2 text-sm w-full`}
                           onClick={() => handleDeleteApiKey(apiKey.token)}
@@ -226,12 +221,30 @@ const ApiKeyPage = () => {
                 <ClipboardIcon className="h-5 w-5" />
               </button>
             </div>
-            <div className="text-sm text-gray-500 mb-2">
-              Created At: {formatDate(apiKey.created_at)}
+            <div className="flex justify-between items-center mt-4">
+              <div className="text-sm text-gray-500">
+                Created At: {formatDate(apiKey.created_at)}
+              </div>
+              <button
+                className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                onClick={() => setSelectedApiKeyId(apiKey.id)}
+              >
+                <ChartBarIcon className="h-4 w-4" />
+                View Metrics
+              </button>
             </div>
           </div>
         ))}
       </div>
+
+      {/* Update MetricsModal to use apiKeyId */}
+      {selectedApiKeyId && (
+        <MetricsModal
+          apiKeyId={selectedApiKeyId}
+          onClose={() => setSelectedApiKeyId(null)}
+        />
+      )}
+
       {isModalOpen &&
         createPortal(
           <Modal onClose={() => setIsModalOpen(false)} title="Add API Key">
