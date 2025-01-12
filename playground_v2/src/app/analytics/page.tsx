@@ -20,7 +20,7 @@ const NetworkPage = () => {
   return (
     <div className="container mx-auto p-4 max-w-fit">
       <Header startDate={params.startDate} endDate={params.endDate} />
-      <Chart startDate={params.startDate} endDate={params.endDate} />
+      <Chart />
       <Footer />
     </div>
   );
