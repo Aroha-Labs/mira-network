@@ -9,15 +9,20 @@ import Modal from "src/components/Modal";
 import ConfirmModal from "src/components/ConfirmModal";
 import { createPortal } from "react-dom";
 import {
-  ClipboardIcon,
   EllipsisVerticalIcon,
   PlusIcon,
   ChartBarIcon,
-} from "@heroicons/react/24/outline"; // Import ClipboardIcon, EllipsisVerticalIcon, PlusIcon, and ChartBarIcon
-import { Menu, MenuItem, MenuItems, Transition } from "@headlessui/react"; // Import Menu and Transition from @headlessui/react
+  KeyIcon,
+  TrashIcon,
+} from "@heroicons/react/24/outline";
 import Loading from "src/components/PageLoading";
 import MetricsModal from "src/components/MetricsModal";
 import api from "src/lib/axios";
+import { format, formatDistanceToNow, parseISO } from "date-fns";
+import toast from "react-hot-toast";
+import CopyToClipboardIcon from "src/components/CopyToClipboardIcon";
+import { Menu, Transition } from "@headlessui/react";
+import { Fragment } from "react";
 
 interface ApiKey {
   id: number;
@@ -82,7 +87,11 @@ const ApiKeyPage = () => {
   });
 
   const handleAddApiKey = () => {
-    addMutation.mutate(description);
+    if (!description.trim()) {
+      toast.error("Description is required");
+      return;
+    }
+    addMutation.mutate(description.trim());
   };
 
   const handleDeleteApiKey = (tokenId: string) => {
@@ -99,28 +108,20 @@ const ApiKeyPage = () => {
     setTokenToDelete(null);
   };
 
-  const handleCopyToClipboard = (token: string) => {
-    navigator.clipboard.writeText(token);
-  };
-
   const getTokenDisplay = (token: string) => {
     return `${token.slice(0, 4)}...${token.slice(-4)}`;
   };
 
   const formatDate = (dateString: string) => {
-    const options: Intl.DateTimeFormatOptions = {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    };
-    return new Date(dateString).toLocaleDateString(undefined, options);
+    const date = parseISO(dateString);
+    const relativeTime = formatDistanceToNow(date, { addSuffix: true });
+    const fullDate = format(date, "PPp");
+    return { relativeTime, fullDate };
   };
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="flex items-center justify-center h-64">
         <Loading />
       </div>
     );
@@ -131,113 +132,127 @@ const ApiKeyPage = () => {
   }
 
   return (
-    <div className="container mx-auto p-4 max-w-lg">
-      {userSession?.user && (
-        <div className="bg-gray-50 p-4 rounded-lg shadow-sm border border-gray-300 mb-4">
-          <div className="text-gray-600">
-            <strong>User ID:</strong> {userSession.user.id}
-          </div>
-        </div>
-      )}
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-semibold">API keys</h1>
-        <button
-          className="px-4 py-2 bg-blue-600 text-white rounded-md flex items-center gap-2 hover:bg-blue-700"
-          onClick={() => setIsModalOpen(true)}
-        >
-          <PlusIcon className="h-5 w-5" />
-          Add API Key
-        </button>
-      </div>
-      {deleteMutation.isPending && (
-        <div className="text-blue-600 mb-4">Deleting API key...</div>
-      )}
-      {deleteMutation.isError && (
-        <div className="text-red-600 mb-4">
-          Error deleting API key: {deleteMutation.error.message}
-        </div>
-      )}
-      <div className="grid grid-cols-1 gap-4">
-        {data?.map((apiKey) => (
-          <div
-            key={apiKey.token}
-            className="bg-gray-50 p-4 rounded-lg shadow-sm border border-gray-300 relative"
-          >
-            <Menu as="div" className="absolute top-2 right-2 text-left">
-              <Menu.Button className="p-1 text-gray-600 rounded-md hover:bg-gray-200">
-                <span className="sr-only">Open options</span>
-                <EllipsisVerticalIcon className="h-5 w-5" />
-              </Menu.Button>
-              <Transition
-                as={React.Fragment}
-                enter="transition ease-out duration-100"
-                enterFrom="transform opacity-0 scale-95"
-                enterTo="transform opacity-100 scale-100"
-                leave="transition ease-in duration-75"
-                leaveFrom="transform opacity-100 scale-100"
-                leaveTo="transform opacity-0 scale-95"
-              >
-                <MenuItems className="absolute right-0 mt-2 w-56 origin-top-right bg-white border border-gray-300 divide-y divide-gray-100 rounded-md shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                  <div className="py-1">
-                    <MenuItem>
-                      {({ active }) => (
-                        <button
-                          className={`${
-                            active
-                              ? "bg-gray-100 text-gray-900"
-                              : "text-gray-700"
-                          } group flex items-center px-4 py-2 text-sm w-full`}
-                          onClick={() => setSelectedApiKeyId(apiKey.id)}
-                        >
-                          View Metrics
-                        </button>
-                      )}
-                    </MenuItem>
-                    <MenuItem>
-                      {({ active }) => (
-                        <button
-                          className={`${
-                            active ? "bg-red-600 text-white" : "text-gray-700"
-                          } group flex items-center px-4 py-2 text-sm w-full`}
-                          onClick={() => handleDeleteApiKey(apiKey.token)}
-                        >
-                          Delete
-                        </button>
-                      )}
-                    </MenuItem>
-                  </div>
-                </MenuItems>
-              </Transition>
-            </Menu>
-            <h2 className="text-lg font-medium mb-2">{apiKey.description}</h2>
-            <div className="flex items-center mb-2">
-              <span className="text-gray-600">
-                {getTokenDisplay(apiKey.token)}
-              </span>
-              <button
-                className="ml-2 p-1 bg-gray-200 text-gray-600 rounded-md hover:bg-gray-300"
-                onClick={() => handleCopyToClipboard(apiKey.token)}
-              >
-                <ClipboardIcon className="h-5 w-5" />
-              </button>
-            </div>
-            <div className="flex justify-between items-center mt-4">
-              <div className="text-sm text-gray-500">
-                Created At: {formatDate(apiKey.created_at)}
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 divide-y divide-gray-200">
+          <div className="p-6">
+            <div className="flex justify-between items-center">
+              <div>
+                <h1 className="text-xl font-semibold text-gray-900">
+                  API Keys
+                </h1>
+                <p className="mt-1 text-sm text-gray-500">
+                  Manage your API keys for programmatic access
+                </p>
               </div>
               <button
-                className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-                onClick={() => setSelectedApiKeyId(apiKey.id)}
+                className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
+                onClick={() => setIsModalOpen(true)}
               >
-                <ChartBarIcon className="h-4 w-4" />
-                View Metrics
+                <PlusIcon className="h-4 w-4 mr-1.5" />
+                New Key
               </button>
             </div>
           </div>
-        ))}
+
+          {data?.length === 0 ? (
+            <div className="p-6 text-center">
+              <KeyIcon className="mx-auto h-10 w-10 text-gray-400" />
+              <h3 className="mt-2 text-sm font-medium text-gray-900">
+                No API keys
+              </h3>
+              <p className="mt-1 text-sm text-gray-500">
+                Get started by creating a new API key.
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-200">
+              {data?.map((apiKey) => {
+                const { relativeTime, fullDate } = formatDate(
+                  apiKey.created_at
+                );
+                return (
+                  <div key={apiKey.token} className="p-6">
+                    <div className="sm:flex sm:justify-between sm:items-start">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h3
+                            className="text-base font-medium text-gray-900 truncate max-w-[300px]"
+                            title={apiKey.description || "Unnamed API Key"}
+                          >
+                            {apiKey.description || (
+                              <span className="italic text-gray-400">
+                                Unnamed API Key
+                              </span>
+                            )}
+                          </h3>
+                          <span
+                            className="text-xs text-gray-500 hover:text-gray-700 shrink-0"
+                            title={fullDate}
+                          >
+                            · {relativeTime}
+                          </span>
+                        </div>
+                        <div className="mt-2 flex items-center gap-2">
+                          <code className="text-sm bg-gray-100 px-2 py-0.5 rounded text-gray-600">
+                            {getTokenDisplay(apiKey.token)}
+                          </code>
+                          <CopyToClipboardIcon text={apiKey.token} />
+                        </div>
+                      </div>
+                      <div className="mt-4 sm:mt-0 flex items-center gap-3">
+                        <button
+                          onClick={() => setSelectedApiKeyId(apiKey.id)}
+                          className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                        >
+                          <ChartBarIcon className="h-4 w-4 mr-1.5" />
+                          Metrics
+                        </button>
+                        <Menu as="div" className="relative">
+                          <Menu.Button className="flex items-center text-gray-400 hover:text-gray-600">
+                            <EllipsisVerticalIcon className="h-5 w-5" />
+                          </Menu.Button>
+                          <Transition
+                            as={Fragment}
+                            enter="transition ease-out duration-100"
+                            enterFrom="transform opacity-0 scale-95"
+                            enterTo="transform opacity-100 scale-100"
+                            leave="transition ease-in duration-75"
+                            leaveFrom="transform opacity-100 scale-100"
+                            leaveTo="transform opacity-0 scale-95"
+                          >
+                            <Menu.Items className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 focus:outline-none">
+                              <div className="py-1">
+                                <Menu.Item>
+                                  {({ active }) => (
+                                    <button
+                                      onClick={() =>
+                                        handleDeleteApiKey(apiKey.token)
+                                      }
+                                      className={`${
+                                        active ? "bg-red-50" : ""
+                                      } group flex items-center w-full px-4 py-2 text-sm text-red-600 hover:text-red-700`}
+                                    >
+                                      <TrashIcon className="mr-3 h-4 w-4" />
+                                      Delete Key
+                                    </button>
+                                  )}
+                                </Menu.Item>
+                              </div>
+                            </Menu.Items>
+                          </Transition>
+                        </Menu>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Update MetricsModal to use apiKeyId */}
+      {/* Modals */}
       {selectedApiKeyId && (
         <MetricsModal
           apiKeyId={selectedApiKeyId}
@@ -248,34 +263,57 @@ const ApiKeyPage = () => {
       {isModalOpen &&
         createPortal(
           <Modal onClose={() => setIsModalOpen(false)} title="Add API Key">
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700">
-                Description
-              </label>
-              <input
-                type="text"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              />
-            </div>
-
-            {addMutation.isPending && (
-              <div className="text-blue-600 mb-4">Adding API key...</div>
-            )}
-            {addMutation.isError && (
-              <div className="text-red-600 mb-4">
-                Error adding API key: {addMutation.error.message}
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Description
+                </label>
+                <input
+                  type="text"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="e.g., Production API Key"
+                  maxLength={100}
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  {description.length}/100 characters
+                </p>
               </div>
-            )}
 
-            <button
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-              onClick={handleAddApiKey}
-              disabled={addMutation.isPending}
-            >
-              {addMutation.isPending ? "Adding..." : "Add"}
-            </button>
+              {addMutation.isPending && (
+                <div className="text-blue-600 mb-4">Adding API key...</div>
+              )}
+              {addMutation.isError && (
+                <div className="text-red-600 mb-4">
+                  Error adding API key: {addMutation.error.message}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={handleAddApiKey}
+                  disabled={addMutation.isPending || !description.trim()}
+                >
+                  {addMutation.isPending ? (
+                    <span className="flex items-center">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                      Adding...
+                    </span>
+                  ) : (
+                    "Add Key"
+                  )}
+                </button>
+              </div>
+            </div>
           </Modal>,
           document.body
         )}
