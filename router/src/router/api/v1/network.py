@@ -119,7 +119,12 @@ async def generate(
 
     machine = get_random_machines(1)[0]
     proxy_url = f"http://{machine.network_ip}:{PROXY_PORT}/v1/chat/completions"
-    llmres = requests.post(proxy_url, json=req.model_dump(), stream=req.stream)
+    llmres = requests.post(
+        proxy_url,
+        json=req.model_dump(),
+        stream=req.stream,
+        headers={"Accept-Encoding": "identity"},
+    )
 
     def generate():
         usage = {}
