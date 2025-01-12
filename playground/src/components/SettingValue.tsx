@@ -1,69 +1,54 @@
 import { useState } from "react";
-import {
-  ChevronDownIcon,
-  ChevronRightIcon,
-  CodeBracketIcon,
-} from "@heroicons/react/24/outline";
+import { ChevronDownIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
 import { JsonValue } from "src/types/json";
 
 interface SettingValueProps {
   value: JsonValue;
   level?: number;
+  showRaw?: boolean; // Add this prop
 }
 
 const ValueLabel = ({ type }: { type: string }) => (
-  <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-mono">
+  <span
+    className={`
+    text-xs px-1.5 py-0.5 rounded-md font-medium
+    ${type === "string" && "bg-green-50 text-green-700"}
+    ${type === "number" && "bg-blue-50 text-blue-700"}
+    ${type === "boolean" && "bg-purple-50 text-purple-700"}
+    ${type === "array" && "bg-amber-50 text-amber-700"}
+    ${type === "object" && "bg-rose-50 text-rose-700"}
+  `}
+  >
     {type}
   </span>
 );
 
-const SettingValue = ({ value, level = 0 }: SettingValueProps) => {
+const SettingValue = ({
+  value,
+  level = 0,
+  showRaw = false,
+}: SettingValueProps) => {
   const [isExpanded, setIsExpanded] = useState(level < 1);
-  const [showRawJson, setShowRawJson] = useState(false);
   const valueType = Array.isArray(value) ? "array" : typeof value;
   const isExpandable = valueType === "object" || valueType === "array";
-  const indent = level > 0 ? "ml-1" : "";
 
-  // Show raw JSON view if enabled
-  if (showRawJson && level === 0) {
+  if (showRaw || (level === 0 && showRaw)) {
     return (
-      <div className="space-y-2">
-        <div className="flex justify-end">
-          <button
-            onClick={() => setShowRawJson(false)}
-            className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-800"
-          >
-            <CodeBracketIcon className="h-4 w-4" />
-            Show Formatted
-          </button>
-        </div>
-        <pre className="bg-gray-50 p-3 rounded-md overflow-x-auto font-mono text-sm text-gray-800">
-          {JSON.stringify(value, null, 2)}
-        </pre>
-      </div>
+      <pre className="bg-gray-50 p-4 rounded-lg border border-gray-200 overflow-x-auto font-mono text-sm text-gray-800">
+        {JSON.stringify(value, null, 2)}
+      </pre>
     );
   }
 
-  // Show toggle for root level only
   if (level === 0) {
     return (
-      <div className="space-y-2">
-        <div className="flex justify-end">
-          <button
-            onClick={() => setShowRawJson(true)}
-            className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-800"
-          >
-            <CodeBracketIcon className="h-4 w-4" />
-            Show Raw
-          </button>
-        </div>
+      <div className="bg-gray-50 rounded-lg border border-gray-200 p-4">
         <RenderValue
           value={value}
           valueType={valueType}
           isExpanded={isExpanded}
           setIsExpanded={setIsExpanded}
           isExpandable={isExpandable}
-          indent={indent}
           level={level}
         />
       </div>
@@ -77,7 +62,6 @@ const SettingValue = ({ value, level = 0 }: SettingValueProps) => {
       isExpanded={isExpanded}
       setIsExpanded={setIsExpanded}
       isExpandable={isExpandable}
-      indent={indent}
       level={level}
     />
   );
@@ -89,7 +73,6 @@ interface RenderValueProps {
   isExpanded: boolean;
   setIsExpanded: (value: boolean) => void;
   isExpandable: boolean;
-  indent: string;
   level: number;
 }
 
@@ -99,16 +82,17 @@ const RenderValue = ({
   isExpanded,
   setIsExpanded,
   isExpandable,
-  indent,
   level,
 }: RenderValueProps) => {
-  if (value === null) return <span className="text-gray-400">null</span>;
+  if (value === null) return <span className="text-gray-400 italic">null</span>;
 
   if (valueType === "string") {
     return (
       <div className="flex items-center gap-2">
         <ValueLabel type="string" />
-        <span className="text-gray-800">&#34;{value as string}&#34;</span>
+        <span className="text-gray-800 break-all">
+          &quot;{value as string}&quot;
+        </span>
       </div>
     );
   }
@@ -136,13 +120,13 @@ const RenderValue = ({
   if (valueType === "array") {
     const arrayValue = value as JsonValue[];
     return (
-      <div className={indent}>
+      <div className="ml-4">
         <div
-          className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded"
+          className="flex items-center gap-2 cursor-pointer hover:bg-white/50 p-1.5 -ml-1.5 rounded-md group"
           onClick={() => setIsExpanded(!isExpanded)}
         >
           {isExpandable && (
-            <span className="text-gray-400">
+            <span className="text-gray-400 group-hover:text-gray-600">
               {isExpanded ? (
                 <ChevronDownIcon className="h-4 w-4" />
               ) : (
@@ -157,7 +141,7 @@ const RenderValue = ({
           <div className="ml-4 border-l border-gray-200 pl-4 space-y-2 mt-2">
             {arrayValue.map((item, index) => (
               <div key={index} className="flex items-center gap-2">
-                <span className="text-gray-400 text-sm font-mono">
+                <span className="text-gray-400 text-xs font-mono min-w-[2rem]">
                   {index}:
                 </span>
                 <SettingValue value={item} level={level + 1} />
@@ -173,13 +157,13 @@ const RenderValue = ({
     const objectValue = value as Record<string, JsonValue>;
     const entries = Object.entries(objectValue);
     return (
-      <div className={indent}>
+      <div className="ml-4">
         <div
-          className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded"
+          className="flex items-center gap-2 cursor-pointer hover:bg-white/50 p-1.5 -ml-1.5 rounded-md group"
           onClick={() => setIsExpanded(!isExpanded)}
         >
           {isExpandable && (
-            <span className="text-gray-400">
+            <span className="text-gray-400 group-hover:text-gray-600">
               {isExpanded ? (
                 <ChevronDownIcon className="h-4 w-4" />
               ) : (
@@ -193,8 +177,8 @@ const RenderValue = ({
         {isExpanded && (
           <div className="ml-4 border-l border-gray-200 pl-4 space-y-2 mt-2">
             {entries.map(([key, val]) => (
-              <div key={key} className="flex items-center gap-2">
-                <span className="text-gray-600 font-medium self-start ">
+              <div key={key} className="flex items-start gap-2">
+                <span className="text-gray-600 font-medium text-sm min-w-[8rem] pt-1">
                   {key}:
                 </span>
                 <SettingValue value={val} level={level + 1} />
