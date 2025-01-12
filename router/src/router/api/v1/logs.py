@@ -48,7 +48,16 @@ def list_all_logs(
     if api_key_id:
         query = query.filter(ApiLogs.api_key_id == api_key_id)
 
-    if order_by not in ["created_at", "total_response_time", "total_tokens"]:
+    if order_by not in [
+        "created_at",
+        "total_response_time",
+        "total_tokens",
+        "prompt_tokens",
+        "completion_tokens",
+        "ttft",
+        "model",
+        "machine_id",
+    ]:
         raise HTTPException(status_code=400, detail="Invalid order_by field")
     if order == "desc":
         query = query.order_by(getattr(ApiLogs, order_by).desc())
