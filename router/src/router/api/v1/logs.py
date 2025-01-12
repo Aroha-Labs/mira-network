@@ -21,11 +21,21 @@ def list_all_logs(
     machine_id: Optional[str] = None,
     model: Optional[str] = None,
     api_key_id: Optional[int] = None,
+    user_id: Optional[str] = None,
     order_by: Optional[str] = "created_at",
     order: Optional[str] = "desc",
 ):
     offset = (page - 1) * page_size
-    query = db.query(ApiLogs).filter(ApiLogs.user_id == user.id)
+
+    # Handle user_id filtering with admin check
+    if user_id:
+        if "admin" not in user.roles:
+            raise HTTPException(
+                status_code=403, detail="Only admins can query other users' logs"
+            )
+        query = db.query(ApiLogs).filter(ApiLogs.user_id == user_id)
+    else:
+        query = db.query(ApiLogs).filter(ApiLogs.user_id == user.id)
 
     if start_date:
         query = query.filter(ApiLogs.created_at >= start_date)
