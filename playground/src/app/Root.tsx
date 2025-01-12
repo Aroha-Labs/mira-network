@@ -65,7 +65,7 @@ const Root = ({ children }: RootProps) => {
             </Link>
             <Link
               href="/terminal"
-              className="flex text-blue-500 hover:underline"
+              className="flex ml-4 text-blue-500 hover:underline"
             >
               Terminal
             </Link>
