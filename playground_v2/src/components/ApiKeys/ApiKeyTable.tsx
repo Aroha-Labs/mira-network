@@ -34,7 +34,7 @@ const ApiKeyTable = () => {
     );
   }
 
-  if (error || data?.length === 0) {
+  if (error) {
     return (
       <Card className="w-[720px] h-[400px] flex justify-center items-center text-[#303030] opacity-40">
         *cricket noises*
@@ -43,8 +43,8 @@ const ApiKeyTable = () => {
   }
 
   return (
-    <Card>
-      <div className="flex justify-between items-center pt-4 pl-4 sticky top-0 bg-white z-10">
+    <Card className="min-w-full md:min-w-[720px]">
+      <div className="flex gap-4 justify-between items-center pt-4 pl-4 sticky top-0 bg-white z-10">
         <p className="text-md leading-[22px] tracking-[-0.013em]">
           YOU HAVE {data?.length} API KEYS
         </p>

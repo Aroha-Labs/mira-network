@@ -25,7 +25,9 @@ const Header = ({
 
         <span className="text-md">&gt;</span>
 
-        <p className="text-md leading-[22px] tracking-[-0.013em]">API LOGS</p>
+        <p className="text-md leading-[22px] tracking-[-0.013em]">
+          INEFRENCE ANALYTICS
+        </p>
       </div>
       <div className="flex-grow border-t border-dashed border-[#9CB9AE] mx-4 flex-1 h-[2px]" />
 

@@ -1,6 +1,6 @@
-from typing import Optional, List, Dict, AsyncGenerator, Union
+from typing import AsyncIterator, Optional, List, Dict, AsyncGenerator, Union
 import httpx
-from mira_sdk.models import (
+from .models import (
     Message,
     ModelProvider,
     AiRequest,
@@ -12,7 +12,12 @@ from mira_sdk.models import (
 
 
 class MiraClient:
-    def __init__(self, base_url: str, api_token: Optional[str] = None):
+
+    def __init__(
+        self,
+        base_url: str = "https://mira-network.alts.dev/",
+        api_token: Optional[str] = None,
+    ):
         """Initialize Mira client.
 
         Args:
@@ -44,9 +49,7 @@ class MiraClient:
         response.raise_for_status()
         return response.json()
 
-    async def generate(
-        self, request: AiRequest
-    ) -> Union[str, AsyncGenerator[str, None]]:
+    async def generate(self, request: AiRequest) -> Union[str, AsyncIterator[str]]:
         """Generate text using the specified model."""
         response = await self._client.post(
             f"{self.base_url}/v1/chat/completions",
@@ -57,12 +60,7 @@ class MiraClient:
         response.raise_for_status()
 
         if request.stream:
-
-            async def stream_response():
-                async for chunk in response.aiter_text():
-                    yield chunk
-
-            return stream_response()
+            return response.aiter_lines()
         else:
             return response.json()
 
@@ -127,7 +125,7 @@ class MiraClient:
     async def create_api_token(self, request: ApiTokenRequest) -> Dict:
         """Create a new API token."""
         response = await self._client.post(
-            f"{self.base_url}/tokens",
+            f"{self.base_url}/api-tokens",
             headers=self._get_headers(),
             json=request.model_dump(),
         )
@@ -154,7 +152,7 @@ class MiraClient:
     async def get_user_credits(self) -> Dict:
         """Get user credits information."""
         response = await self._client.get(
-            f"{self.base_url}/credits",
+            f"{self.base_url}/user-credits",
             headers=self._get_headers(),
         )
         response.raise_for_status()

@@ -109,18 +109,14 @@ h6 {
   }
 }
 
-/* Custom scrollbar styling */
+/* Custom vertical scrollbar styling */
 ::-webkit-scrollbar {
   width: 6px;
+  max-height: 6px;
 }
 
 ::-webkit-scrollbar-thumb {
   background-color: #308f6a;
-  height: 105px;
-  top: 241px;
-  left: 304px;
-  gap: 0px;
-  opacity: 0px;
 }
 
 ::-webkit-scrollbar-track {
