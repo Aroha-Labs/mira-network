@@ -1,11 +1,12 @@
 "use client";
 
-import axios from "axios";
+import api from "src/lib/axios";
 import { useSession } from "src/hooks/useSession";
-import { API_BASE_URL } from "src/config";
 import UserCard from "src/components/UserCard";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import Loading from "src/components/PageLoading";
+import { useState } from "react";
+import MetricsModal from "src/components/MetricsModal";
 
 interface User {
   id: string;
@@ -16,26 +17,16 @@ interface User {
   };
 }
 
-const fetchUsers = async ({
-  pageParam = 1,
-  token,
-}: {
-  pageParam: number;
-  token: string;
-}) => {
-  const response = await axios.get<User[]>(`${API_BASE_URL}/admin/users`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    params: {
-      page: pageParam,
-    },
+const fetchUsers = async ({ pageParam = 1 }) => {
+  const response = await api.get<User[]>("/admin/users", {
+    params: { page: pageParam },
   });
   return response.data;
 };
 
 const AdminUsers = () => {
   const { data: userSession } = useSession();
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
   const {
     data,
@@ -46,16 +37,7 @@ const AdminUsers = () => {
     isFetchingNextPage,
   } = useInfiniteQuery({
     queryKey: ["users"],
-    queryFn: ({ pageParam }) => {
-      if (!userSession?.access_token) {
-        return Promise.reject("No user session");
-      }
-
-      return fetchUsers({
-        pageParam,
-        token: userSession.access_token,
-      });
-    },
+    queryFn: ({ pageParam }) => fetchUsers({ pageParam }),
     enabled: !!userSession?.access_token,
     initialPageParam: 1,
     getNextPageParam: (lastPage, pages) => {
@@ -84,30 +66,48 @@ const AdminUsers = () => {
   }
 
   return (
-    <div className="p-6 pb-32 bg-white rounded shadow-md">
-      <h1 className="text-3xl font-bold mb-4">Users</h1>
-      <p className="text-gray-700 mb-4">Manage users here.</p>
-      <ul className="space-y-2">
-        {data?.pages.flatMap((page) =>
-          page.map((user) => <UserCard key={user.id} user={user} />)
-        )}
-      </ul>
-      <div className="flex justify-center mt-4">
-        <button
-          onClick={() => fetchNextPage()}
-          className={`bg-gray-300 text-gray-700 p-2 px-6 rounded ${
-            !hasNextPage || isFetchingNextPage ? "" : "hover:bg-gray-400"
-          }`}
-          disabled={!hasNextPage || isFetchingNextPage}
-        >
-          {isFetchingNextPage
-            ? "Loading..."
-            : hasNextPage
-            ? "Load More"
-            : "No More Users"}
-        </button>
+    <>
+      <div className=" px-4 sm:px-6 lg:px-8 py-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
+          <p className="mt-2 text-sm text-gray-600">
+            Manage users, their roles, credits, and view their usage metrics
+          </p>
+        </div>
+
+        <div className="grid gap-6">
+          {data?.pages.flatMap((page) =>
+            page.map((user) => <UserCard key={user.id} user={user} />)
+          )}
+        </div>
+
+        <div className="mt-8 flex justify-center">
+          <button
+            onClick={() => fetchNextPage()}
+            className={`px-4 py-2 border rounded-md ${
+              !hasNextPage || isFetchingNextPage
+                ? "bg-gray-100 text-gray-500"
+                : "bg-white text-gray-700 hover:bg-gray-50"
+            }`}
+            disabled={!hasNextPage || isFetchingNextPage}
+          >
+            {isFetchingNextPage
+              ? "Loading..."
+              : hasNextPage
+              ? "Load More"
+              : "No More Users"}
+          </button>
+        </div>
       </div>
-    </div>
+
+      {selectedUserId && (
+        <MetricsModal
+          userId={selectedUserId}
+          title={`User Metrics`}
+          onClose={() => setSelectedUserId(null)}
+        />
+      )}
+    </>
   );
 };
 
