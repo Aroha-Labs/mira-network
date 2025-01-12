@@ -8,11 +8,20 @@ import {
   TableRow,
 } from "src/components/Table";
 import Card from "src/components/card";
-import useApiLogs, { ApiLog } from "src/hooks/useApiLogs";
+import { ApiLog, ApiLogsResponse } from "src/hooks/useApiLogs";
+import calculateCosts from "./calculateCost";
 
-const LogsTable = ({ onRowClick }: { onRowClick: (log: ApiLog) => void }) => {
-  const { data, isLoading, error } = useApiLogs();
-
+const LogsTable = ({
+  onRowClick,
+  data,
+  isLoading,
+  error,
+}: {
+  onRowClick: (log: ApiLog) => void;
+  data?: ApiLogsResponse;
+  isLoading: boolean;
+  error: Error | null;
+}) => {
   if (isLoading) {
     return (
       <Card className="w-[720px] h-[400px] flex justify-center items-center">
@@ -36,7 +45,7 @@ const LogsTable = ({ onRowClick }: { onRowClick: (log: ApiLog) => void }) => {
           <TableRow>
             <TableHead>Timestamp</TableHead>
             <TableHead>Tokens</TableHead>
-            <TableHead>Provider</TableHead>
+            <TableHead>Node</TableHead>
             <TableHead>Model</TableHead>
             <TableHead>Cost</TableHead>
             <TableHead></TableHead>
@@ -44,7 +53,6 @@ const LogsTable = ({ onRowClick }: { onRowClick: (log: ApiLog) => void }) => {
         </TableHeader>
         <TableBody>
           {data?.logs?.map((log) => {
-            const [provider, ...modelName] = log.model.split("/");
             return (
               <TableRow
                 key={log?.id}
@@ -55,9 +63,9 @@ const LogsTable = ({ onRowClick }: { onRowClick: (log: ApiLog) => void }) => {
                   {new Date(log.created_at).toLocaleString()}
                 </TableCell>
                 <TableCell>{log.total_tokens}</TableCell>
-                <TableCell>{provider}</TableCell>
-                <TableCell>{modelName.join("/")}</TableCell>
-                <TableCell>${(log.total_tokens * 0.0003).toFixed(3)}</TableCell>
+                <TableCell>{log?.machine_id}</TableCell>
+                <TableCell>{log?.model}</TableCell>
+                <TableCell>${calculateCosts(log)?.toFixed(3)}</TableCell>
                 <TableCell>
                   <CaretRight className="h-5 w-5 inline-block" />
                 </TableCell>

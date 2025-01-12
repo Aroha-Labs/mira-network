@@ -211,6 +211,13 @@ async def generate(
 
         db.commit()
 
-    res = StreamingResponse(generate(), media_type="text/event-stream")
+    if req.stream:
+        res = StreamingResponse(generate(), media_type="text/event-stream")
+    else:
+        return Response(
+            content=llmres.text,
+            status_code=llmres.status_code,
+            headers=dict(llmres.headers),
+        )
 
     return res

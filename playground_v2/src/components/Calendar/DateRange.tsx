@@ -14,10 +14,11 @@ import {
 import { cn } from "src/lib/utils";
 import Calendar from "./calendar";
 
-interface DatePickerWithRangeProps
-  extends React.HTMLAttributes<HTMLDivElement> {
+interface DatePickerWithRangeProps {
   dateFrom: string;
   dateTo: string;
+  onChange: (date: DateRange) => void;
+  className?: string;
 }
 
 const validateDate = (dateString: string): Date | undefined => {
@@ -65,7 +66,7 @@ const DatePickerWithRange = ({
         <PopoverTrigger asChild>
           <Button
             id="date"
-            variant={"outline"}
+            variant="ghost"
             className={cn(
               "w-[300px] justify-start text-left font-normal rounded-sm",
               !date && "text-muted-foreground"
