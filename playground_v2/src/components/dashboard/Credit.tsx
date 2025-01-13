@@ -17,7 +17,9 @@ const Credit = () => {
       <div className="flex justify-between items-center pl-[20px] pr-[20px] pt-[14px] pb-[32px]">
         <div className="flex flex-col gap-[6px]">
           <p className="text-[#303030] text-[16px] font-[700] leading-[16px] capitalize">
-            {isCreditsLoading ? "_ _ _" : userCredits?.credits?.toFixed(2)}
+            {isCreditsLoading
+              ? "_ _ _"
+              : `$${userCredits?.credits?.toFixed(2)}`}
           </p>
           <p className="text-[#303030] opacity-40 text-[13px] font-[500] leading-[13px] tracking-[-0.26px] capitalize">
             Left in Credits
