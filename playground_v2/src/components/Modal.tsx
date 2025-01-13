@@ -17,7 +17,10 @@ const Modal = ({
   className,
 }: ModalProps & { showCloseIcon?: boolean; className?: string }) => {
   return createPortal(
-    <div className="fixed inset-0 bg-gray-300 bg-opacity-50 flex items-center justify-center z-50">
+    <div
+      className="fixed inset-0 bg-gray-300 bg-opacity-50 flex items-center justify-center z-50"
+      onClick={onClose}
+    >
       <div className={cn("p-4 max-w-lg w-full relative", className)}>
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold">{title}</h2>
