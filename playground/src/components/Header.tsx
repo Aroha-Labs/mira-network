@@ -1,6 +1,11 @@
 import Link from 'next/link';
 import { useState, Fragment } from 'react';
-import { Bars3Icon, XMarkIcon, UserCircleIcon, Cog6ToothIcon } from '@heroicons/react/24/outline';
+import {
+  Bars3Icon,
+  XMarkIcon,
+  UserCircleIcon,
+  Cog6ToothIcon,
+} from '@heroicons/react/24/outline';
 import { useSession } from 'src/hooks/useSession';
 import { useLogout } from 'src/hooks/useLogout';
 import { Menu, Transition } from '@headlessui/react';
@@ -28,7 +33,9 @@ const UserProfile = () => {
     <Menu as="div" className="relative">
       <Menu.Button className="flex items-center gap-2 p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-50">
         <UserCircleIcon className="h-6 w-6" />
-        <span className="hidden md:block text-sm">{session?.user?.email?.split('@')[0]}</span>
+        <span className="hidden md:block text-sm">
+          {session?.user?.email?.split('@')[0]}
+        </span>
       </Menu.Button>
       <Transition
         as={Fragment}
@@ -100,7 +107,10 @@ export const Header = () => {
               <img src="/img/logo.svg" alt="Mira" className="h-8 w-auto" />
               <div className="flex items-center gap-2">
                 <h3 className="text-lg font-medium">console</h3>
-                <sup className="text-xs font-light text-[#CBD5E1]" style={{ marginLeft: '-8px' }}>
+                <sup
+                  className="text-xs font-light text-[#CBD5E1]"
+                  style={{ marginLeft: '-8px' }}
+                >
                   beta
                 </sup>
               </div>
