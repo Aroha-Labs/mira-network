@@ -107,9 +107,12 @@ export const Header = () => {
               <img src="/img/logo.svg" alt="Mira" className="h-8 w-auto" />
               <div className="flex items-center gap-2">
                 <h3 className="text-lg font-medium">console</h3>
-                <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-medium">
-                  Beta
-                </span>
+                <sup
+                  className="text-xs font-light text-[#CBD5E1]"
+                  style={{ marginLeft: "-8px" }}
+                >
+                  beta
+                </sup>
               </div>
             </Link>
           </div>
