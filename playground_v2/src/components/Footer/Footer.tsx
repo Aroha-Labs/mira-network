@@ -10,28 +10,33 @@ const links = [
   {
     text: "SDK",
     href: "https://flow-docs.mira.network/documentation/get-started/introduction",
+    target: "_blank",
   },
   {
     text: "DISCORD",
     href: "https://discord.com/invite/mira-network",
+    target: "_blank",
   },
   {
     text: "X",
     href: "https://x.com/Mira_Network",
+    target: "_blank",
   },
   {
     text: "ABOUT",
     href: "https://mira.network/about",
+    target: "_blank",
   },
 ];
 
 const Footer = ({ className }: { className?: string }) => (
   <div className={cn("mt-8", className)}>
     <div className="flex gap-[24px] mb-4">
-      {links.map(({ text, href }) => (
+      {links.map(({ text, href, target }) => (
         <Link
           key={text}
           href={href}
+          target={target}
           className={cn(
             jetBrainsMono.className,
             "text-base text-black font-medium opacity-50 leading-[22px] tracking-[-0.013em] text-left underline decoration-solid underline-from-font decoration-skip-ink-auto"

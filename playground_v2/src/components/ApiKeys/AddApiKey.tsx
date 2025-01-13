@@ -13,10 +13,11 @@ const AddApiKey = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [description, setDescription] = useState<"success" | "error" | "">("");
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const description = (e.target as HTMLFormElement).description.value;
-    addApiKey.mutate(description);
+    await addApiKey.mutateAsync(description);
+    setIsModalOpen(false);
   };
 
   useEffect(() => {
