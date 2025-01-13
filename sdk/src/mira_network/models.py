@@ -22,7 +22,9 @@ class ModelProvider(BaseModel):
 
 class AiRequest(BaseModel):
     model: str = Field("mira/llama3.1", title="Model")
-    model_provider: Optional[ModelProvider] = Field(None, title="Model Provider (optional)")
+    model_provider: Optional[ModelProvider] = Field(
+        None, title="Model Provider (optional)"
+    )
     messages: List[Message] = Field([], title="Messages")
     stream: Optional[bool] = Field(False, title="Stream")
 
@@ -34,34 +36,34 @@ class AiRequest(BaseModel):
         return v
 
 
-class FlowChatCompletion(BaseModel):
-    variables: Optional[Dict] = Field(None, title="Variables")
+# class FlowChatCompletion(BaseModel):
+#     variables: Optional[Dict] = Field(None, title="Variables")
 
 
-class FlowRequest(BaseModel):
-    system_prompt: str
-    name: str
+# class FlowRequest(BaseModel):
+#     system_prompt: str
+#     name: str
 
 
 class ApiTokenRequest(BaseModel):
     description: Optional[str] = None
 
 
-class AddCreditRequest(BaseModel):
-    user_id: str
-    amount: float
-    description: Optional[str] = None
+# class AddCreditRequest(BaseModel):
+#     user_id: str
+#     amount: float
+#     description: Optional[str] = None
 
-    @field_validator("amount")
-    @classmethod
-    def validate_amount(cls, v: float) -> float:
-        if v <= 0:
-            raise ValueError("Amount must be greater than 0")
-        return v
+#     @field_validator("amount")
+#     @classmethod
+#     def validate_amount(cls, v: float) -> float:
+#         if v <= 0:
+#             raise ValueError("Amount must be greater than 0")
+#         return v
 
-    @field_validator("user_id")
-    @classmethod
-    def validate_user_id(cls, v: str) -> str:
-        if not v.strip():
-            raise ValueError("User ID cannot be empty")
-        return v
+#     @field_validator("user_id")
+#     @classmethod
+#     def validate_user_id(cls, v: str) -> str:
+#         if not v.strip():
+#             raise ValueError("User ID cannot be empty")
+#         return v
