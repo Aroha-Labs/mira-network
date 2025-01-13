@@ -7,59 +7,59 @@ import jetBrainsMono from "src/app/fonts/jetBrainsMono";
 const inter = Inter({ subsets: ["latin"] });
 
 const links = [
-	{
-		text: "SDK",
-		href: "https://flow-docs.mira.network/documentation/get-started/introduction",
-		target: "_blank",
-	},
-	{
-		text: "DISCORD",
-		href: "https://discord.com/invite/mira-network",
-		target: "_blank",
-	},
-	{
-		text: "X",
-		href: "https://x.com/Mira_Network",
-		target: "_blank",
-	},
-	{
-		text: "ABOUT",
-		href: "https://mira.network/about",
-		target: "_blank",
-	},
+  {
+    text: "SDK",
+    href: "https://flow-docs.mira.network/documentation/get-started/introduction",
+    target: "_blank",
+  },
+  {
+    text: "DISCORD",
+    href: "https://discord.com/invite/mira-network",
+    target: "_blank",
+  },
+  {
+    text: "X",
+    href: "https://x.com/Mira_Network",
+    target: "_blank",
+  },
+  {
+    text: "ABOUT",
+    href: "https://mira.network/about",
+    target: "_blank",
+  },
 ];
 
 const Footer = ({ className }: { className?: string }) => (
-	<div className={cn("mt-8", className)}>
-		<div className="flex gap-[24px] mb-4">
-			{links.map(({ text, href, target }) => (
-				<Link
-					key={text}
-					href={href}
-					target={target}
-					className={cn(
-						jetBrainsMono.className,
-						"text-base text-black font-medium opacity-50 leading-[22px] tracking-[-0.013em] text-left underline decoration-solid underline-from-font decoration-skip-ink-auto"
-					)}
-				>
-					{text}
-				</Link>
-			))}
-		</div>
-		<div className="flex h-[48px] w-full items-center opacity-60">
-			<div className="flex items-center justify-center p-4 bg-white border border-solid border-[#DADADA]">
-				<Image src="/img/logo.svg" alt="Left Logo" width={24} height={24} />
-			</div>
-			<span
-				className={cn(
-					inter.className,
-					"ml-4 text-xs font-medium opacity-60 text-black"
-				)}
-			>
-				©2024 Aroha Labs. All rights reserved.
-			</span>
-		</div>
-	</div>
+  <div className={cn("mt-8", className)}>
+    <div className="flex gap-[24px] mb-4">
+      {links.map(({ text, href, target }) => (
+        <Link
+          key={text}
+          href={href}
+          target={target}
+          className={cn(
+            jetBrainsMono.className,
+            "text-base text-black font-medium opacity-50 leading-[22px] tracking-[-0.013em] text-left underline decoration-solid underline-from-font decoration-skip-ink-auto"
+          )}
+        >
+          {text}
+        </Link>
+      ))}
+    </div>
+    <div className="flex h-[48px] w-full items-center opacity-60">
+      <div className="flex items-center justify-center p-4 bg-white border border-solid border-[#DADADA]">
+        <Image src="/img/logo.svg" alt="Left Logo" width={24} height={24} />
+      </div>
+      <span
+        className={cn(
+          inter.className,
+          "ml-4 text-xs font-medium opacity-60 text-black"
+        )}
+      >
+        ©2024 Aroha Labs. All rights reserved.
+      </span>
+    </div>
+  </div>
 );
 
 export default Footer;
