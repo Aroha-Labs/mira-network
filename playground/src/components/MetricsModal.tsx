@@ -56,13 +56,9 @@ interface MetricsModalProps {
   };
 }
 
-const Shimmer = () => (
-  <div className="animate-pulse bg-gray-200 rounded h-full w-full" />
-);
+const Shimmer = () => <div className="animate-pulse bg-gray-200 rounded h-full w-full" />;
 
-const ValueShimmer = () => (
-  <div className="animate-pulse bg-gray-200 rounded h-6 w-16" />
-);
+const ValueShimmer = () => <div className="animate-pulse bg-gray-200 rounded h-6 w-16" />;
 
 const ChartShimmer = () => (
   <div className="animate-pulse bg-gray-200/60 rounded-lg h-full w-full" />
@@ -123,14 +119,7 @@ const MetricsModal = ({
   }, [dateRangeState]);
 
   const { data, isLoading, error } = useQuery<{ logs: ApiLog[] }>({
-    queryKey: [
-      "metrics-logs",
-      machineId,
-      apiKeyId,
-      userId,
-      modelFilter,
-      dateRange,
-    ],
+    queryKey: ["metrics-logs", machineId, apiKeyId, userId, modelFilter, dateRange],
     queryFn: async () => {
       const resp = await api.get("/api-logs", {
         params: {
@@ -155,8 +144,7 @@ const MetricsModal = ({
     const totalTokens = logs.reduce((sum, log) => sum + log.total_tokens, 0);
     const avgResponseTime =
       logs.reduce((sum, log) => sum + log.total_response_time, 0) / totalCalls;
-    const avgTTFT =
-      logs.reduce((sum, log) => sum + (log.ttft || 0), 0) / totalCalls;
+    const avgTTFT = logs.reduce((sum, log) => sum + (log.ttft || 0), 0) / totalCalls;
     const totalCost = logs.reduce((sum, log) => {
       if (!log.model_pricing) return sum;
       return (
@@ -233,8 +221,7 @@ const MetricsModal = ({
         const key = timeSlots.find((slot) => {
           const nextSlot = timeSlots[timeSlots.indexOf(slot) + 1];
           return (
-            (!nextSlot || isBefore(date, nextSlot.date)) &&
-            !isBefore(date, slot.date)
+            (!nextSlot || isBefore(date, nextSlot.date)) && !isBefore(date, slot.date)
           );
         })?.key;
 
@@ -274,8 +261,7 @@ const MetricsModal = ({
 
     const grouped = groupData(
       [...data.logs].sort(
-        (a, b) =>
-          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
       )
     );
 
@@ -292,9 +278,7 @@ const MetricsModal = ({
     const totalTokens = promptTokens.map((p, i) => p + completionTokens[i]);
 
     const responseTimeData = grouped.data.map(
-      (logs) =>
-        logs.reduce((sum, log) => sum + log.total_response_time, 0) /
-        logs.length
+      (logs) => logs.reduce((sum, log) => sum + log.total_response_time, 0) / logs.length
     );
 
     // Split costs into prompt and completion
@@ -313,8 +297,7 @@ const MetricsModal = ({
     );
 
     const ttftData = grouped.data.map(
-      (logs) =>
-        logs.reduce((sum, log) => sum + (log.ttft || 0), 0) / (logs.length || 1)
+      (logs) => logs.reduce((sum, log) => sum + (log.ttft || 0), 0) / (logs.length || 1)
     );
 
     const modelData = Object.entries(metrics.modelUsage);
@@ -546,9 +529,7 @@ const MetricsModal = ({
 
           <div className="bg-white rounded-lg shadow-sm border border-gray-100">
             <div className="px-3 py-2 border-b border-gray-100">
-              <h3 className="text-gray-700 font-medium text-sm">
-                Model Distribution
-              </h3>
+              <h3 className="text-gray-700 font-medium text-sm">Model Distribution</h3>
             </div>
             <div className="p-3">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -612,9 +593,7 @@ const MetricsModal = ({
           {renderMetricBlock(
             "Cost Distribution",
             `$${metrics.totalCost.toFixed(4)}`,
-            chartData && (
-              <Bar data={chartData.cost} options={getChartOptions("cost")} />
-            )
+            chartData && <Bar data={chartData.cost} options={getChartOptions("cost")} />
           )}
           {renderMetricBlock(
             "Token Usage",
@@ -635,18 +614,14 @@ const MetricsModal = ({
           {renderMetricBlock(
             "Avg Response Time",
             `${metrics.avgResponseTime.toFixed(2)}ms`,
-            chartData && (
-              <Line data={chartData.responseTime} options={chartOptions} />
-            )
+            chartData && <Line data={chartData.responseTime} options={chartOptions} />
           )}
         </div>
 
         {/* Model Distribution */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-100 transition-all duration-200 hover:shadow-md">
           <div className="px-3 py-2 border-b border-gray-100">
-            <h3 className="text-gray-700 font-medium text-sm">
-              Model Distribution
-            </h3>
+            <h3 className="text-gray-700 font-medium text-sm">Model Distribution</h3>
           </div>
           <div className="p-3">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -656,9 +631,7 @@ const MetricsModal = ({
                     key={model}
                     className="flex justify-between items-center px-2 py-1 bg-gray-50 rounded"
                   >
-                    <span className="truncate text-gray-600 mr-2 text-xs">
-                      {model}
-                    </span>
+                    <span className="truncate text-gray-600 mr-2 text-xs">{model}</span>
                     <span className="font-medium text-gray-900 text-xs">
                       {count} calls
                     </span>
@@ -716,6 +689,7 @@ const MetricsModal = ({
             : "Unknown"
         }`
       }
+      maxWidth="sm:max-w-6xl"
     >
       {renderContent()}
     </Modal>
