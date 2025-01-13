@@ -1,12 +1,10 @@
 from .client import MiraClient
+from .sync_client import MiraSyncClient
 from .models import (
     Message,
     ModelProvider,
     AiRequest,
-    FlowChatCompletion,
-    FlowRequest,
     ApiTokenRequest,
-    AddCreditRequest,
 )
 
 __all__ = [
@@ -14,8 +12,5 @@ __all__ = [
     "Message",
     "ModelProvider",
     "AiRequest",
-    "FlowChatCompletion",
-    "FlowRequest",
     "ApiTokenRequest",
-    "AddCreditRequest",
 ]

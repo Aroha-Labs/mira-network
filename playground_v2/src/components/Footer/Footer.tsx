@@ -9,7 +9,7 @@ const inter = Inter({ subsets: ["latin"] });
 const links = [
   {
     text: "SDK",
-    href: "https://flow-docs.mira.network/documentation/get-started/introduction",
+    href: "https://docs.mira.network",
     target: "_blank",
   },
   {
