@@ -11,7 +11,7 @@ const Card: FC<CardProps> = ({ children, className, contentClassName }) => {
   return (
     <div
       className={cn(
-        "relative bg-white p-4 w-full border border-[#306E564F]",
+        "relative bg-white p-[12px] w-full border border-[#306E564F]",
         className
       )}
     >

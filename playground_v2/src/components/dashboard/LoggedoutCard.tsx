@@ -6,10 +6,10 @@ const LoggedoutCardContent = () => {
     <Card>
       <div className="p-4 flex flex-col gap-[216px]">
         <div>
-          <h2 className="font-jetbrains-mono text-lg font-bold leading-[22px]">
+          <h2 className="text-[18px] font-[700] leading-[21.6px] text-[#303030]">
             trustless, verified <br /> intelligence
           </h2>
-          <h3 className="font-jetbrains-mono text-sm font-bold text-[#9C9B9B] mt-[12px]">
+          <h3 className="text-[14px] font-[700] leading-[16.8px] text-[#9C9B9B] mt-[12px] font-['JetBrains_Mono']">
             now as an api
           </h3>
         </div>

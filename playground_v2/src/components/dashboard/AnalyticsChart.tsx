@@ -22,7 +22,11 @@ const AnalyticsChart = () => {
     apiLogsParamsState.setState(() => params);
   }, []);
 
-  return <ChartsLayout data={chartDataByDay ?? []} title="" />;
+  return (
+    <div className="pt-[38px]">
+      <ChartsLayout data={chartDataByDay ?? []} title="" />
+    </div>
+  );
 };
 
 export default AnalyticsChart;

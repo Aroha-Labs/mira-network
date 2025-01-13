@@ -23,17 +23,17 @@ const UserInfo = ({ user }: UserInfoProps) => {
 
   return (
     <div className="flex flex-wrap items-center justify-between mb-8 gap-4 md:gap-0">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-[12px]">
         <span className="text-xs md:text-md">&gt;</span>
         <p
           className={cn(
-            "font-medium text-xs md:text-base leading-[22px] tracking-[-0.013em] opacity-60"
+            "text-black font-['JetBrains_Mono'] text-[12px] font-normal leading-[22px] tracking-[-0.156px]"
           )}
         >
           {user?.user_metadata?.full_name}
         </p>
 
-        <p className="text-xs md:text-base leading-[22px] tracking-[-0.013em] list-item opacity-40 ml-4">
+        <p className="text-black font-['JetBrains_Mono'] text-[12px] font-medium leading-[22px] tracking-[-0.156px] list-item opacity-40 ml-4">
           {user?.user_metadata?.email}
         </p>
       </div>
@@ -42,7 +42,7 @@ const UserInfo = ({ user }: UserInfoProps) => {
         <button
           className={cn(
             jetBrainsMono.className,
-            "text-md font-medium leading-[22px] tracking-[-0.013em] text-left underline decoration-solid underline-from-font decoration-skip-ink-auto opacity-60"
+            "text-black text-[12px] font-normal leading-[22px] tracking-[-0.156px] underline decoration-solid decoration-skip-ink-auto"
           )}
           onClick={handleLoggedOutClicked}
         >

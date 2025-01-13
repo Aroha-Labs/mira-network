@@ -6,15 +6,18 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "src/components/Chart";
+import { cn } from "src/lib/utils";
 import { v4 as uuidv4 } from "uuid";
 import EmptyChart from "./EmptyChart";
 
 const ChartsLayout = ({
   data,
   title,
+  className,
 }: {
   data: { date: string; [key: string]: string | number }[];
   title: string;
+  className?: string;
 }) => {
   if (data.length === 0) {
     return <EmptyChart />;
@@ -35,7 +38,7 @@ const ChartsLayout = ({
   };
 
   return (
-    <div className="flex flex-col gap-10 p-4 w-full">
+    <div className={cn(className, "flex flex-col gap-10 p-4 w-full")}>
       {title && title !== "" && (
         <p className="text-xl text-slate-900">{title}</p>
       )}

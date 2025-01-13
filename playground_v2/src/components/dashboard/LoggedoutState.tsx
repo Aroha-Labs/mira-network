@@ -3,7 +3,7 @@ import LoggedoutCard from "./LoggedoutCard";
 import LoggedoutHeader from "./LoggedoutHeader";
 
 const LoggedoutState = () => (
-  <div className="max-w-[710px] w-full">
+  <div className="max-w-[400px] w-full">
     <LoggedoutHeader />
     <LoggedoutCard />
     <LoggedoutFooter />
