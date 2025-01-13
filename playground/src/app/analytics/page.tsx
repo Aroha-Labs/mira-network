@@ -17,14 +17,7 @@ import {
 import { Bar } from "react-chartjs-2";
 import Loading from "src/components/PageLoading";
 
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend
-);
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 interface ApiLog {
   created_at: string;
@@ -72,39 +65,29 @@ const AnalyticsPage = () => {
   });
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <Loading />
-      </div>
-    );
+    return <Loading fullPage />;
   }
 
   if (error) {
     return <div>Error loading analytics data</div>;
   }
 
-  const tokenUsageByDay = data?.logs.reduce(
-    (acc: Record<string, number>, log) => {
-      const date = format(new Date(log.created_at), "yyyy-MM-dd");
-      if (!acc[date]) {
-        acc[date] = 0;
-      }
-      acc[date] += log.total_tokens;
-      return acc;
-    },
-    {}
-  );
+  const tokenUsageByDay = data?.logs.reduce((acc: Record<string, number>, log) => {
+    const date = format(new Date(log.created_at), "yyyy-MM-dd");
+    if (!acc[date]) {
+      acc[date] = 0;
+    }
+    acc[date] += log.total_tokens;
+    return acc;
+  }, {});
 
-  const tokenUsageByModel = data?.logs.reduce(
-    (acc: Record<string, number>, log) => {
-      if (!acc[log.model]) {
-        acc[log.model] = 0;
-      }
-      acc[log.model] += log.total_tokens;
-      return acc;
-    },
-    {}
-  );
+  const tokenUsageByModel = data?.logs.reduce((acc: Record<string, number>, log) => {
+    if (!acc[log.model]) {
+      acc[log.model] = 0;
+    }
+    acc[log.model] += log.total_tokens;
+    return acc;
+  }, {});
 
   const labels = Array.from({ length: 30 }, (_, i) =>
     format(subDays(new Date(), 29 - i), "yyyy-MM-dd")

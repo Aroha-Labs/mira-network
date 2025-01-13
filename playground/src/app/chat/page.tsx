@@ -4,10 +4,7 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import Link from "next/link";
 import ChatBubble from "src/components/ChatBubble";
 // import SystemPromptInput from "src/components/SystemPromptInput";
-import {
-  ChatBubbleBottomCenterIcon,
-  StopIcon,
-} from "@heroicons/react/24/outline";
+import { ChatBubbleBottomCenterIcon, StopIcon } from "@heroicons/react/24/outline";
 import Loading, { Spinner } from "src/components/PageLoading";
 import AutoGrowTextarea from "src/components/AutoGrowTextarea";
 import ConfirmModal from "src/components/ConfirmModal";
@@ -45,9 +42,7 @@ const fetchChatCompletion = async (
   if (!response.ok) {
     try {
       const data = await response.json();
-      throw new Error(
-        data.detail || data.error.message || "Failed to send message"
-      );
+      throw new Error(data.detail || data.error.message || "Failed to send message");
     } catch (error) {
       throw error;
     }
@@ -191,10 +186,7 @@ export default function Chat() {
         newMessages,
         (chunk) => {
           assistantMessage.content += chunk;
-          setMessages((prevMessages) => [
-            ...prevMessages.slice(0, -1),
-            assistantMessage,
-          ]);
+          setMessages((prevMessages) => [...prevMessages.slice(0, -1), assistantMessage]);
         },
         abortControllerRef.current,
         selectedModel,
@@ -206,9 +198,7 @@ export default function Chat() {
         console.error("Failed to send message:", error);
         setMessages((prevMessages) => prevMessages.slice(0, -2));
         setInput(userMessage.content);
-        setErrorMessage(
-          err.message || "Failed to send message. Please try again."
-        );
+        setErrorMessage(err.message || "Failed to send message. Please try again.");
       }
     } finally {
       setIsSending(false);
@@ -266,10 +256,7 @@ export default function Chat() {
         newMessages,
         (chunk) => {
           assistantMessage.content += chunk;
-          setMessages((prevMessages) => [
-            ...prevMessages.slice(0, -1),
-            assistantMessage,
-          ]);
+          setMessages((prevMessages) => [...prevMessages.slice(0, -1), assistantMessage]);
         },
         abortControllerRef.current,
         selectedModel,
@@ -306,11 +293,7 @@ export default function Chat() {
   };
 
   if (isLoading || isModelsLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <Loading />
-      </div>
-    );
+    return <Loading fullPage />;
   }
 
   if (supportedModelsError) {
@@ -427,9 +410,7 @@ export default function Chat() {
           )}
         </div>
         {errorMessage && (
-          <div className="text-red-500 text-sm mt-2 text-center">
-            {errorMessage}
-          </div>
+          <div className="text-red-500 text-sm mt-2 text-center">{errorMessage}</div>
         )}
       </div>
       {showConfirmModal && (

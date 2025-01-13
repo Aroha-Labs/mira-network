@@ -35,7 +35,7 @@ export default function Home() {
   });
 
   if (isLoading) {
-    return <Loading />;
+    return <Loading fullPage />;
   }
 
   if (error) {
@@ -54,17 +54,11 @@ export default function Home() {
 
   return (
     <div className="flex flex-col items-center justify-center flex-1 bg-gray-100 p-4 space-y-4">
-      <img
-        src="/img/logo.svg"
-        alt="Mira Network Logo"
-        className="h-12 w-auto"
-      />
-      <h1 className="text-sm font-bold text-gray-800">
-        Console | Mira Network
-      </h1>
+      <img src="/img/logo.svg" alt="Mira Network Logo" className="h-12 w-auto" />
+      <h1 className="text-sm font-bold text-gray-800">Console | Mira Network</h1>
       <p className="text-sm text-gray-600 text-center max-w-md">
-        A distributed system for managing and interacting with various LLM
-        providers through a unified interface
+        A distributed system for managing and interacting with various LLM providers
+        through a unified interface
       </p>
       <div className="h-0.5 "></div>
       <UserInfo user={userSession?.user}>
@@ -106,21 +100,9 @@ export default function Home() {
           </div>
         </div>
       </div>
-      <LinkBox
-        href="/api-logs"
-        label="View API Logs"
-        isDisabled={!userSession?.user}
-      />
-      <LinkBox
-        href="/api-keys"
-        label="Manage API Keys"
-        isDisabled={!userSession?.user}
-      />
-      <LinkBox
-        href="/network"
-        label="Network"
-        isDisabled={!userSession?.user}
-      />
+      <LinkBox href="/api-logs" label="View API Logs" isDisabled={!userSession?.user} />
+      <LinkBox href="/api-keys" label="Manage API Keys" isDisabled={!userSession?.user} />
+      <LinkBox href="/network" label="Network" isDisabled={!userSession?.user} />
       <Link
         href="/privacy-policy.html"
         target="_blank"
