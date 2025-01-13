@@ -39,7 +39,7 @@ const Footer = ({ className }: { className?: string }) => (
           target={target}
           className={cn(
             jetBrainsMono.className,
-            "text-base text-black font-medium opacity-50 leading-[22px] tracking-[-0.013em] text-left underline decoration-solid underline-from-font decoration-skip-ink-auto"
+            "text-[12px] text-[#000] opacity-60 font-medium leading-[22px] tracking-[-0.156px] underline decoration-solid underline-from-font decoration-skip-ink-auto"
           )}
         >
           {text}
@@ -47,13 +47,13 @@ const Footer = ({ className }: { className?: string }) => (
       ))}
     </div>
     <div className="flex h-[48px] w-full items-center opacity-60">
-      <div className="flex items-center justify-center p-4 bg-white border border-solid border-[#DADADA]">
+      <div className="flex p-3 items-center gap-2 bg-white border border-solid border-[#DADADA]">
         <Image src="/img/logo.svg" alt="Left Logo" width={24} height={24} />
       </div>
       <span
         className={cn(
           inter.className,
-          "ml-4 text-xs font-medium opacity-60 text-black"
+          "ml-4 text-[12px] font-medium leading-[22px] tracking-[-0.156px] text-[#000]"
         )}
       >
         ©2024 Aroha Labs. All rights reserved.
