@@ -9,7 +9,7 @@ const Header = ({ onClose }: { onClose: () => void }) => {
         onClick={onClose}
       >
         <span className="text-md">&gt;</span>
-        <p className="text-md leading-[22px] tracking-[-0.013em]">GO BACK</p>
+        <p className="text-md leading-[22px] tracking-[-0.013em]">Close</p>
       </Button>
       <div className="flex-grow border-t border-dashed border-[#9CB9AE] mx-4 flex-1 h-[2px]" />
     </div>

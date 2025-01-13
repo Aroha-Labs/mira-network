@@ -94,6 +94,7 @@ def get_llm_completion(
         headers={
             "Content-Type": "application/json",
             "Authorization": f"Bearer {model_provider.api_key}",
+            "Accept-Encoding": "identity",
         },
         json={
             "model": model,
