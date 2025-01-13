@@ -8,6 +8,7 @@ export interface ApiLogsParams {
   endDate: string;
   orderBy: string;
   order: string;
+  machineId?: string | null;
 }
 
 export const DEFAULT_PARAMS = {
@@ -17,6 +18,7 @@ export const DEFAULT_PARAMS = {
   endDate: format(addDays(new Date(), 1), "yyyy-MM-dd"),
   orderBy: "created_at",
   order: "desc",
+  machineId: null,
 };
 
 export const apiLogsParamsState = new Store<ApiLogsParams>(DEFAULT_PARAMS);

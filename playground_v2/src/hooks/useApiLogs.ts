@@ -40,31 +40,56 @@ export interface ApiLogsResponse {
   page_size: number;
 }
 
-const fetchApiLogs = async (
-  token?: string,
-  page: number = 1,
-  pageSize: number = 100,
-  startDate?: string,
-  endDate?: string,
-  orderBy: string = "created_at",
-  order: string = "desc"
-): Promise<ApiLogsResponse> => {
+interface ApiLogsParams {
+  page: number;
+  page_size: number;
+  start_date: string;
+  end_date: string;
+  order_by: string;
+  order: string;
+  machine_id?: string | null;
+}
+
+const fetchApiLogs = async ({
+  token,
+  page = 1,
+  pageSize = 100,
+  startDate,
+  endDate,
+  orderBy = "created_at",
+  order = "desc",
+  machineId,
+}: {
+  token: string;
+  page: number;
+  pageSize: number;
+  startDate: string;
+  endDate: string;
+  orderBy: string;
+  order: string;
+  machineId?: string | null;
+}) => {
   console.log("fetching api logs", page);
   if (!token) {
     throw new Error("No token provided");
   }
+  const params: ApiLogsParams = {
+    page,
+    page_size: pageSize,
+    order_by: orderBy,
+    order,
+    start_date: startDate,
+    end_date: endDate,
+  };
+  if (machineId) {
+    params.machine_id = machineId;
+  }
+
   const response = await axios.get(`${API_BASE_URL}/api-logs`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
-    params: {
-      page,
-      page_size: pageSize,
-      start_date: startDate,
-      end_date: endDate,
-      order_by: orderBy,
-      order,
-    },
+    params,
   });
   return response.data;
 };
@@ -82,21 +107,23 @@ const useApiLogs = () => {
       params.order,
       params.page,
       params.pageSize,
+      params.machineId,
       userSession?.access_token,
     ],
     queryFn: async () => {
       if (!userSession?.access_token) {
         throw new Error("User session not found");
       }
-      return await fetchApiLogs(
-        userSession.access_token,
-        params.page,
-        params.pageSize,
-        params.startDate,
-        params.endDate,
-        params.orderBy,
-        params.order
-      );
+      return await fetchApiLogs({
+        token: userSession.access_token,
+        page: params.page,
+        pageSize: params.pageSize,
+        startDate: params.startDate,
+        endDate: params.endDate,
+        orderBy: params.orderBy,
+        order: params.order,
+        machineId: params.machineId,
+      });
     },
     enabled: !!userSession?.access_token,
   });
