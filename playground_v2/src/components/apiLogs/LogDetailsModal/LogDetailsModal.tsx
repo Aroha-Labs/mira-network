@@ -2,7 +2,6 @@ import Modal from "src/components/Modal";
 import { ApiLog } from "src/hooks/useApiLogs";
 import Card from "../../card";
 import BodySection from "./BodySection";
-import Header from "./Header";
 import HeadersSection from "./HeadersSection";
 import Table from "./Table";
 
@@ -17,10 +16,8 @@ const LogDetailsModal = ({ log, onClose }: LogDetailsModalProps) => {
       onClose={onClose}
       title=""
       showCloseIcon={false}
-      className="bg-transparent top-[-100px]"
+      className="bg-transparent"
     >
-      <Header onClose={onClose} />
-
       <Card>
         <Table log={log} />
 
