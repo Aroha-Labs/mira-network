@@ -1,14 +1,14 @@
-import Link from 'next/link';
-import { useState, Fragment } from 'react';
+import Link from "next/link";
+import { useState, Fragment } from "react";
 import {
   Bars3Icon,
   XMarkIcon,
   UserCircleIcon,
   Cog6ToothIcon,
-} from '@heroicons/react/24/outline';
-import { useSession } from 'src/hooks/useSession';
-import { useLogout } from 'src/hooks/useLogout';
-import { Menu, Transition } from '@headlessui/react';
+} from "@heroicons/react/24/outline";
+import { useSession } from "src/hooks/useSession";
+import { useLogout } from "src/hooks/useLogout";
+import { Menu, Transition } from "@headlessui/react";
 
 const UserProfile = () => {
   const { data: session, isLoading } = useSession();
@@ -34,7 +34,7 @@ const UserProfile = () => {
       <Menu.Button className="flex items-center gap-2 p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-50">
         <UserCircleIcon className="h-6 w-6" />
         <span className="hidden md:block text-sm">
-          {session?.user?.email?.split('@')[0]}
+          {session?.user?.email?.split("@")[0]}
         </span>
       </Menu.Button>
       <Transition
@@ -53,7 +53,7 @@ const UserProfile = () => {
                 <Link
                   href="/admin"
                   className={`${
-                    active ? 'bg-gray-50' : ''
+                    active ? "bg-gray-50" : ""
                   } flex items-center px-4 py-2 text-sm text-gray-700`}
                 >
                   <Cog6ToothIcon className="mr-3 h-4 w-4" />
@@ -66,7 +66,7 @@ const UserProfile = () => {
                 <button
                   onClick={() => logout.mutate()}
                   className={`${
-                    active ? 'bg-red-50' : ''
+                    active ? "bg-red-50" : ""
                   } flex items-center w-full px-4 py-2 text-sm text-red-600`}
                 >
                   <svg
@@ -109,7 +109,7 @@ export const Header = () => {
                 <h3 className="text-lg font-medium">console</h3>
                 <sup
                   className="text-xs font-light text-[#CBD5E1]"
-                  style={{ marginLeft: '-8px' }}
+                  style={{ marginLeft: "-8px" }}
                 >
                   beta
                 </sup>
