@@ -16,7 +16,7 @@ const LayoutChildren = ({ children }: LayoutChildrenProps) => {
   const hasPermission = userRoles.includes("user");
 
   if (isLoading) {
-    return <Loading />;
+    return <Loading fullPage />;
   }
 
   if (session && !hasPermission) {
@@ -38,9 +38,7 @@ const LayoutChildren = ({ children }: LayoutChildrenProps) => {
             {logoutMutation.isPending ? "Logging out..." : "Logout"}
           </button>
           {logoutMutation.isError && (
-            <div className="mt-2 text-red-700">
-              Error: {logoutMutation.error.message}
-            </div>
+            <div className="mt-2 text-red-700">Error: {logoutMutation.error.message}</div>
           )}
         </div>
       </div>
