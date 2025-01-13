@@ -17,7 +17,7 @@ from mira_network.sync_client import MiraSyncClient
 from mira_network.models import AiRequest, Message
 
 # Using context manager (recommended)
-with MiraSyncClient(api_token="your-api-token") as client:
+with MiraSyncClient(api_token="your-api-token") as client:  # base_url defaults to https://apis.mira.network/
     # Example 1: Non-streaming response
     request = AiRequest(
         messages=[
@@ -50,13 +50,15 @@ from mira_network.models import AiRequest, Message
 
 async def main():
     # Using async context manager (recommended)
-    async with MiraClient(api_token="your-api-token") as client:
+    async with MiraClient(api_token="your-api-token") as client:  # base_url defaults to https://apis.mira.network/
         # Example 1: Non-streaming response
         request = AiRequest(
             messages=[
                 Message(role="system", content="You are a helpful assistant."),
                 Message(role="user", content="Hello!")
             ],
+            model="gpt-4o",
+            model_provider=None,
             stream=False
         )
         response = await client.generate(request)
@@ -89,11 +91,17 @@ Both clients support context managers for proper resource cleanup:
 
 ```python
 # Synchronous
-with MiraSyncClient(api_token="your-api-token") as client:
+with MiraSyncClient(
+    api_token="your-api-token",
+    base_url="https://apis.mira.network/"  # Optional, this is the default
+) as client:
     # Your sync code here
 
 # Asynchronous
-async with MiraClient(api_token="your-api-token") as client:
+async with MiraClient(
+    api_token="your-api-token",
+    base_url="https://apis.mira.network/"  # Optional, this is the default
+) as client:
     # Your async code here
 ```
 
