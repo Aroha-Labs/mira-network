@@ -3,21 +3,23 @@
 import c from "clsx";
 import { useEffect, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Lato, Merriweather } from "next/font/google";
 import LayoutChildren from "./LayoutChildren";
 import { Toaster } from "react-hot-toast";
 import { Header } from "src/components/Header";
 
 const queryClient = new QueryClient();
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const lato = Lato({
+  variable: "--font-body",
   subsets: ["latin"],
+  weight: ["400", "700"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const merriweather = Merriweather({
+  variable: "--font-header",
   subsets: ["latin"],
+  weight: ["400", "700"],
 });
 
 interface RootProps {
@@ -44,8 +46,8 @@ const Root = ({ children }: RootProps) => {
     <html lang="en">
       <body
         className={c(
-          geistSans.variable,
-          geistMono.variable,
+          lato.variable,
+          merriweather.variable,
           "antialiased text-base flex flex-col bg-gray-100"
         )} // Tailwind's text-base sets the font size to 14px
       >
