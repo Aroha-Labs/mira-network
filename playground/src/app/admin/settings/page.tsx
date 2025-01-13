@@ -11,10 +11,7 @@ import SettingEditor from "src/components/SettingEditor";
 import SettingValue from "src/components/SettingValue";
 import { toast } from "react-hot-toast";
 import { JsonValue } from "src/types/json";
-import {
-  ClipboardDocumentIcon,
-  CodeBracketIcon,
-} from "@heroicons/react/24/outline";
+import { ClipboardDocumentIcon, CodeBracketIcon } from "@heroicons/react/24/outline";
 
 interface SystemSetting {
   id: number;
@@ -88,16 +85,14 @@ const AdminSettings = () => {
   }
 
   if (isLoading) {
-    return <Loading />;
+    return <Loading fullPage />;
   }
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-semibold text-gray-900">
-          System Settings
-        </h1>
+        <h1 className="text-2xl font-semibold text-gray-900">System Settings</h1>
         <p className="mt-1 text-sm text-gray-500">
           Configure and manage system-wide settings
         </p>
@@ -106,10 +101,7 @@ const AdminSettings = () => {
       {/* Settings List */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 divide-y divide-gray-200">
         {settings?.map((setting) => (
-          <div
-            key={setting.id}
-            className="p-6 transition-colors hover:bg-gray-50"
-          >
+          <div key={setting.id} className="p-6 transition-colors hover:bg-gray-50">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
               <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
@@ -121,9 +113,7 @@ const AdminSettings = () => {
                   </span>
                 </div>
                 {setting.description && (
-                  <p className="mt-1 text-sm text-gray-500">
-                    {setting.description}
-                  </p>
+                  <p className="mt-1 text-sm text-gray-500">{setting.description}</p>
                 )}
               </div>
               <div className="flex flex-wrap items-center gap-2">

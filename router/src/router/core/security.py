@@ -3,7 +3,7 @@ from fastapi import HTTPException, Depends
 from sqlmodel import select
 from supabase import create_client, Client
 from src.router.core.types import User
-from src.router.models.user import UserCustomClaim
+from src.router.models.user import User as UserModel
 from src.router.models.tokens import ApiToken
 from src.router.db.session import get_session
 from src.router.core.config import SUPABASE_URL, SUPABASE_KEY
@@ -35,19 +35,19 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
         if user_response.user is None:
             raise HTTPException(status_code=401, detail="Unauthorized access")
 
-        user_custom_claims = db.exec(
-            select(UserCustomClaim).where(
-                UserCustomClaim.user_id == user_response.user.id
-            )
+        user = db.exec(
+            select(UserModel).where(UserModel.user_id == user_response.user.id)
         ).first()
 
-        if user_custom_claims is None:
+        if user is None:
             user_roles = []
         else:
-            user_roles = user_custom_claims.claim.get("roles", [])
+            user_roles = user.custom_claim.get("roles", [])
 
         return User(
-            **user_response.user.model_dump(), roles=user_roles, api_key_id=api_token.id
+            **user_response.user.model_dump(),
+            roles=user_roles,
+            api_key_id=api_token.id,
         )
 
     # Verify if token is a JWT token (supabase token)
