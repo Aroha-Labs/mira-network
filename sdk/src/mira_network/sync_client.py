@@ -9,7 +9,7 @@ from .models import (
 class MiraSyncClient:
     def __init__(
         self,
-        base_url: str = "https://apis.mira.network/",
+        base_url: str = "https://apis.mira.network",
         api_token: Optional[str] = None,
     ):
         """Initialize Mira synchronous client.
