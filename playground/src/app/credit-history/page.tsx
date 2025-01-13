@@ -29,11 +29,7 @@ const CreditHistoryPage = () => {
   });
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loading />
-      </div>
-    );
+    return <Loading fullPage />;
   }
 
   if (error) {
@@ -46,10 +42,7 @@ const CreditHistoryPage = () => {
 
   // Calculate total credits and usage
   const totalCredits =
-    data?.reduce(
-      (sum, entry) => sum + (entry.amount > 0 ? entry.amount : 0),
-      0
-    ) || 0;
+    data?.reduce((sum, entry) => sum + (entry.amount > 0 ? entry.amount : 0), 0) || 0;
   const totalUsage =
     data?.reduce(
       (sum, entry) => sum + (entry.amount < 0 ? Math.abs(entry.amount) : 0),
@@ -74,9 +67,7 @@ const CreditHistoryPage = () => {
               <ArrowDownIcon className="h-6 w-6 text-blue-600" />
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-500">
-                Total Credits Added
-              </p>
+              <p className="text-sm font-medium text-gray-500">Total Credits Added</p>
               <p className="text-xl font-semibold text-gray-900">
                 {totalCredits.toFixed(4)}
               </p>
@@ -140,23 +131,15 @@ const CreditHistoryPage = () => {
                         <div className="text-sm flex items-center gap-2">
                           <span
                             className={`font-medium ${
-                              entry.amount > 0
-                                ? "text-blue-600"
-                                : "text-red-600"
+                              entry.amount > 0 ? "text-blue-600" : "text-red-600"
                             }`}
                           >
                             {entry.amount > 0 ? "+" : ""}
                             {entry.amount.toFixed(4)}
                           </span>
                           <span className="text-gray-500">•</span>
-                          <time
-                            dateTime={entry.created_at}
-                            className="text-gray-500"
-                          >
-                            {format(
-                              new Date(entry.created_at),
-                              "MMM d, yyyy HH:mm"
-                            )}
+                          <time dateTime={entry.created_at} className="text-gray-500">
+                            {format(new Date(entry.created_at), "MMM d, yyyy HH:mm")}
                           </time>
                         </div>
                         <p className="mt-0.5 text-sm text-gray-600">
