@@ -24,6 +24,11 @@ with MiraSyncClient(api_token="your-api-token") as client:
             Message(role="system", content="You are a helpful assistant."),
             Message(role="user", content="Hello!")
         ],
+        model="gpt-4o",
+        model_provider=ModelProvider(
+            base_url="https://apis.mira.network",
+            api_key="your-api-key"
+        ), # Model Provider Configuration
         stream=False
     )
     response = client.generate(request)
