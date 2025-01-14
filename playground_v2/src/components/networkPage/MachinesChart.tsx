@@ -12,7 +12,7 @@ const MachinesChart = ({
   changeActiveMachine,
 }: MachinesChartProps) => {
   return (
-    <Card contentClassName="max-h-[500px]" className="max-w-[720px]">
+    <Card contentClassName="max-h-[600px]" className="max-w-[720px]">
       <div className="flex flex-col gap-2">
         <MachinesHeader
           activeMachine={activeMachine}
