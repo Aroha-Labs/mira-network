@@ -10,7 +10,7 @@ class MiraSyncClient:
     def __init__(
         self,
         base_url: str = "https://apis.mira.network",
-        api_token: Optional[str] = None,
+        api_key: Optional[str] = None,
     ):
         """Initialize Mira synchronous client.
 
@@ -19,7 +19,7 @@ class MiraSyncClient:
             api_token: Optional API token for authentication
         """
         self.base_url = base_url
-        self.api_token = api_token
+        self.api_key = api_key
         self._session = requests.Session()
 
     def __enter__(self):
@@ -30,8 +30,8 @@ class MiraSyncClient:
 
     def _get_headers(self) -> Dict[str, str]:
         headers = {"Content-Type": "application/json"}
-        if self.api_token:
-            headers["Authorization"] = f"Bearer {self.api_token}"
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
         return headers
 
     def list_models(self) -> List[str]:

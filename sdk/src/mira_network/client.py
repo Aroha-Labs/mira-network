@@ -1,4 +1,4 @@
-from typing import AsyncIterator, Optional, List, Dict, AsyncGenerator, Union, Any
+from typing import AsyncIterator, Optional, List, Dict, Union, Any
 import httpx
 from .models import (
     AiRequest,
