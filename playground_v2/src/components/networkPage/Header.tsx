@@ -10,15 +10,15 @@ const Header = () => {
       <div className="flex items-center gap-3 w-full md:w-auto">
         <Link
           href="/"
-          className="font-medium text-md leading-[22px] tracking-[-0.013em] opacity-40"
+          className="font-medium text-[13px] leading-[22px] tracking-[-0.013em] opacity-40"
         >
           <span className="underline">console</span>
           <sup className="text-xs font-light text-gray-500">beta</sup>
         </Link>
 
-        <span className="text-md hidden md:block">&gt;</span>
+        <span className="text-[13px] hidden md:block">&gt;</span>
 
-        <p className="text-md leading-[22px] tracking-[-0.013em] hidden md:block">
+        <p className="text-[13px] leading-[22px] tracking-[-0.013em] hidden md:block">
           NETWORK
         </p>
         <div className="w-full border-t border-dashed border-[#9CB9AE] mx-4 h-[2px] block md:hidden" />
