@@ -6,7 +6,7 @@ import {
   PaginationItem,
   PaginationNext,
   PaginationPrevious,
-} from './Pagination';
+} from "./Pagination";
 
 // Component to handle individual pagination items
 const PaginationItems = ({
@@ -22,7 +22,11 @@ const PaginationItems = ({
 
   // Always show the first page
   items.push(
-    <PaginationItem className="cursor-pointer" key={1} onClick={() => handlePageChange(1)}>
+    <PaginationItem
+      className="cursor-pointer"
+      key={1}
+      onClick={() => handlePageChange(1)}
+    >
       <PaginationButton isActive={currentPage === 1}>1</PaginationButton>
     </PaginationItem>
   );
@@ -66,7 +70,9 @@ const PaginationItems = ({
         key={totalPages}
         onClick={() => handlePageChange(totalPages)}
       >
-        <PaginationButton isActive={currentPage === totalPages}>{totalPages}</PaginationButton>
+        <PaginationButton isActive={currentPage === totalPages}>
+          {totalPages}
+        </PaginationButton>
       </PaginationItem>
     );
   }
@@ -83,9 +89,10 @@ const CustomPagination = ({
   currentPage: number;
   handlePageChange: (page: number) => void;
 }) => {
+  if (totalPages <= 1) return null;
   return (
-    <Pagination className="mt-12">
-      <PaginationContent>
+    <Pagination className="mt-8 justify-end">
+      <PaginationContent className="flex items-start">
         {currentPage > 1 && (
           <PaginationItem
             className="cursor-pointer"
