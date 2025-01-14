@@ -39,9 +39,12 @@ const LogsTable = ({
   }
 
   return (
-    <Card>
-      <Table className="m-4 w-[625px]">
-        <TableHeader>
+    <Card contentClassName="overflow-hidden">
+      <Table
+        className="m-0 w-[625px]"
+        containerClassName="w-[620px] h-[400px] overflow-auto m-4 pb-[50px]"
+      >
+        <TableHeader className="sticky top-0 bg-white z-10">
           <TableRow>
             <TableHead>Timestamp</TableHead>
             <TableHead>Tokens</TableHead>
