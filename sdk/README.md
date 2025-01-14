@@ -17,7 +17,9 @@
   <a href="https://pypi.org/project/mira-network/"><img src="https://img.shields.io/pypi/l/mira-network" alt="License"></a>
   
   <!-- Build Status -->
-  <a href="https://github.com/Aroha-Labs/mira-network/actions"><img src="https://github.com/Aroha-Labs/mira-network/workflows/ci-sdk/badge.svg" alt="Build Status"></a>
+  <a href="https://github.com/Aroha-Labs/mira-network/actions/workflows/ci-sdk.yml">
+    <img src="https://github.com/Aroha-Labs/mira-network/actions/workflows/ci-sdk.yml/badge.svg" alt="Build Status">
+  </a>
 </p>
 
 <p align="center">
