@@ -9,7 +9,6 @@ dependencies = [
   "requests>=2.32.3",
   "pytest-cov>=6.0.0",
 ]
-
 description = "Python SDK for Mira Network API"
 license = {text = "MIT"}
 name = "mira-network"
