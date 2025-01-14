@@ -5,7 +5,6 @@ import { format, isValid } from "date-fns";
 import * as React from "react";
 import { DateRange } from "react-day-picker";
 
-import { Button } from "src/components/button";
 import {
   Popover,
   PopoverContent,
@@ -81,17 +80,16 @@ const DatePickerWithRange = ({
     <div className={cn("grid gap-2", className)}>
       <Popover open={open} onOpenChange={handleOpenChange}>
         <PopoverTrigger asChild>
-          <Button
+          <span
             id="date"
-            variant="ghost"
             className={cn(
-              "justify-start text-left text-black text-[13px] p-0 m-0 font-normal font-medium leading-[22px] tracking-[-0.156px] underline opacity-60 h-fit",
+              "justify-start cursor-pointer flex items-center gap-2 text-left text-black text-[13px] p-0 m-0 font-normal font-medium leading-[22px] tracking-[-0.156px] underline opacity-60 h-fit",
               !date && "text-muted-foreground"
             )}
           >
             {formattedDate()}
             <CaretDown />
-          </Button>
+          </span>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="start">
           <Calendar
