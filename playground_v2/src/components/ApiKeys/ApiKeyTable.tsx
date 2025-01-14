@@ -64,7 +64,7 @@ const ApiKeyTable = () => {
                   className="cursor-pointer flex justify-end"
                 >
                   <Button variant="link" className="p-0">
-                    {isCopied === key.token ? "Copied!" : "Copy"}
+                    {isCopied === key.token ? "Copied!" : "Copy Key"}
                   </Button>
                 </TableCell>
                 <TableCell>
