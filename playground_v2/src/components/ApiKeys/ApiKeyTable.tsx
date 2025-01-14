@@ -12,7 +12,11 @@ const getTokenDisplay = (token: string) => {
   return `${token.slice(0, 4)}...${token.slice(-4)}`;
 };
 
-const ApiKeyTable = () => {
+const ApiKeyTable = ({
+  setIsModalOpen,
+}: {
+  setIsModalOpen: (open: boolean) => void;
+}) => {
   const { data, isLoading, error } = useApiTokens();
   const [isCopied, setIsCopied] = useState("");
 
@@ -48,7 +52,7 @@ const ApiKeyTable = () => {
         <p className="text-md leading-[22px] tracking-[-0.013em]">
           YOU HAVE {data?.length} API KEY{data?.length === 1 ? "" : "S"}
         </p>
-        <AddApiKey />
+        <AddApiKey onModalOpenChange={setIsModalOpen} />
       </div>
       <Table className="mt-10 mb-10">
         <TableBody>
@@ -70,7 +74,10 @@ const ApiKeyTable = () => {
                   </Button>
                 </TableCell>
                 <TableCell>
-                  <DeleteApiKey token={key.token} />
+                  <DeleteApiKey
+                    token={key.token}
+                    onModalOpenChange={setIsModalOpen}
+                  />
                 </TableCell>
               </TableRow>
             );

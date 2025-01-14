@@ -8,7 +8,11 @@ import {
 import useApiTokens from "src/hooks/useApiTokens";
 import Card from "../card";
 
-const AddApiKey = () => {
+const AddApiKey = ({
+  onModalOpenChange,
+}: {
+  onModalOpenChange: (open: boolean) => void;
+}) => {
   const { addApiKey, data } = useApiTokens();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [description, setDescription] = useState<"success" | "error" | "">("");
@@ -17,7 +21,7 @@ const AddApiKey = () => {
     e.preventDefault();
     const description = (e.target as HTMLFormElement).description.value;
     await addApiKey.mutateAsync(description);
-    setIsModalOpen(false);
+    handleOpenChange(false);
   };
 
   useEffect(() => {
@@ -31,8 +35,13 @@ const AddApiKey = () => {
     }
   }, [addApiKey.isSuccess, addApiKey.isError]);
 
+  const handleOpenChange = (open: boolean) => {
+    setIsModalOpen(open);
+    onModalOpenChange(open);
+  };
+
   return (
-    <Popover open={isModalOpen} onOpenChange={setIsModalOpen}>
+    <Popover open={isModalOpen} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button onClick={() => setIsModalOpen(true)}>Add API Key</Button>
       </PopoverTrigger>
@@ -79,7 +88,7 @@ const AddApiKey = () => {
                 type="button"
                 onClick={(e) => {
                   e.preventDefault();
-                  setIsModalOpen(false);
+                  handleOpenChange(false);
                 }}
               >
                 Cancel
