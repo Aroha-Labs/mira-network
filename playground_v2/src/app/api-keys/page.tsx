@@ -6,7 +6,7 @@ import Footer from "src/components/Footer";
 
 const ApiKeysPage = () => {
   return (
-    <div className="container mx-auto p-4 max-w-fit">
+    <div className="container mx-auto p-4 w-[720px]">
       <Header />
       <ApiKeyTable />
       <Footer />
