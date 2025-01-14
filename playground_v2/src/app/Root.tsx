@@ -34,7 +34,7 @@ const Root = ({ children }: RootProps) => {
       <body
         className={c(
           jetBrainsMono.className,
-          "antialiased text-base flex flex-col items-center justify-center flex-1 p-4 space-y-4"
+          "antialiased text-base flex flex-col items-center justify-center flex-1 p-4 space-y-4 md:p-0 md:space-y-0 md:m-0 md:overflow-hidden"
         )}
       >
         <QueryClientProvider client={queryClient}>
@@ -50,7 +50,7 @@ const Root = ({ children }: RootProps) => {
           <LayoutChildren>{children}</LayoutChildren>
         </QueryClientProvider>
         <Link
-          href="https://console-feedback.arohalabs.tech"
+          href="https://feedback.mira.network/"
           target="_blank"
           rel="noopener noreferrer"
           className="fixed px-3 py-1 text-sm text-white bg-blue-500 shadow-lg bottom-4 right-4 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300"
