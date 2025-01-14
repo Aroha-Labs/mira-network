@@ -27,12 +27,18 @@ async def test_list_models(client):
 
 @pytest.mark.asyncio
 async def test_generate(client):
-    result = await client.chat_completions_create(
-        model="gpt-4o",
-        messages=[Message(role="user", content="Hi Who are you!")],
-        stream=False,
-    )
-    assert len(result) > 0
+    for _ in range(3):
+        try:
+            result = await client.chat_completions_create(
+                model="gpt-4o",
+                messages=[Message(role="user", content="Hi Who are you!")],
+                stream=False,
+            )
+            assert len(result) > 0
+            return  # Success, exit the loop
+        except Exception as e:
+            print(f"Attempt failed: {e}")
+    pytest.fail("All attempts failed")
 
 
 @pytest.mark.asyncio
