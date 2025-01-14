@@ -14,11 +14,11 @@ const Header = ({
   const params = useStore(apiLogsParamsState, (state) => state);
 
   return (
-    <div className="flex flex-wrap items-center justify-between mb-8">
+    <div className="flex flex-wrap items-center justify-between mb-[16px]">
       <div className="flex items-center gap-3">
         <Link
           href="/"
-          className="font-medium text-md leading-[22px] tracking-[-0.013em] opacity-40"
+          className="text-black text-[12px] font-normal font-medium leading-[22px] tracking-[-0.156px] underline opacity-40"
         >
           <span className="underline">console</span>
           <sup className="text-xs font-light text-gray-500">beta</sup>
@@ -26,7 +26,9 @@ const Header = ({
 
         <span className="text-md">&gt;</span>
 
-        <p className="text-md leading-[22px] tracking-[-0.013em]">API LOGS</p>
+        <p className="text-black text-[12px] font-normal font-medium leading-[22px] tracking-[-0.156px]">
+          API LOGS
+        </p>
       </div>
       <div className="flex-grow border-t border-dashed border-[#9CB9AE] mx-4 flex-1 h-[2px]" />
 
