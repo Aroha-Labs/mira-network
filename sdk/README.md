@@ -1,16 +1,23 @@
 <div align="center">
-  <img src="https://your-domain.com/logo.png" alt="Mira Network SDK" width="200"/>
+  <img src="https://mira.network/_next/static/media/nav_logo.dfc4db53.svg" alt="Mira Network SDK" width="100"/>
   <h1>Mira Network Python SDK</h1>
   <p><strong>Your Universal Gateway to AI Language Models</strong></p>
 </div>
 
 <p align="center">
-  <a href="https://badge.fury.io/py/mira-network"><img src="https://badge.fury.io/py/mira-network.svg" alt="PyPI version"></a>
-  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
-  <a href="https://github.com/mira-network/python-sdk/actions"><img src="https://github.com/mira-network/python-sdk/workflows/tests/badge.svg" alt="Build Status"></a>
-  <a href="https://codecov.io/gh/mira-network/python-sdk"><img src="https://codecov.io/gh/mira-network/python-sdk/branch/main/graph/badge.svg" alt="Coverage Status"></a>
-  <a href="https://pypi.org/project/mira-network/"><img src="https://img.shields.io/pypi/dm/mira-network.svg" alt="Downloads"></a>
-  <a href="https://discord.gg/mira-network"><img src="https://img.shields.io/discord/1234567890?color=7289da&label=discord" alt="Discord"></a>
+  <!-- Version and Download stats -->
+  <a href="https://pypi.org/project/mira-network/"><img src="https://img.shields.io/pypi/v/mira-network" alt="PyPI Version"></a>
+  <a href="https://pypi.org/project/mira-network/"><img src="https://img.shields.io/pypi/dm/mira-network" alt="Downloads"></a>
+  
+  <!-- Package metadata -->
+  <a href="https://pypi.org/project/mira-network/"><img src="https://img.shields.io/pypi/format/mira-network" alt="Format"></a>
+  <a href="https://pypi.org/project/mira-network/"><img src="https://img.shields.io/pypi/implementation/mira-network" alt="Implementation"></a>
+  
+  <!-- License -->
+  <a href="https://pypi.org/project/mira-network/"><img src="https://img.shields.io/pypi/l/mira-network" alt="License"></a>
+  
+  <!-- Build Status -->
+  <a href="https://github.com/mira-network/python-sdk/actions"><img src="https://github.com/mira-network/python-sdk/workflows/ci-sdk/badge.svg" alt="Build Status"></a>
 </p>
 
 <p align="center">
@@ -333,3 +340,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 <p align="center">Built with ❤️ by the Mira Network team</p>
+****
