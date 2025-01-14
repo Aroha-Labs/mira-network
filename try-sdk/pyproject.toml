@@ -1,0 +1,19 @@
+[project]
+name = "sdk-test"
+version = "0.1.0"
+description = "Default template for PDM package"
+authors = [
+    {name = "Hamid Raza", email = "contact@hamidraza.com"},
+]
+dependencies = ["mira-network @ file:///${PROJECT_ROOT}/../sdk", "asyncio>=3.4.3"]
+requires-python = "==3.11.*"
+readme = "README.md"
+license = {text = "MIT"}
+
+
+[tool.pdm]
+distribution = false
+
+[tool.pdm.scripts]
+_.env_file = ".env"
+dev = "./main.py"
