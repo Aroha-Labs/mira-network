@@ -1,8 +1,8 @@
+import { User } from "@supabase/supabase-js";
 import Link from "next/link";
 import React from "react";
-import { User } from "@supabase/supabase-js";
-import { useLogout } from "src/hooks/useLogout";
 import ProfileImage from "src/components/ProfileImage";
+import { useLogout } from "src/hooks/useLogout";
 
 interface UserInfoProps {
   user?: User;
@@ -19,8 +19,8 @@ const UserInfo: React.FC<UserInfoProps> = ({ user, children }) => {
   const isLoggedIn = !!user;
 
   return (
-    <div className="bg-white rounded shadow w-full max-w-md">
-      <div className="bg-gray-50 p-4 rounded-t">
+    <div className="bg-white shadow w-full max-w-md">
+      <div className="bg-gray-50 p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center">
             <ProfileImage
@@ -30,7 +30,7 @@ const UserInfo: React.FC<UserInfoProps> = ({ user, children }) => {
                   : "/img/avatar-dummy.svg"
               }
               alt="Avatar"
-              className="w-12 h-12 rounded-full mr-4"
+              className="w-12 h-12 mr-4"
             />
             <div>
               <p className="font-bold">
@@ -46,7 +46,7 @@ const UserInfo: React.FC<UserInfoProps> = ({ user, children }) => {
           {isLoggedIn ? (
             <button
               onClick={handleLogout}
-              className={`flex items-center text-gray-700 rounded-full px-3 py-1 border border-gray-300 text-sm  ${
+              className={`flex items-center text-gray-700 px-3 py-1 border border-gray-300 text-sm  ${
                 logoutMutation.isPending
                   ? "cursor-not-allowed opacity-50"
                   : "hover:bg-gray-200 active:bg-gray-300 transition"
@@ -100,7 +100,7 @@ const UserInfo: React.FC<UserInfoProps> = ({ user, children }) => {
           ) : (
             <Link
               href="/login"
-              className="flex items-center text-white bg-green-500 rounded-full px-3 py-1 border border-green-500 text-sm hover:bg-green-600 active:bg-green-700 transition"
+              className="flex items-center text-white bg-green-500 px-3 py-1 border border-green-500 text-sm hover:bg-green-600 active:bg-green-700 transition"
             >
               Login
             </Link>

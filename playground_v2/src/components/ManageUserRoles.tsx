@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import axios from "axios";
+import { useEffect, useState } from "react";
+import Modal from "src/components/Modal";
 import { API_BASE_URL } from "src/config";
 import { useSession } from "src/hooks/useSession";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import Modal from "src/components/Modal";
 
 interface ManageUserRolesProps {
   userId: string;
@@ -95,7 +95,7 @@ const ManageUserRoles = ({ userId, onClose }: ManageUserRolesProps) => {
           ))}
           <button
             type="submit"
-            className="bg-blue-500 text-white p-2 rounded hover:bg-blue-600"
+            className="bg-blue-500 text-white p-2 hover:bg-blue-600"
             disabled={updateUserRolesMutation.isPending}
           >
             {updateUserRolesMutation.isPending ? "Updating..." : "Update Roles"}

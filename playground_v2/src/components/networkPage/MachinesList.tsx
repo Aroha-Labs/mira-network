@@ -34,7 +34,7 @@ const MachinesList = ({
             onClick={() => changeActiveMachine(machine.machine_uid)}
           >
             <span
-              className={`w-2 h-2 rounded-full ${
+              className={`w-2 h-2 ${
                 machine.status === "online" ? "bg-green-500" : "bg-gray-500"
               }`}
             ></span>

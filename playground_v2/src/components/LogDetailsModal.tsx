@@ -33,7 +33,7 @@ const LogDetailsModal: React.FC<LogDetailsModalProps> = ({
           activeTab === "messages"
             ? "bg-blue-500 text-white"
             : "bg-gray-200 text-gray-800"
-        } rounded-l-md`}
+        }`}
         onClick={() => onTabChange("messages")}
       >
         Messages
@@ -43,7 +43,7 @@ const LogDetailsModal: React.FC<LogDetailsModalProps> = ({
           activeTab === "raw"
             ? "bg-blue-500 text-white"
             : "bg-gray-200 text-gray-800"
-        } rounded-r-md`}
+        }`}
         onClick={() => onTabChange("raw")}
       >
         Raw
@@ -55,7 +55,7 @@ const LogDetailsModal: React.FC<LogDetailsModalProps> = ({
           (message: { role: string; content: string }, index: number) => (
             <div
               key={index}
-              className={`p-2 rounded-md ${
+              className={`p-2 ${
                 message.role === "user"
                   ? "bg-blue-100 text-blue-800"
                   : "bg-gray-100 text-gray-800"
@@ -65,12 +65,12 @@ const LogDetailsModal: React.FC<LogDetailsModalProps> = ({
             </div>
           )
         )}
-        <div className="p-2 rounded-md bg-green-100 text-green-800">
+        <div className="p-2 bg-green-100 text-green-800">
           <strong>Response:</strong> {log.response}
         </div>
       </div>
     ) : (
-      <pre className="whitespace-pre-wrap bg-gray-100 p-4 rounded-md">
+      <pre className="whitespace-pre-wrap bg-gray-100 p-4">
         {JSON.stringify(JSON.parse(log.payload), null, 2)}
       </pre>
     )}
