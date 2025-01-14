@@ -33,7 +33,7 @@ jobs:
 
       - name: Run tests
         run: |
-          pytest tests/ --cov=./ --cov-report=xml
+          pytest sdk/tests/ --cov=sdk/ --cov-report=xml
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
@@ -57,7 +57,7 @@ jobs:
           pip install ruff black
 
       - name: Check formatting with Black
-        run: black --check .
+        run: black --check sdk/
 
       - name: Lint with Ruff
-        run: ruff check .
+        run: ruff check sdk/
