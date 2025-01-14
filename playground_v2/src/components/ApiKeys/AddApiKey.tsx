@@ -37,7 +37,7 @@ const AddApiKey = () => {
         <Button onClick={() => setIsModalOpen(true)}>Add API Key</Button>
       </PopoverTrigger>
       <PopoverContent className="min-w-80 p-0">
-        <Card>
+        <Card className="p-[32px]">
           <div className="flex items-center justify-between">
             <p className="text-md leading-[22px] tracking-[-0.013em] pl-0 pr-4 pt-4 pb-4">
               &lt; Create new key
