@@ -68,7 +68,7 @@ const DatePickerWithRange = ({
             id="date"
             variant="ghost"
             className={cn(
-              "justify-start text-left text-black text-[12px] font-normal font-medium leading-[22px] tracking-[-0.156px] underline opacity-60",
+              "justify-start text-left text-black text-[13px] p-0 m-0 font-normal font-medium leading-[22px] tracking-[-0.156px] underline opacity-60 h-fit",
               !date && "text-muted-foreground"
             )}
           >

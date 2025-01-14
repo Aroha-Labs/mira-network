@@ -27,13 +27,13 @@ const UserInfo = ({ user }: UserInfoProps) => {
         <span className="text-xs md:text-md">&gt;</span>
         <p
           className={cn(
-            "text-black font-['JetBrains_Mono'] text-[12px] font-normal leading-[22px] tracking-[-0.156px]"
+            "text-black text-[13px] font-normal leading-[22px] tracking-[-0.156px]"
           )}
         >
           {user?.user_metadata?.full_name}
         </p>
 
-        <p className="text-black font-['JetBrains_Mono'] text-[12px] font-medium leading-[22px] tracking-[-0.156px] list-item opacity-40 ml-4">
+        <p className="text-black text-[13px] font-medium leading-[22px] tracking-[-0.156px] list-item opacity-40 ml-4">
           {user?.user_metadata?.email}
         </p>
       </div>
@@ -42,7 +42,7 @@ const UserInfo = ({ user }: UserInfoProps) => {
         <button
           className={cn(
             jetBrainsMono.className,
-            "text-black text-[12px] font-normal leading-[22px] tracking-[-0.156px] underline decoration-solid decoration-skip-ink-auto"
+            "text-black text-[13px] font-normal leading-[22px] tracking-[-0.156px] underline decoration-solid decoration-skip-ink-auto"
           )}
           onClick={handleLoggedOutClicked}
         >
@@ -51,14 +51,14 @@ const UserInfo = ({ user }: UserInfoProps) => {
       )}
       {loggedOutClicked && (
         <div className="flex items-center justify-center">
-          <p className="text-md font-medium leading-[22px] tracking-[-0.013em] text-left opacity-60">
+          <p className="text-[13px] font-medium leading-[22px] tracking-[-0.013em] text-left opacity-60">
             Confirm logout
           </p>
           <div className="border-t border-dashed border-[#9CB9AE] w-[10px] h-[2px] mx-[10px]" />
 
           <Button
             variant="link"
-            className="underline m-0 p-0"
+            className="underline m-0 p-0 text-[13px]"
             onClick={handleLogout}
           >
             Yes
@@ -67,7 +67,7 @@ const UserInfo = ({ user }: UserInfoProps) => {
 
           <Button
             variant="link"
-            className="underline m-0 p-0"
+            className="underline m-0 p-0 text-[13px]"
             onClick={() => setLoggedOutClicked(false)}
           >
             No

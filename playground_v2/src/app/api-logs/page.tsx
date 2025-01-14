@@ -36,7 +36,7 @@ const ApiLogsPage = () => {
   }
 
   return (
-    <div className="container mx-auto p-4 max-w-fit">
+    <div className="container mx-auto p-4 w-[720px]">
       <Header startDate={params.startDate} endDate={params.endDate} />
       <LogsTable
         onRowClick={handleRowClick}

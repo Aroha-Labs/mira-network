@@ -10,7 +10,7 @@ const LoggedoutHeader = () => (
     <div className="flex-grow border-t border-dashed border-[#9CB9AE] mx-4 h-[1px]" />
     <span
       className={cn(
-        "text-md font-bold leading-[22px] tracking-[-0.013em] text-[#303030]"
+        "text-[13px] font-bold leading-[22px] tracking-[-0.013em] text-[#303030]"
       )}
     >
       console
