@@ -28,15 +28,36 @@ jobs:
           IFS='.' read -r major minor patch <<< "$latest_ver"
           new_patch=$((patch + 1))
 
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            new_tag="v$major.$minor.$new_patch"
-          else
-            new_tag="v$major.$minor.$new_patch-dev"
-          fi
+          # Function to check if tag exists
+          tag_exists() {
+            git rev-parse "$1" >/dev/null 2>&1
+          }
+
+          # Find next available tag
+          while true; do
+            if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+              new_tag="v$major.$minor.$new_patch"
+            else
+              new_tag="v$major.$minor.$new_patch-dev"
+            fi
+
+            if ! tag_exists "$new_tag"; then
+              break
+            fi
+            new_patch=$((new_patch + 1))
+          done
+
+          echo "Creating new tag: $new_tag"
 
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git tag -a $new_tag -m "Release $new_tag"
-          git push origin $new_tag
+
+          # Create and push tag with error handling
+          if git tag -a $new_tag -m "Release $new_tag" && git push origin $new_tag; then
+            echo "Successfully created and pushed tag $new_tag"
+          else
+            echo "Failed to create or push tag"
+            exit 1
+          fi
         env:
           latest_tag: ${{ steps.get_latest_tag.outputs.latest_tag }}
