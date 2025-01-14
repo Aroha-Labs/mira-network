@@ -1,11 +1,3 @@
-import { Fragment, useState } from "react";
-import axios from "axios";
-import CopyToClipboardIcon from "src/components/CopyToClipboardIcon";
-import { API_BASE_URL } from "src/config";
-import { useSession } from "src/hooks/useSession";
-import Modal from "src/components/Modal";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import ProfileImage from "./ProfileImage";
 import {
   Menu,
   MenuButton,
@@ -14,7 +6,15 @@ import {
   Transition,
 } from "@headlessui/react";
 import { ChevronDownIcon as MenuIcon } from "@heroicons/react/24/outline";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import axios from "axios";
+import { Fragment, useState } from "react";
+import CopyToClipboardIcon from "src/components/CopyToClipboardIcon";
 import ManageUserRoles from "src/components/ManageUserRoles";
+import Modal from "src/components/Modal";
+import { API_BASE_URL } from "src/config";
+import { useSession } from "src/hooks/useSession";
+import ProfileImage from "./ProfileImage";
 
 const USDollar = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -121,13 +121,13 @@ const UserCard = ({ user }: { user: User }) => {
   };
 
   return (
-    <li className="p-4 bg-gray-100 rounded shadow-sm">
+    <li className="p-4 bg-gray-100 shadow-sm">
       <div className="flex items-start justify-between">
         <div className="flex items-center space-x-4">
           <ProfileImage
             src={user.user_metadata.avatar_url}
             alt={user.user_metadata.name}
-            className="w-10 h-10 rounded-full"
+            className="w-10 h-10"
           />
           <div>
             <p className="font-bold">{user.user_metadata.name}</p>
@@ -138,7 +138,7 @@ const UserCard = ({ user }: { user: User }) => {
             </div>
             <div className="mt-2 flex items-center space-x-2">
               {isCreditsLoading ? (
-                <div className="w-24 h-4 bg-gray-200 animate-pulse rounded"></div>
+                <div className="w-24 h-4 bg-gray-200 animate-pulse"></div>
               ) : creditsError ? (
                 <span className="text-red-500 text-sm">
                   Error loading credits
@@ -154,7 +154,7 @@ const UserCard = ({ user }: { user: User }) => {
             </div>
             <div className="mt-2 flex items-center space-x-2">
               {isRolesLoading ? (
-                <div className="w-24 h-4 bg-gray-200 animate-pulse rounded"></div>
+                <div className="w-24 h-4 bg-gray-200 animate-pulse"></div>
               ) : rolesError ? (
                 <span className="text-red-500 text-sm">
                   Error loading roles
@@ -185,7 +185,7 @@ const UserCard = ({ user }: { user: User }) => {
             leaveFrom="transform opacity-100 scale-100"
             leaveTo="transform opacity-0 scale-95"
           >
-            <MenuItems className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded shadow-lg">
+            <MenuItems className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 shadow-lg">
               <MenuItem>
                 {({ active }) => (
                   <button
@@ -221,12 +221,12 @@ const UserCard = ({ user }: { user: User }) => {
               type="number"
               value={credits}
               onChange={(e) => setCredits(Number(e.target.value))}
-              className="border border-gray-300 p-2 rounded"
+              className="border border-gray-300 p-2"
               placeholder="Credits"
             />
             <button
               type="submit"
-              className="bg-blue-500 text-white p-2 rounded hover:bg-blue-600"
+              className="bg-blue-500 text-white p-2 hover:bg-blue-600"
               disabled={addCreditsMutation.isPending}
             >
               {addCreditsMutation.isPending ? "Adding..." : "Add Credits"}

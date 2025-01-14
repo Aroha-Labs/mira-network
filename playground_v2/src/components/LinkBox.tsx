@@ -1,5 +1,5 @@
-import React from "react";
 import Link from "next/link";
+import React from "react";
 
 interface LinkBoxProps {
   href: string;
@@ -9,7 +9,7 @@ interface LinkBoxProps {
 
 const LinkBox: React.FC<LinkBoxProps> = ({ href, label, isDisabled }) => {
   return isDisabled ? (
-    <div className="bg-white p-4 rounded shadow w-full max-w-md flex justify-between items-center cursor-not-allowed opacity-50">
+    <div className="bg-white p-4 shadow w-full max-w-md flex justify-between items-center cursor-not-allowed opacity-50">
       <p className="text-gray-700">{label}</p>
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -27,7 +27,7 @@ const LinkBox: React.FC<LinkBoxProps> = ({ href, label, isDisabled }) => {
   ) : (
     <Link
       href={href}
-      className="bg-white p-4 rounded shadow w-full max-w-md flex justify-between items-center cursor-pointer hover:bg-gray-200 active:bg-gray-300 transition"
+      className="bg-white p-4 shadow w-full max-w-md flex justify-between items-center cursor-pointer hover:bg-gray-200 active:bg-gray-300 transition"
     >
       <p className="text-gray-700">{label}</p>
       <svg
