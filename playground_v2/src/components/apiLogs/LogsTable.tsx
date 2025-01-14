@@ -40,7 +40,7 @@ const LogsTable = ({
 
   return (
     <Card>
-      <Table className="m-4">
+      <Table className="m-4 w-[625px]">
         <TableHeader>
           <TableRow>
             <TableHead>Timestamp</TableHead>
