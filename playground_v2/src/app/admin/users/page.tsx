@@ -1,11 +1,11 @@
 "use client";
 
-import axios from "axios";
-import { useSession } from "src/hooks/useSession";
-import { API_BASE_URL } from "src/config";
-import UserCard from "src/components/UserCard";
 import { useInfiniteQuery } from "@tanstack/react-query";
+import axios from "axios";
 import Loading from "src/components/PageLoading";
+import UserCard from "src/components/UserCard";
+import { API_BASE_URL } from "src/config";
+import { useSession } from "src/hooks/useSession";
 
 interface User {
   id: string;
@@ -84,7 +84,7 @@ const AdminUsers = () => {
   }
 
   return (
-    <div className="p-6 pb-32 bg-white rounded shadow-md">
+    <div className="p-6 pb-32 bg-white shadow-md">
       <h1 className="text-3xl font-bold mb-4">Users</h1>
       <p className="text-gray-700 mb-4">Manage users here.</p>
       <ul className="space-y-2">
@@ -95,7 +95,7 @@ const AdminUsers = () => {
       <div className="flex justify-center mt-4">
         <button
           onClick={() => fetchNextPage()}
-          className={`bg-gray-300 text-gray-700 p-2 px-6 rounded ${
+          className={`bg-gray-300 text-gray-700 p-2 px-6 ${
             !hasNextPage || isFetchingNextPage ? "" : "hover:bg-gray-400"
           }`}
           disabled={!hasNextPage || isFetchingNextPage}

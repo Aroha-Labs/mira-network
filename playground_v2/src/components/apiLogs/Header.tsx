@@ -18,7 +18,7 @@ const Header = ({
       <div className="flex items-center gap-3">
         <Link
           href="/"
-          className="text-black text-[13px] font-normal font-medium leading-[22px] tracking-[-0.156px] underline opacity-40"
+          className="text-black text-[13px] font-normal font-medium leading-[22px] tracking-[-0.156px] opacity-40"
         >
           <span className="underline">console</span>
           <sup className="text-xs font-light text-gray-500">beta</sup>

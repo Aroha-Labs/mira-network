@@ -1,12 +1,11 @@
 import Link from "next/link";
 import ActiveMachines from "./ActiveMachines";
 import NetworkPopover from "./NetworkPopover";
-import TotalInferenceCalls from "./TotalInferenceCalls";
 import TotalTokens from "./TotalTokens";
 
 const Header = () => {
   return (
-    <div className="flex flex-wrap items-center justify-between mb-8 gap-8">
+    <div className="flex flex-wrap items-center justify-between mb-[16px] gap-8">
       <div className="flex items-center gap-3 w-full md:w-auto">
         <Link
           href="/"
@@ -30,7 +29,6 @@ const Header = () => {
       <div className="hidden md:flex-grow md:border-t md:border-dashed md:border-[#9CB9AE] md:mx-4 md:flex-1 md:h-[2px]" />
 
       <div className="md:flex gap-4 items-center hidden">
-        <TotalInferenceCalls />
         <TotalTokens />
         <ActiveMachines />
       </div>

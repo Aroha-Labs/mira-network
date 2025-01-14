@@ -2,7 +2,7 @@ import { Button } from "src/components/button";
 
 const Header = ({ onClose }: { onClose: () => void }) => {
   return (
-    <div className="sticky top-0 flex flex-wrap items-center justify-between mb-8 z-10">
+    <div className="sticky top-0 flex flex-wrap items-center justify-between mb-[16px] z-10">
       <Button
         variant="link"
         className="flex items-center gap-3 cursor-pointer"

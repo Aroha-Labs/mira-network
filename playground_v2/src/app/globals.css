@@ -108,17 +108,32 @@ h6 {
     @apply bg-background text-foreground;
   }
 }
-
 /* Custom vertical scrollbar styling */
 ::-webkit-scrollbar {
   width: 6px;
+  border-radius: 0px;
   max-height: 6px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background-color: #308f6a;
+  background-color: #d8d8d8;
+  border-radius: 0px;
 }
 
 ::-webkit-scrollbar-track {
   background: transparent;
+  border-radius: 0px;
+}
+
+/* Custom horizontal scrollbar styling */
+::-webkit-scrollbar:horizontal {
+  height: 0;
+}
+
+::-webkit-scrollbar-thumb:horizontal {
+  display: none;
+}
+
+::-webkit-scrollbar-track:horizontal {
+  display: none;
 }

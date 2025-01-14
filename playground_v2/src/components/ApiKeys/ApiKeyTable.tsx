@@ -43,8 +43,8 @@ const ApiKeyTable = () => {
   }
 
   return (
-    <Card className="min-w-full md:min-w-[720px]">
-      <div className="flex gap-4 justify-between items-center pt-4 pl-4 sticky top-0 bg-white z-10">
+    <Card className="min-w-full md:min-w-[720px] p-[32px]">
+      <div className="flex gap-4 justify-between items-center sticky top-0 bg-white z-10">
         <p className="text-md leading-[22px] tracking-[-0.013em]">
           YOU HAVE {data?.length} API KEY{data?.length === 1 ? "" : "S"}
         </p>
@@ -55,7 +55,9 @@ const ApiKeyTable = () => {
           {data?.map((key: ApiKey) => {
             return (
               <TableRow key={key?.token} className="cursor-pointer">
-                <TableCell className="text-[13px]">{key.description}</TableCell>
+                <TableCell className="text-[13px] pl-0">
+                  {key.description}
+                </TableCell>
                 <TableCell className="opacity-40 min-w-[300px] text-[13px]">
                   {getTokenDisplay(key.token)}
                 </TableCell>

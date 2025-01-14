@@ -1,10 +1,10 @@
 "use client";
 
+import { Bars4Icon, XMarkIcon } from "@heroicons/react/24/outline";
+import { useStore } from "@tanstack/react-store";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { Bars4Icon, XMarkIcon } from "@heroicons/react/24/outline";
-import { useStore } from "@tanstack/react-store";
 import { userRolesState } from "src/state/userRolesState";
 
 const AdminLayout = ({ children }: { children: React.ReactNode }) => {
@@ -18,7 +18,7 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
     return (
       <div className="flex items-center justify-center flex-1 bg-gray-100">
         <div
-          className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative"
+          className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 relative"
           role="alert"
         >
           <strong className="font-bold">Error: </strong>
@@ -41,25 +41,19 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
         <nav className="p-4">
           <ul className="space-y-2">
             <li className={pathname === "/admin" ? "font-bold" : ""}>
-              <Link
-                href="/admin"
-                className="block p-2 rounded hover:bg-gray-700"
-              >
+              <Link href="/admin" className="block p-2 hover:bg-gray-700">
                 Dashboard
               </Link>
             </li>
             <li className={pathname === "/admin/users" ? "font-bold" : ""}>
-              <Link
-                href="/admin/users"
-                className="block p-2 rounded hover:bg-gray-700"
-              >
+              <Link href="/admin/users" className="block p-2 hover:bg-gray-700">
                 Users
               </Link>
             </li>
             <li className={pathname === "/admin/settings" ? "font-bold" : ""}>
               <Link
                 href="/admin/settings"
-                className="block p-2 rounded hover:bg-gray-700"
+                className="block p-2 hover:bg-gray-700"
               >
                 Settings
               </Link>

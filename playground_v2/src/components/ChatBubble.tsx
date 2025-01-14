@@ -1,16 +1,16 @@
 import {
-  FaceSmileIcon,
+  ArrowPathIcon,
   EyeIcon,
   EyeSlashIcon,
-  TrashIcon,
+  FaceSmileIcon,
   PencilIcon,
-  ArrowPathIcon,
+  TrashIcon,
 } from "@heroicons/react/24/outline";
-import ReactMarkdown from "src/components/ReactMarkdown";
-import CopyToClipboardIcon from "src/components/CopyToClipboardIcon";
-import ConfirmModal from "src/components/ConfirmModal";
 import { User } from "@supabase/supabase-js";
 import { useState } from "react";
+import ConfirmModal from "src/components/ConfirmModal";
+import CopyToClipboardIcon from "src/components/CopyToClipboardIcon";
+import ReactMarkdown from "src/components/ReactMarkdown";
 import ProfileImage from "./ProfileImage";
 
 interface ChatBubbleProps {
@@ -60,7 +60,7 @@ export default function ChatBubble({
           <ProfileImage
             src={userInfo.avatar_url}
             alt="User Avatar"
-            className="h-6 w-6 rounded-full inline-block"
+            className="h-6 w-6 inline-block"
           />
         ) : (
           <FaceSmileIcon className="h-6 w-6 inline-block" />
@@ -74,10 +74,10 @@ export default function ChatBubble({
         </strong>
       </div>
       <div
-        className={`px-3 py-2 rounded-lg shadow-md max-w-full min-w-48 w-auto ${
+        className={`px-3 py-2 shadow-md max-w-full min-w-48 w-auto ${
           msg.role === "user"
-            ? "bg-sky-50 text-black self-end rounded-tr-lg"
-            : "bg-indigo-50 text-black self-start rounded-tl-lg border border-gray-300"
+            ? "bg-sky-50 text-black self-end"
+            : "bg-indigo-50 text-black self-start border border-gray-300"
         }`}
       >
         {showRaw ? (
