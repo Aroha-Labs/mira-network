@@ -5,7 +5,7 @@ from mira_network import MiraClient
 
 async def main():
     client = MiraClient(
-        api_key="sk-mira-701d920ff62d74d337edcff20870dc0958cc264721896264",
+        api_key="sk-mira-xxxxxxxxxxxxxxxxxxxxxxxx",
     )
     # models = await client.list_models()
     # print(json.dumps(models, indent=2))
