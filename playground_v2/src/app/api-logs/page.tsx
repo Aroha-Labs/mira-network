@@ -44,19 +44,21 @@ const ApiLogsPage = () => {
         isLoading={isLoading}
         error={error}
       />
-      <Pagination
-        currentPage={params.page ?? 1}
-        totalPages={Number((data?.total ?? 0) / (data?.page_size ?? 1))}
-        handlePageChange={(pageNumber) =>
-          apiLogsParamsState.setState(() => ({ ...params, page: pageNumber }))
-        }
-      />
       {selectedLog &&
         createPortal(
           <LogDetailsModal log={selectedLog} onClose={handleCloseModal} />,
           document.body
         )}
-      <Footer />
+      <div className="flex justify-between">
+        <Footer />
+        <Pagination
+          currentPage={params.page ?? 1}
+          totalPages={Number((data?.total ?? 0) / (data?.page_size ?? 1))}
+          handlePageChange={(pageNumber) =>
+            apiLogsParamsState.setState(() => ({ ...params, page: pageNumber }))
+          }
+        />
+      </div>
     </div>
   );
 };
