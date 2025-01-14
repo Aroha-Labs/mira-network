@@ -18,15 +18,15 @@ const Header = ({
       <div className="flex items-center gap-3">
         <Link
           href="/"
-          className="font-medium text-md leading-[22px] tracking-[-0.013em] opacity-40"
+          className="font-medium text-[13px] leading-[22px] tracking-[-0.013em] opacity-40"
         >
           <span className="underline">console</span>
           <sup className="text-xs font-light text-gray-500">beta</sup>
         </Link>
 
-        <span className="text-md">&gt;</span>
+        <span className="text-[13px]">&gt;</span>
 
-        <p className="text-md leading-[22px] tracking-[-0.013em]">
+        <p className="text-[13px] leading-[22px] tracking-[-0.013em]">
           INEFRENCE ANALYTICS
         </p>
       </div>
