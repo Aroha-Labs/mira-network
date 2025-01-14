@@ -7,9 +7,11 @@ import { apiLogsParamsState } from "src/state/apiLogsParamsState";
 const Header = ({
   startDate,
   endDate,
+  onOpenChange,
 }: {
   startDate?: string;
   endDate?: string;
+  onOpenChange: (open: boolean) => void;
 }) => {
   const params = useStore(apiLogsParamsState, (state) => state);
 
@@ -44,6 +46,7 @@ const Header = ({
             }));
           }
         }}
+        onOpenChange={onOpenChange}
       />
     </div>
   );
