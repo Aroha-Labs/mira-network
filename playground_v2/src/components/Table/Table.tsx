@@ -103,7 +103,7 @@ const TableHead = React.forwardRef<
   <th
     ref={ref}
     className={cn(
-      "h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0 text-xs font-semibold leading-[20px] tracking-[0.1em] uppercase",
+      "h-12 px-4 text-left align-middle font-medium text-[var(--base-muted-foreground,#71717A)] font-[JetBrains Mono] text-[10px] font-normal font-[var(--font-weight-medium,500)] leading-[var(--typography-base-sizes-small-line-height,20px)] tracking-[0.1em] uppercase",
       className
     )}
     {...props}
@@ -117,7 +117,10 @@ const TableCell = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <td
     ref={ref}
-    className={cn("p-4 align-middle [&:has([role=checkbox])]:pr-0", className)}
+    className={cn(
+      "p-4 align-middle overflow-hidden text-[var(--base-foreground,#18181B)] text-ellipsis text-[10px] font-normal font-[var(--font-weight-medium,500)] leading-[var(--typography-base-sizes-small-line-height,20px)] [&:has([role=checkbox])]:pr-0 display-webkit-box webkit-box-orient-vertical webkit-line-clamp-1",
+      className
+    )}
     {...props}
   />
 ));
