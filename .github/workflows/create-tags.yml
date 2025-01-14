@@ -1,0 +1,63 @@
+name: Create Version Tags
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+
+jobs:
+  create-tag:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get latest tag
+        id: get_latest_tag
+        run: |
+          latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "latest_tag=${latest_tag}" >> $GITHUB_OUTPUT
+
+      - name: Bump version and push tag
+        id: tag_version
+        run: |
+          latest_ver=${latest_tag#v}
+          IFS='.' read -r major minor patch <<< "$latest_ver"
+          new_patch=$((patch + 1))
+
+          # Function to check if tag exists
+          tag_exists() {
+            git rev-parse "$1" >/dev/null 2>&1
+          }
+
+          # Find next available tag
+          while true; do
+            if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+              new_tag="v$major.$minor.$new_patch"
+            else
+              new_tag="v$major.$minor.$new_patch-dev"
+            fi
+
+            if ! tag_exists "$new_tag"; then
+              break
+            fi
+            new_patch=$((new_patch + 1))
+          done
+
+          echo "Creating new tag: $new_tag"
+
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+          # Create and push tag with error handling
+          if git tag -a $new_tag -m "Release $new_tag" && git push origin $new_tag; then
+            echo "Successfully created and pushed tag $new_tag"
+          else
+            echo "Failed to create or push tag"
+            exit 1
+          fi
+        env:
+          latest_tag: ${{ steps.get_latest_tag.outputs.latest_tag }}
