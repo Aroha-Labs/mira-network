@@ -1,12 +1,12 @@
 import { useEffect } from "react";
-import useApiLogs from "src/hooks/useApiLogs";
+import useAllApiLogs from "src/hooks/useAllApiLogs";
 import {
   apiLogsParamsState,
   DEFAULT_PARAMS,
 } from "src/state/apiLogsParamsState";
 
 const TotalTokens = () => {
-  const { totalTokens, error, isLoading } = useApiLogs();
+  const { totalTokens, error, isLoading } = useAllApiLogs();
 
   useEffect(() => {
     apiLogsParamsState.setState(() => DEFAULT_PARAMS);
