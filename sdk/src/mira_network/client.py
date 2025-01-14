@@ -57,8 +57,6 @@ class MiraClient:
             **kwargs,
         )
 
-        print("\n\n\n======>", request.model_dump(), "\n\n\n")
-
         response = await self._client.post(
             f"{self.base_url}/v1/chat/completions",
             headers=self._get_headers(),
