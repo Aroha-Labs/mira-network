@@ -7,7 +7,13 @@ import {
 } from "src/components/popover";
 import useApiTokens from "src/hooks/useApiTokens";
 
-const DeleteApiKey = ({ token }: { token: string }) => {
+const DeleteApiKey = ({
+  token,
+  onModalOpenChange,
+}: {
+  token: string;
+  onModalOpenChange: (open: boolean) => void;
+}) => {
   const { deleteMutation } = useApiTokens();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -15,15 +21,21 @@ const DeleteApiKey = ({ token }: { token: string }) => {
     if (token) {
       deleteMutation.mutate(token);
     }
+    handleOpenChange(false);
+  };
+
+  const handleOpenChange = (open: boolean) => {
+    setIsModalOpen(open);
+    onModalOpenChange(open);
   };
 
   return (
-    <Popover open={isModalOpen} onOpenChange={setIsModalOpen}>
+    <Popover open={isModalOpen} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
           variant="link"
           className="p-0"
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => handleOpenChange(true)}
         >
           Delete
         </Button>
@@ -34,7 +46,7 @@ const DeleteApiKey = ({ token }: { token: string }) => {
         </p>
 
         <div className="flex justify-center gap-4">
-          <Button variant="secondary" onClick={() => setIsModalOpen(false)}>
+          <Button variant="secondary" onClick={() => handleOpenChange(false)}>
             Cancel
           </Button>
           <Button

@@ -26,12 +26,22 @@ const validateDate = (dateString: string): Date | undefined => {
   return isValid(date) ? date : undefined;
 };
 
+interface DatePickerWithRangeProps {
+  dateFrom: string;
+  dateTo: string;
+  onChange: (date: DateRange) => void;
+  onOpenChange?: (open: boolean) => void;
+  className?: string;
+}
+
 const DatePickerWithRange = ({
   className,
   dateFrom,
   dateTo,
   onChange,
+  onOpenChange,
 }: DatePickerWithRangeProps) => {
+  const [open, setOpen] = React.useState(false);
   const initialFrom = validateDate(dateFrom);
   const initialTo = validateDate(dateTo);
 
@@ -60,9 +70,16 @@ const DatePickerWithRange = ({
     }
   };
 
+  const handleOpenChange = (open: boolean) => {
+    setOpen(open);
+    if (onOpenChange) {
+      onOpenChange(open);
+    }
+  };
+
   return (
     <div className={cn("grid gap-2", className)}>
-      <Popover>
+      <Popover open={open} onOpenChange={handleOpenChange}>
         <PopoverTrigger asChild>
           <Button
             id="date"
