@@ -28,7 +28,7 @@ export default function Login() {
       />
       <h1 className="text-2xl font-bold">Login to Mira</h1>
       <button
-        className="flex items-center bg-black text-white py-2 px-12 rounded-full shadow my-8 hover:bg-gray-800 active:bg-gray-900"
+        className="flex items-center bg-black text-white py-2 px-12 shadow my-8 hover:bg-gray-800 active:bg-gray-900"
         onClick={handleLogin}
       >
         <Image

@@ -38,14 +38,14 @@ const AddApiKey = () => {
       </PopoverTrigger>
       <PopoverContent className="min-w-80 p-0">
         <Card className="p-[32px]">
-          <div className="flex items-center justify-between">
-            <p className="text-md leading-[22px] tracking-[-0.013em] pl-0 pr-4 pt-4 pb-4">
+          <div className="flex items-center justify-between pb-[12px]">
+            <p className="text-md leading-[22px] tracking-[-0.013em] p-0 uppercase">
               &lt; Create new key
             </p>
             <div className="flex-grow border-t w-full border-dashed border-[#9CB9AE] mx-1 flex-1 h-[2px]" />
           </div>
 
-          <form onSubmit={handleSubmit} className="py-4">
+          <form onSubmit={handleSubmit}>
             <label
               htmlFor="description"
               className="block text-sm font-medium text-[#9C9B9B]"

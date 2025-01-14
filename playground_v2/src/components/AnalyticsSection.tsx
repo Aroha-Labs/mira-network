@@ -1,8 +1,8 @@
+import { Session } from "@supabase/supabase-js";
+import { useQuery } from "@tanstack/react-query";
+import axios from "axios";
 import Link from "next/link";
 import React from "react";
-import { Session } from "@supabase/supabase-js";
-import axios from "axios";
-import { useQuery } from "@tanstack/react-query";
 import { API_BASE_URL } from "src/config";
 
 interface AnalyticsSectionProps {
@@ -43,7 +43,7 @@ const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({ userSession }) => {
           <p className="text-sm text-gray-600">Inference calls</p>
           <div className="font-bold text-lg">
             {isLoading ? (
-              <div className="animate-pulse bg-gray-300 h-6 w-12 rounded"></div>
+              <div className="animate-pulse bg-gray-300 h-6 w-12"></div>
             ) : error ? (
               "Error"
             ) : isLoggedIn ? (
@@ -56,7 +56,7 @@ const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({ userSession }) => {
         {isLoggedIn ? (
           <Link
             href="/analytics"
-            className="flex items-center text-gray-700 rounded-full px-3 py-1 ml-4 border border-gray-300 text-sm hover:bg-gray-200 active:bg-gray-300 transition"
+            className="flex items-center text-gray-700 px-3 py-1 ml-4 border border-gray-300 text-sm hover:bg-gray-200 active:bg-gray-300 transition"
           >
             View analytics
             <svg
@@ -73,7 +73,7 @@ const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({ userSession }) => {
             </svg>
           </Link>
         ) : (
-          <div className="flex items-center text-gray-400 rounded-full px-3 py-1 ml-4 border border-gray-300 text-sm cursor-not-allowed">
+          <div className="flex items-center text-gray-400 px-3 py-1 ml-4 border border-gray-300 text-sm cursor-not-allowed">
             View analytics
             <svg
               xmlns="http://www.w3.org/2000/svg"

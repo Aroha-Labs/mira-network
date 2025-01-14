@@ -1,5 +1,6 @@
 import { useStore } from "@tanstack/react-store";
 import Link from "next/link";
+import { Button } from "src/components/button";
 import Card from "src/components/card";
 import { useLogout } from "src/hooks/useLogout";
 import { usePermissions } from "src/hooks/usePermissions";
@@ -30,15 +31,20 @@ const LayoutChildren = ({ children }: LayoutChildrenProps) => {
               Welcome to the Voyager Testnet. To get access and free credits,
               please join our Discord server and send us a message there.
             </div>
-            <div className="mt-8">
+            <div className="mt-8 flex gap-[6px]">
               <Link
                 href="https://discord.com/invite/mira-network"
                 target="_blank"
                 className="px-4 py-2 text-white bg-black"
-                onClick={() => logoutMutation.mutate()}
               >
                 Join Discord
               </Link>
+              <Button
+                onClick={() => logoutMutation.mutate()}
+                variant="secondary"
+              >
+                Logout
+              </Button>
             </div>
           </div>
         </Card>

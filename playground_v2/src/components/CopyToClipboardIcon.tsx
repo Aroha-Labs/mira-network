@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { ClipboardIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
+import { CheckCircleIcon, ClipboardIcon } from "@heroicons/react/24/outline";
 import c from "clsx";
+import { useState } from "react";
 
 import styles from "./CopyToClipboardIcon.module.scss";
 
@@ -30,7 +30,7 @@ export default function CopyToClipboardIcon({
         <span
           className={c(
             styles.tooltiptext,
-            "absolute bg-gray-700 text-white text-xs rounded py-1 px-2 bottom-full -left-1/2 transform transition-opacity duration-200 ease-in-out opacity-0 group-hover:opacity-100"
+            "absolute bg-gray-700 text-white text-xs py-1 px-2 bottom-full -left-1/2 transform transition-opacity duration-200 ease-in-out opacity-0 group-hover:opacity-100"
           )}
         >
           {copied ? "Copied!" : "Copy to clipboard"}

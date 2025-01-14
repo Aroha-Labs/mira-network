@@ -1,18 +1,18 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 import ChatBubble from "src/components/ChatBubble";
 // import SystemPromptInput from "src/components/SystemPromptInput";
 import {
   ChatBubbleBottomCenterIcon,
   StopIcon,
 } from "@heroicons/react/24/outline";
-import Loading, { Spinner } from "src/components/PageLoading";
+import { useQuery } from "@tanstack/react-query";
 import AutoGrowTextarea from "src/components/AutoGrowTextarea";
 import ConfirmModal from "src/components/ConfirmModal";
+import Loading, { Spinner } from "src/components/PageLoading";
 import { LLM_BASE_URL } from "src/config";
-import { useQuery } from "@tanstack/react-query";
 import { useSession } from "src/hooks/useSession";
 
 interface Message {
@@ -318,7 +318,7 @@ export default function Chat() {
       <div className="flex items-center justify-center h-screen">
         <Link
           href="/login"
-          className="bg-blue-500 text-white p-4 rounded-lg hover:bg-blue-600"
+          className="bg-blue-500 text-white p-4 hover:bg-blue-600"
         >
           Login
         </Link>
@@ -337,7 +337,7 @@ export default function Chat() {
         <select
           value={selectedModel}
           onChange={handleModelChange}
-          className="border border-gray-300 p-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="border border-gray-300 p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           {supportedModelsData.map((model: string) => (
             <option key={model} value={model}>
@@ -395,7 +395,7 @@ export default function Chat() {
       <div className="w-full p-4 bg-white border-t border-gray-300 sticky bottom-0">
         <div className="max-w-2xl mx-auto flex justify-center space-x-2">
           <AutoGrowTextarea
-            className="flex-1 border border-gray-300 p-2 rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            className="flex-1 border border-gray-300 p-2 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
             value={input}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
@@ -403,7 +403,7 @@ export default function Chat() {
             disabled={isSending}
           />
           <button
-            className="bg-blue-500 text-white p-2 rounded-r-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="bg-blue-500 text-white p-2 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
             onClick={() => sendMessage(input)}
             disabled={isSending}
           >
@@ -411,7 +411,7 @@ export default function Chat() {
           </button>
           {isSending && (
             <button
-              className="bg-red-500 text-white p-2 rounded-md hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
+              className="bg-red-500 text-white p-2 hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
               onClick={handleStop}
             >
               <StopIcon className="h-5 w-5" />

@@ -6,7 +6,7 @@ const Chart = () => {
   const { chartDataByDay } = useApiLogs();
 
   return (
-    <Card>
+    <Card contentClassName="max-h-[600px]">
       <ChartsLayout data={chartDataByDay ?? []} title="" />
     </Card>
   );
