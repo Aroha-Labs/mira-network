@@ -60,7 +60,11 @@ const useApiTokens = () => {
       if (!userSession?.access_token) {
         throw new Error("User session not found");
       }
-      return addApiKey(userSession.access_token, description);
+      let toAdd = description;
+      if (!toAdd || toAdd.length === 0) {
+        toAdd = `secret-key-${(query?.data?.length ?? 0) + 1}`;
+      }
+      return addApiKey(userSession.access_token, toAdd);
     },
     onSuccess: () => {
       // Refetch the 'apiKeys' query after a successful mutation
