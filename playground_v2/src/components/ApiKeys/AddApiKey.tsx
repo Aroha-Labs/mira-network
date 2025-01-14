@@ -9,7 +9,7 @@ import useApiTokens from "src/hooks/useApiTokens";
 import Card from "../card";
 
 const AddApiKey = () => {
-  const { addApiKey } = useApiTokens();
+  const { addApiKey, data } = useApiTokens();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [description, setDescription] = useState<"success" | "error" | "">("");
 
@@ -55,7 +55,7 @@ const AddApiKey = () => {
             <input
               id="description"
               type="text"
-              placeholder="secret-key-1"
+              placeholder={`secret-key-${(data?.length ?? 0) + 1}`}
               className="mt-1 block w-full px-3 py-2 border border-[#D7E2DE] shadow-sm focus:outline-none focus:border-[#308F6A] focus:border-blue-500 sm:text-sm"
             />
             {description === "error" && (
