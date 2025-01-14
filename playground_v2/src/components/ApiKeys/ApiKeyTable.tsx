@@ -14,13 +14,13 @@ const getTokenDisplay = (token: string) => {
 
 const ApiKeyTable = () => {
   const { data, isLoading, error } = useApiTokens();
-  const [isCopied, setIsCopied] = useState(false);
+  const [isCopied, setIsCopied] = useState("");
 
   const handleCopyToClipboard = async (token: string) => {
     try {
       await navigator.clipboard.writeText(token);
-      setIsCopied(true);
-      setTimeout(() => setIsCopied(false), 2000); // Reset copy state after 2 seconds
+      setIsCopied(token);
+      setTimeout(() => setIsCopied(""), 2000); // Reset copy state after 2 seconds
     } catch (error) {
       console.error("Failed to copy headers: ", error);
     }
@@ -46,7 +46,7 @@ const ApiKeyTable = () => {
     <Card className="min-w-full md:min-w-[720px]">
       <div className="flex gap-4 justify-between items-center pt-4 pl-4 sticky top-0 bg-white z-10">
         <p className="text-md leading-[22px] tracking-[-0.013em]">
-          YOU HAVE {data?.length} API KEYS
+          YOU HAVE {data?.length} API KEY{data?.length === 1 ? "" : "S"}
         </p>
         <AddApiKey />
       </div>
@@ -55,20 +55,16 @@ const ApiKeyTable = () => {
           {data?.map((key: ApiKey) => {
             return (
               <TableRow key={key?.token} className="cursor-pointer">
-                <TableCell>{key.description}</TableCell>
-                <TableCell className="opacity-40 min-w-[300px]">
+                <TableCell className="text-[13px]">{key.description}</TableCell>
+                <TableCell className="opacity-40 min-w-[300px] text-[13px]">
                   {getTokenDisplay(key.token)}
                 </TableCell>
                 <TableCell
                   onClick={() => handleCopyToClipboard(key.token)}
-                  className="cursor-pointer"
+                  className="cursor-pointer flex justify-end"
                 >
-                  <Button
-                    tooltip={isCopied ? "Copied!" : "Copy Token"}
-                    variant="link"
-                    className="p-0"
-                  >
-                    Copy
+                  <Button variant="link" className="p-0">
+                    {isCopied === key.token ? "Copied!" : "Copy"}
                   </Button>
                 </TableCell>
                 <TableCell>

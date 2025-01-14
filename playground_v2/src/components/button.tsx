@@ -95,7 +95,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         )}
         {tooltip && (
           <div
-            className={`absolute ${tooltipPositionClasses[tooltipDirection]} hidden group-hover:block`}
+            className={`absolute ${tooltipPositionClasses[tooltipDirection]} hidden group-hover:block z-500`}
           >
             <div className="bg-black text-white text-xs py-1 px-2 relative">
               {tooltip}
