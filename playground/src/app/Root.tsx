@@ -57,15 +57,12 @@ const Root = ({ children }: RootProps) => {
           {!isOnline && (
             <div className="relative px-4 py-3 text-center text-red-700 bg-red-100 border border-red-400 rounded">
               <span className="font-medium">No internet connection.</span>
-              <span className="block sm:inline">
-                {" "}
-                Please check your network.
-              </span>
+              <span className="block sm:inline"> Please check your network.</span>
             </div>
           )}
           <LayoutChildren>{children}</LayoutChildren>
           <a
-            href="https://console-feedback.arohalabs.tech"
+            href="https://feedback.mira.network"
             target="_blank"
             rel="noopener noreferrer"
             className="fixed px-3 py-1 text-sm text-white bg-blue-500 rounded-full shadow-lg bottom-4 right-4 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300"
