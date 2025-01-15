@@ -30,35 +30,30 @@ const Root = ({ children }: RootProps) => {
   }, []);
 
   return (
-    <html lang="en">
-      <body
-        className={c(
-          jetBrainsMono.className,
-          "antialiased text-base flex flex-col items-center justify-center flex-1 p-4 space-y-4 md:p-0 md:space-y-0 md:m-0 md:overflow-hidden"
+    <body
+      className={c(
+        jetBrainsMono.className,
+        "antialiased text-base flex flex-col items-center justify-center flex-1 p-4 space-y-4 md:p-0 md:space-y-0 md:m-0 md:overflow-hidden"
+      )}
+    >
+      <QueryClientProvider client={queryClient}>
+        {!isOnline && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 relative text-center">
+            <span className="font-medium">No internet connection.</span>
+            <span className="block sm:inline"> Please check your network.</span>
+          </div>
         )}
+        <LayoutChildren>{children}</LayoutChildren>
+      </QueryClientProvider>
+      <Link
+        href="https://feedback.mira.network/"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="fixed px-3 py-1 text-sm text-white bg-blue-500 shadow-lg bottom-4 right-4 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300"
       >
-        <QueryClientProvider client={queryClient}>
-          {!isOnline && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 relative text-center">
-              <span className="font-medium">No internet connection.</span>
-              <span className="block sm:inline">
-                {" "}
-                Please check your network.
-              </span>
-            </div>
-          )}
-          <LayoutChildren>{children}</LayoutChildren>
-        </QueryClientProvider>
-        <Link
-          href="https://feedback.mira.network/"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="fixed px-3 py-1 text-sm text-white bg-blue-500 shadow-lg bottom-4 right-4 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300"
-        >
-          Feedback
-        </Link>
-      </body>
-    </html>
+        Feedback
+      </Link>
+    </body>
   );
 };
 
