@@ -5,6 +5,8 @@ import {
   XMarkIcon,
   UserCircleIcon,
   Cog6ToothIcon,
+  CommandLineIcon,
+  ChatBubbleBottomCenterTextIcon,
 } from "@heroicons/react/24/outline";
 import { useSession } from "src/hooks/useSession";
 import { useLogout } from "src/hooks/useLogout";
@@ -95,7 +97,6 @@ const UserProfile = () => {
 };
 
 export const Header = () => {
-  const { data: session } = useSession();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
@@ -105,85 +106,65 @@ export const Header = () => {
           <div className="flex-1 flex items-center">
             <Link href="/" className="flex items-center gap-2">
               <img src="/img/logo.svg" alt="Mira" className="h-8 w-auto" />
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
                 <h3 className="text-lg font-medium">console</h3>
-                <sup
-                  className="text-xs font-light text-[#CBD5E1]"
-                  style={{ marginLeft: "-8px" }}
-                >
+                <div className="text-xs font-medium text-blue-600 border border-blue-200 bg-blue-50 px-1 rounded ml-1">
                   beta
-                </sup>
+                </div>
               </div>
             </Link>
           </div>
 
-          <nav className="hidden md:flex items-center gap-6">
-            {session ? (
-              <>
-                <Link
-                  href="/chat"
-                  className="text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 px-3 py-2 rounded-md transition-colors"
-                >
-                  Console
-                </Link>
-                <Link
-                  href="/terminal"
-                  className="text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 px-3 py-2 rounded-md transition-colors"
-                >
-                  Terminal
-                </Link>
-              </>
-            ) : (
-              <>
-                <Link
-                  href="/pricing"
-                  className="text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 px-3 py-2 rounded-md transition-colors"
-                >
-                  Pricing
-                </Link>
-                <Link
-                  href="/docs"
-                  className="text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 px-3 py-2 rounded-md transition-colors"
-                >
-                  Documentation
-                </Link>
-              </>
-            )}
-          </nav>
-
-          <div className="ml-4 flex items-center gap-2">
-            <UserProfile />
-            {session && (
-              <button
-                className="md:hidden p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100"
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              >
-                {isMobileMenuOpen ? (
-                  <XMarkIcon className="h-6 w-6" />
-                ) : (
-                  <Bars3Icon className="h-6 w-6" />
-                )}
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {isMobileMenuOpen && session && (
-        <div className="md:hidden border-t border-gray-200">
-          <div className="px-2 pt-2 pb-3 space-y-1">
+          <nav className="hidden md:flex items-center gap-2">
             <Link
               href="/chat"
-              className="block text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 px-3 py-2 rounded-md"
-              onClick={() => setIsMobileMenuOpen(false)}
+              className="text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 px-4 py-2 rounded-md transition-colors inline-flex items-center gap-2"
             >
+              <ChatBubbleBottomCenterTextIcon className="h-5 w-5" />
               Console
             </Link>
             <Link
               href="/terminal"
-              className="block text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 px-3 py-2 rounded-md"
+              className="text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 px-4 py-2 rounded-md transition-colors inline-flex items-center gap-2"
+            >
+              <CommandLineIcon className="h-5 w-5" />
+              Terminal
+            </Link>
+          </nav>
+
+          <div className="ml-4 flex items-center gap-2">
+            <UserProfile />
+            <button
+              className="md:hidden p-2 rounded-md text-gray-700 hover:text-gray-900 hover:bg-gray-50"
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            >
+              {isMobileMenuOpen ? (
+                <XMarkIcon className="h-5 w-5" />
+              ) : (
+                <Bars3Icon className="h-5 w-5" />
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {isMobileMenuOpen && (
+        <div className="md:hidden border-t border-gray-200">
+          <div className="px-2 pt-2 pb-3 space-y-1">
+            <Link
+              href="/chat"
+              className="block text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 px-3 py-2 rounded-md inline-flex items-center gap-2"
               onClick={() => setIsMobileMenuOpen(false)}
             >
+              <ChatBubbleBottomCenterTextIcon className="h-5 w-5" />
+              Console
+            </Link>
+            <Link
+              href="/terminal"
+              className="block text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 px-3 py-2 rounded-md inline-flex items-center gap-2"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              <CommandLineIcon className="h-5 w-5" />
               Terminal
             </Link>
           </div>
