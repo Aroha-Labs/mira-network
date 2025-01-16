@@ -32,15 +32,13 @@ const UserCard = ({ user }: { user: User }) => {
         <div className="sm:flex sm:items-start sm:justify-between">
           <div className="flex items-start space-x-4">
             <ProfileImage
-              src={user.meta.user_metadata.avatar_url}
-              alt={user.meta.user_metadata.name}
+              src={user.avatar_url}
+              alt={user.full_name}
               className="w-12 h-12 rounded-full border border-gray-200"
             />
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">
-                {user.meta.user_metadata.name}
-              </h3>
-              <p className="text-sm text-gray-500">{user.meta.user_metadata.email}</p>
+              <h3 className="text-lg font-semibold text-gray-900">{user.full_name}</h3>
+              <p className="text-sm text-gray-500">{user.email}</p>
               <div className="mt-1 flex items-center space-x-2">
                 <span className="text-xs text-gray-500">{user.id}</span>
                 <CopyToClipboardIcon text={user.id} />
@@ -126,7 +124,7 @@ const UserCard = ({ user }: { user: User }) => {
       {isAddCreditsModalOpen && (
         <AddCreditsModal
           userId={user.user_id}
-          userName={user.meta.user_metadata.name}
+          userName={user.full_name}
           onClose={() => setIsAddCreditsModalOpen(false)}
         />
       )}
@@ -136,7 +134,7 @@ const UserCard = ({ user }: { user: User }) => {
       {selectedUserId && (
         <MetricsModal
           userId={selectedUserId}
-          title={`Metrics for ${user.meta.user_metadata.name}`}
+          title={`Metrics for ${user.full_name}`}
           onClose={() => setSelectedUserId(null)}
         />
       )}
