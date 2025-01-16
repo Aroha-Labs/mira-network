@@ -9,6 +9,7 @@ import ConfirmModal from "./ConfirmModal";
 import ChatBubble from "./ChatBubble";
 import { Spinner } from "./PageLoading";
 import api from "src/lib/axios";
+import { API_BASE_URL } from "src/config";
 
 interface FlowChatProps {
   flow: {
@@ -84,7 +85,6 @@ const fetchSupportedModels = async () => {
 //     reader.releaseLock();
 //   }
 // };
-
 const fetchChatCompletion = async (
   messages: Message[],
   onMessage: (chunk: string) => void,
@@ -94,7 +94,7 @@ const fetchChatCompletion = async (
   flowId: number
 ) => {
   const response = await api.post(
-    `/v1/flow/${flowId}/chat/completions`,
+    `${API_BASE_URL}/v1/flow/${flowId}/chat/completions`,
     {
       model,
       messages,
@@ -108,45 +108,49 @@ const fetchChatCompletion = async (
   );
 
   if (response.status !== 200) {
-    throw new Error("Failed to send message");
-  }
-
-  const reader = response.data.getReader();
-  const decoder = new TextDecoder();
-
-  try {
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-
-      const chunk = decoder.decode(value, { stream: true });
-      const lines = chunk.split("\n");
-
-      for (const line of lines) {
-        if (line.startsWith("data: ")) {
-          const data = line.slice(6);
-          if (data === "[DONE]") continue;
-
-          try {
-            const parsed = JSON.parse(data);
-            if (parsed.choices?.[0]?.delta?.content) {
-              onMessage(parsed.choices[0].delta.content);
-            }
-          } catch (error) {
-            console.error("error:", error);
-            console.warn("Failed to parse chunk:", data);
-          }
-        }
-      }
-    }
-  } catch (error) {
-    if ((error as Error).name === "AbortError") {
+    try {
+      const data = response.data;
+      throw new Error(data.detail || data.error.message || "Failed to send message");
+    } catch (error) {
       throw error;
     }
-    console.error("Error processing stream:", error);
-    throw error;
-  } finally {
-    reader.releaseLock();
+  }
+
+  const reader = response.data.body?.getReader();
+  const decoder = new TextDecoder();
+  let done = false;
+
+  while (!done) {
+    const { value, done: doneReading } = await reader!.read()!;
+    done = doneReading;
+
+    if (doneReading) continue;
+
+    const chunks = decoder
+      .decode(value, { stream: true })
+      // split by newline and `data: `
+      .split("\n")
+      .flatMap((c) => c.split("data: "))
+      .filter((c) => {
+        if (!c) return false;
+        const wordsToIgnore = ["[DONE]", "[ERROR]", "OPENROUTER PROCESSING"];
+        return !wordsToIgnore.some((w) => c.includes(w));
+      });
+
+    for (const chunk of chunks) {
+      let data;
+      try {
+        data = JSON.parse(chunk);
+
+        if (data.error) {
+          throw new Error(data.error.message);
+        }
+        const choice = data.choices[0];
+        onMessage(choice.delta ? choice.delta.content : choice.message.content);
+      } catch (error) {
+        console.error("Failed to parse response:", error);
+      }
+    }
   }
 };
 
@@ -283,9 +287,7 @@ export default function FlowChat({ flow, onClose }: FlowChatProps) {
         console.error("Failed to send message:", error);
         setMessages((prev) => prev.slice(0, -2));
         setUserInput(messageToSend);
-        setErrorMessage(
-          err.message || "Failed to send message. Please try again."
-        );
+        setErrorMessage(err.message || "Failed to send message. Please try again.");
       }
     } finally {
       setIsLoading(false);
@@ -325,10 +327,7 @@ export default function FlowChat({ flow, onClose }: FlowChatProps) {
               ))}
             </select>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700"
-          >
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
             Close
           </button>
         </div>
@@ -337,30 +336,22 @@ export default function FlowChat({ flow, onClose }: FlowChatProps) {
           {/* Left Panel */}
           <div className="w-1/3 p-4 overflow-y-auto border-r border-gray-200">
             <div className="mb-6">
-              <h3 className="mb-2 text-sm font-medium text-gray-700">
-                System Prompt
-              </h3>
+              <h3 className="mb-2 text-sm font-medium text-gray-700">System Prompt</h3>
               <div className="p-3 rounded-md bg-gray-50">
                 <p className="text-sm text-gray-600">{flow.system_prompt}</p>
               </div>
             </div>
 
             <div className="mb-6">
-              <h3 className="mb-2 text-sm font-medium text-gray-700">
-                Variables
-              </h3>
+              <h3 className="mb-2 text-sm font-medium text-gray-700">Variables</h3>
               <div className="space-y-3">
                 {flow.variables.map((variable) => (
                   <div key={variable}>
-                    <label className="block mb-1 text-sm text-gray-600">
-                      {variable}
-                    </label>
+                    <label className="block mb-1 text-sm text-gray-600">{variable}</label>
                     <input
                       type="text"
                       value={variables[variable] || ""}
-                      onChange={(e) =>
-                        handleVariableChange(variable, e.target.value)
-                      }
+                      onChange={(e) => handleVariableChange(variable, e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder={`Enter ${variable}`}
                     />
