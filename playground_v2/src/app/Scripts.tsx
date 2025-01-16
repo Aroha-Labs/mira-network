@@ -1,3 +1,5 @@
+import { GoogleAnalytics } from "@next/third-parties/google";
+
 const Scripts = () => {
   return (
     <>
@@ -3649,21 +3651,7 @@ const Scripts = () => {
         }}
       />
 
-      <script
-        async
-        src="https://www.googletagmanager.com/gtag/js?id=G-CVXSR30QYE"
-      ></script>
-
-      <script
-        dangerouslySetInnerHTML={{
-          __html: `
-            window.dataLayer = window.dataLayer || [];
-            function gtag() { dataLayer.push(arguments); }
-            gtag('js', new Date());
-            gtag('config', 'G-CVXSR30QYE');
-          `,
-        }}
-      />
+      <GoogleAnalytics gaId="G-CVXSR30QYE" />
     </>
   );
 };
