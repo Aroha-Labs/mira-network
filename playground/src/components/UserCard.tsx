@@ -1,9 +1,6 @@
 import { Fragment, useState } from "react";
 import { User } from "src/types/user";
-import api from "src/lib/axios";
 import CopyToClipboardIcon from "src/components/CopyToClipboardIcon";
-import { useSession } from "src/hooks/useSession";
-import { useQuery } from "@tanstack/react-query";
 import ProfileImage from "./ProfileImage";
 import { Menu, Transition } from "@headlessui/react";
 import { ChevronDownIcon as MenuIcon, ChartBarIcon } from "@heroicons/react/24/outline";
@@ -12,22 +9,10 @@ import { USDollar } from "src/utils/currency";
 import MetricsModal from "./MetricsModal";
 import AddCreditsModal from "src/components/AddCreditsModal";
 
-const fetchUserCredits = async (userId: string) => {
-  const response = await api.get(`/admin/user-credits/${userId}`);
-  return response.data.credits;
-};
-
 const UserCard = ({ user }: { user: User }) => {
-  const { data: userSession } = useSession();
   const [isAddCreditsModalOpen, setIsAddCreditsModalOpen] = useState(false);
   const [isRolesModalOpen, setIsRolesModalOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
-
-  const { data: userCredits, isLoading: isCreditsLoading } = useQuery({
-    queryKey: ["userCredits", user.id],
-    queryFn: () => fetchUserCredits(user.id),
-    enabled: !!userSession?.access_token,
-  });
 
   const handleManageRoles = () => {
     setIsRolesModalOpen(true);
@@ -118,13 +103,9 @@ const UserCard = ({ user }: { user: User }) => {
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="bg-gray-50 px-4 py-2 rounded-md">
             <p className="text-xs font-medium text-gray-500">Credits</p>
-            {isCreditsLoading ? (
-              <div className="h-5 w-20 bg-gray-200 animate-pulse rounded mt-1"></div>
-            ) : (
-              <p className="mt-1 font-semibold text-gray-900">
-                {USDollar.format(userCredits)}
-              </p>
-            )}
+            <p className="mt-1 font-semibold text-gray-900">
+              {USDollar.format(user.credits)}
+            </p>
           </div>
           <div className="bg-gray-50 px-4 py-2 rounded-md">
             <p className="text-xs font-medium text-gray-500">Roles</p>
@@ -144,13 +125,13 @@ const UserCard = ({ user }: { user: User }) => {
       {/* Modals */}
       {isAddCreditsModalOpen && (
         <AddCreditsModal
-          userId={user.id}
+          userId={user.user_id}
           userName={user.meta.user_metadata.name}
           onClose={() => setIsAddCreditsModalOpen(false)}
         />
       )}
       {isRolesModalOpen && (
-        <ManageUserRoles userId={user.id} onClose={() => setIsRolesModalOpen(false)} />
+        <ManageUserRoles user={user} onClose={() => setIsRolesModalOpen(false)} />
       )}
       {selectedUserId && (
         <MetricsModal

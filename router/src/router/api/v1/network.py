@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, Depends, Response, HTTPException
 from fastapi.responses import StreamingResponse
@@ -9,7 +10,7 @@ from src.router.models.logs import ApiLogs
 from src.router.db.session import get_session
 from src.router.core.security import verify_user
 from src.router.utils.network import get_random_machines, PROXY_PORT
-from src.router.models.user import UserCredits, UserCreditsHistory
+from src.router.models.user import User as UserModel, UserCreditsHistory
 from src.router.schemas.ai import AiRequest, VerifyRequest
 import requests
 import time
@@ -97,16 +98,12 @@ async def generate(
 ) -> Response:
     timeStart = time.time()
 
-    user_credits = db.exec(
-        select(UserCredits).where(UserCredits.user_id == user.id)
-    ).first()
+    user_data = db.exec(select(UserModel).where(UserModel.user_id == user.id)).first()
 
-    if user_credits is None:
-        user_credits = UserCredits(user_id=user.id, credits=0)
-        db.add(user_credits)
-        db.commit()
+    if not user_data:
+        raise HTTPException(status_code=404, detail="User not found")
 
-    if user_credits.credits <= 0:
+    if user_data.credits <= 0:
         raise HTTPException(status_code=402, detail="Insufficient credits")
 
     supported_models = get_supported_models(db)
@@ -196,24 +193,25 @@ async def generate(
         db.add(api_log)
 
         # Calculate cost and reduce user credits
+        prompt_tokens = usage.get("prompt_tokens", 0)
+        completion_tokens = usage.get("completion_tokens", 0)
         total_tokens = usage.get("total_tokens", 0)
-        cost = total_tokens * 0.0003
 
-        user_credits = db.exec(
-            select(UserCredits).where(UserCredits.user_id == user.id)
-        ).first()
+        prompt_tokens_cost = prompt_tokens * model_p.prompt_token
+        completion_tokens_cost = completion_tokens * model_p.completion_token
 
-        if user_credits:
-            user_credits.credits -= cost
-            db.add(user_credits)
+        cost = prompt_tokens_cost + completion_tokens_cost
 
-            # Update user credit history
-            user_credits_history = UserCreditsHistory(
-                user_id=user.id,
-                amount=-cost,
-                description=f"Used {total_tokens} tokens",
-            )
-            db.add(user_credits_history)
+        user_data.credits -= cost
+        user_data.updated_at = datetime.utcnow()
+
+        # Update user credit history
+        user_credits_history = UserCreditsHistory(
+            user_id=user.id,
+            amount=-cost,
+            description=f"Used {total_tokens} tokens. Prompt tokens: {prompt_tokens}, Completion tokens: {completion_tokens}",
+        )
+        db.add(user_credits_history)
 
         db.commit()
 

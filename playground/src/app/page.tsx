@@ -7,30 +7,21 @@ import AnalyticsSection from "src/components/AnalyticsSection";
 import Loading from "src/components/PageLoading";
 import { useSession } from "src/hooks/useSession";
 import { useQuery } from "@tanstack/react-query";
-import axios from "axios";
-import { API_BASE_URL } from "src/config";
+import api from "src/lib/axios";
+import { User } from "src/types/user";
 import { USDollar } from "src/utils/currency";
 
-const fetchUserCredits = async (token: string) => {
-  const response = await axios.get(`${API_BASE_URL}/user-credits`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
+const fetchUserDetails = async () => {
+  const response = await api.get<User>("/me");
   return response.data;
 };
 
 export default function Home() {
   const { data: userSession, error, isLoading } = useSession();
 
-  const { data: userCredits, isLoading: isCreditsLoading } = useQuery({
-    queryKey: ["userCredits"],
-    queryFn: () => {
-      if (!userSession?.access_token) {
-        throw new Error("User session not found");
-      }
-      return fetchUserCredits(userSession.access_token);
-    },
+  const { data: userData, isLoading: isUserLoading } = useQuery({
+    queryKey: ["userData"],
+    queryFn: fetchUserDetails,
     enabled: !!userSession?.access_token,
   });
 
@@ -69,14 +60,14 @@ export default function Home() {
           <div>
             <p className="text-sm text-gray-600">Credits remaining</p>
             <div className="font-bold text-lg">
-              {isCreditsLoading ? (
+              {isUserLoading ? (
                 <div className="animate-pulse bg-gray-300 h-6 w-12 rounded mt-1"></div>
               ) : userSession?.user ? (
                 <Link
                   href="/credit-history"
                   className="text-blue-600 underline decoration-dotted hover:decoration-solid"
                 >
-                  {USDollar.format(userCredits.credits)}
+                  {USDollar.format(userData?.credits ?? 0)}
                 </Link>
               ) : (
                 "$---"

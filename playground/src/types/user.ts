@@ -1,21 +1,19 @@
 export interface User {
   id: string;
-  email: string;
-  avatar_url: string;
   user_id: string;
+  email: string;
+  full_name: string;
+  avatar_url?: string;
+  provider: string;
   meta: {
-    app_metadata: {
-      provider: string;
-      providers: string[];
-    };
     user_metadata: {
-      iss: string;
-      sub: string;
+      avatar_url: string;
       name: string;
       email: string;
+      iss: string;
+      sub: string;
       picture: string;
       full_name: string;
-      avatar_url: string;
       provider_id: string;
       custom_claims: {
         hd: string;
@@ -23,13 +21,16 @@ export interface User {
       email_verified: boolean;
       phone_verified: boolean;
     };
+    app_metadata: {
+      provider: string;
+      providers: string[];
+    };
   };
-  last_login_at: string;
-  updated_at: string;
-  full_name: string;
-  provider: string;
-  custom_claim: {
+  custom_claim?: {
     roles: string[];
-  } | null;
+  };
+  credits: number;
+  last_login_at: string;
   created_at: string;
+  updated_at: string;
 }

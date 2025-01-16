@@ -3,7 +3,7 @@ name: Prod Deploy to Cloudflare pages
 on:
   push:
     branches:
-      - mainv2
+      - main
     paths:
       - "playground/**"
       - ".github/workflows/playground-prod-deployment.yaml"
