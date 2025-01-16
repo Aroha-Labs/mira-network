@@ -52,7 +52,9 @@ jobs:
                 .map(file => join(subDir, file));
             });
 
-          console.log(sourcemapFiles);
+          console.log('sourcemapDir=', sourcemapDir);
+          console.log('sourcemapFiles=', sourcemapFiles);
+          console.log('NEW_RELIC_API_KEY=', process.env.NEW_RELIC_API_KEY);
 
           sourcemapFiles.forEach(sourcemapPath => {
             const javascriptUrl = \`https://console.mira.network\${sourcemapPath.replace('out', '').replace('.map', '')}\`;
