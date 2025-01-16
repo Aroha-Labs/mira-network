@@ -103,54 +103,47 @@ const fetchChatCompletion = async (
     },
     {
       signal: controller.signal,
-      responseType: "stream",
+      responseType: "text",
+      onDownloadProgress: (progressEvent) => {
+        const text = progressEvent.event.target.responseText;
+        const newText = text.substring(progressEvent.loaded);
+
+        // Split on data: and process each SSE message
+        const lines = newText.split("data: ");
+        for (const line of lines) {
+          if (!line.trim()) continue;
+
+          // Skip known non-content messages
+          if (
+            line.includes("[DONE]") ||
+            line.includes("OPENROUTER PROCESSING") ||
+            line.includes('"finish_reason":"stop"')
+          ) {
+            continue;
+          }
+
+          try {
+            const data = JSON.parse(line);
+            // Extract content from the delta or message
+            if (data.choices?.[0]?.delta?.content) {
+              onMessage(data.choices[0].delta.content);
+            } else if (data.choices?.[0]?.message?.content) {
+              onMessage(data.choices[0].message.content);
+            }
+          } catch (error) {
+            // Only log if it's not an empty or partial chunk
+            if (line.trim() && !line.includes('"content":""')) {
+              console.debug("Failed to parse chunk:", line);
+            }
+          }
+        }
+      },
     }
   );
 
   if (response.status !== 200) {
-    try {
-      const data = response.data;
-      throw new Error(data.detail || data.error.message || "Failed to send message");
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  const reader = response.data.body?.getReader();
-  const decoder = new TextDecoder();
-  let done = false;
-
-  while (!done) {
-    const { value, done: doneReading } = await reader!.read()!;
-    done = doneReading;
-
-    if (doneReading) continue;
-
-    const chunks = decoder
-      .decode(value, { stream: true })
-      // split by newline and `data: `
-      .split("\n")
-      .flatMap((c) => c.split("data: "))
-      .filter((c) => {
-        if (!c) return false;
-        const wordsToIgnore = ["[DONE]", "[ERROR]", "OPENROUTER PROCESSING"];
-        return !wordsToIgnore.some((w) => c.includes(w));
-      });
-
-    for (const chunk of chunks) {
-      let data;
-      try {
-        data = JSON.parse(chunk);
-
-        if (data.error) {
-          throw new Error(data.error.message);
-        }
-        const choice = data.choices[0];
-        onMessage(choice.delta ? choice.delta.content : choice.message.content);
-      } catch (error) {
-        console.error("Failed to parse response:", error);
-      }
-    }
+    const data = response.data;
+    throw new Error(data.detail || data.error?.message || "Failed to send message");
   }
 };
 
