@@ -35,7 +35,7 @@ jobs:
 
       - name: Upload Sourcemaps to New Relic
         env:
-          NEW_RELIC_LICENSE_KEY: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
+          NEW_RELIC_API_KEY: ${{ secrets.NEW_RELIC_API_KEY }}
         run: |
           node -e "
           const { readdirSync } = require('fs');
@@ -52,6 +52,8 @@ jobs:
                 .map(file => join(subDir, file));
             });
 
+          console.log(sourcemapFiles);
+
           sourcemapFiles.forEach(sourcemapPath => {
             const javascriptUrl = \`https://console.mira.network\${sourcemapPath.replace('out', '').replace('.map', '')}\`;
 
@@ -59,7 +61,7 @@ jobs:
               sourcemapPath,
               javascriptUrl,
               applicationId: 1120363591,
-              apiKey: process.env.NEW_RELIC_LICENSE_KEY,
+              apiKey: process.env.NEW_RELIC_API_KEY,
             }, function (err) {
               console.log(err || \`Source map upload done for \${sourcemapPath}\`);
             });
@@ -68,8 +70,8 @@ jobs:
 
       - name: Create New Relic Deployment Marker
         run: |
-          curl -X POST "https://api.newrelic.com/v2/applications/${{ secrets.NEW_RELIC_APP_ID }}/deployments.json" \
-          -H "X-Api-Key:${{ secrets.NEW_RELIC_LICENSE_KEY }}" \
+          curl -X POST "https://api.newrelic.com/v2/applications/1120363591/deployments.json" \
+          -H "X-Api-Key:${{ secrets.NEW_RELIC_API_KEY }}" \
           -H "Content-Type: application/json" \
           -d '{
             "deployment": {
