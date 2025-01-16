@@ -276,7 +276,17 @@ def update_users_from_supabase(
     user: User = Depends(verify_admin),
     db: Session = Depends(get_session),
 ):
-    users = supabase.auth.admin.list_users()
+    # get all users from supabase and update the users table
+    users = []
+    page = 1
+    while True:
+        page_users = supabase.auth.admin.list_users(page=page, per_page=100)
+        users.extend(page_users)
+        if len(page_users) < 100:
+            break
+        page += 1
+
+    # users = supabase.auth.admin.list_users(page=1, per_page=100)
 
     for supabase_user in users:
         user_data = {
