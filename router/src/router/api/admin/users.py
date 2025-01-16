@@ -5,7 +5,7 @@ from sqlalchemy import func
 from sqlmodel import Session, select
 from src.router.schemas.credits import AddCreditRequest
 from src.router.core.security import supabase, verify_admin
-from src.router.models.user import UserCreditsHistory, UserCredits
+from src.router.models.user import UserCreditsHistory
 from src.router.db.session import get_session
 from enum import Enum
 from gotrue.types import User
@@ -230,12 +230,10 @@ def get_user_credits_by_id(
     db: Session = Depends(get_session),
     user=Depends(verify_admin),
 ):
-    user_credits = db.exec(
-        select(UserCredits).where(UserCredits.user_id == user_id)
-    ).first()
-    if not user_credits:
+    user_data = db.exec(select(UserModel).where(UserModel.user_id == user_id)).first()
+    if not user_data:
         return {"credits": 0}
-    return {"credits": user_credits.credits}
+    return {"credits": user_data.credits}
 
 
 @router.post("/add-credit")
@@ -244,15 +242,15 @@ def add_credit(
     db: Session = Depends(get_session),
     user=Depends(verify_admin),
 ):
-    user_credits = db.exec(
-        select(UserCredits).where(UserCredits.user_id == request.user_id)
+    user_data = db.exec(
+        select(UserModel).where(UserModel.user_id == request.user_id)
     ).first()
 
-    if user_credits:
-        user_credits.credits += request.amount
-    else:
-        user_credits = UserCredits(user_id=request.user_id, credits=request.amount)
-        db.add(user_credits)
+    if not user_data:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user_data.credits += request.amount
+    user_data.updated_at = datetime.utcnow()
 
     credit_history = UserCreditsHistory(
         user_id=request.user_id,
@@ -262,7 +260,7 @@ def add_credit(
     db.add(credit_history)
     db.commit()
 
-    return {"credits": user_credits.credits}
+    return {"credits": user_data.credits}
 
 
 @router.post(
