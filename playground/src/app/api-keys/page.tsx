@@ -121,7 +121,9 @@ const ApiKeyPage = () => {
   };
 
   const formatDate = (dateString: string) => {
-    const date = parseISO(dateString);
+    // Append 'Z' to indicate UTC if the string doesn't include timezone info
+    const utcString = dateString.endsWith("Z") ? dateString : `${dateString}Z`;
+    const date = parseISO(utcString);
     const relativeTime = formatDistanceToNow(date, { addSuffix: true });
     const fullDate = format(date, "PPp");
     return { relativeTime, fullDate };
@@ -184,9 +186,7 @@ const ApiKeyPage = () => {
               There was a problem loading your API keys. Please try again later.
             </p>
             <button
-              onClick={() =>
-                queryClient.invalidateQueries({ queryKey: ["apiKeys"] })
-              }
+              onClick={() => queryClient.invalidateQueries({ queryKey: ["apiKeys"] })}
               className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
             >
               Retry
@@ -205,9 +205,7 @@ const ApiKeyPage = () => {
           <div className="p-6">
             <div className="flex flex-wrap sm:flex-nowrap justify-between items-center gap-4">
               <div>
-                <h1 className="text-xl font-semibold text-gray-900">
-                  API Keys
-                </h1>
+                <h1 className="text-xl font-semibold text-gray-900">API Keys</h1>
                 <p className="mt-1 text-sm text-gray-500">
                   Manage your API keys for programmatic access
                 </p>
@@ -254,9 +252,7 @@ const ApiKeyPage = () => {
           {data?.length === 0 ? (
             <div className="p-6 text-center">
               <KeyIcon className="mx-auto h-10 w-10 text-gray-400" />
-              <h3 className="mt-2 text-sm font-medium text-gray-900">
-                No API keys
-              </h3>
+              <h3 className="mt-2 text-sm font-medium text-gray-900">No API keys</h3>
               <p className="mt-1 text-sm text-gray-500">
                 Get started by creating a new API key.
               </p>
@@ -264,9 +260,7 @@ const ApiKeyPage = () => {
           ) : (
             <div className="divide-y divide-gray-200">
               {data?.map((apiKey) => {
-                const { relativeTime, fullDate } = formatDate(
-                  apiKey.created_at
-                );
+                const { relativeTime, fullDate } = formatDate(apiKey.created_at);
                 return (
                   <div key={apiKey.token} className="p-6">
                     <div className="sm:flex sm:justify-between sm:items-start">
@@ -322,9 +316,7 @@ const ApiKeyPage = () => {
                                 <Menu.Item>
                                   {({ active }) => (
                                     <button
-                                      onClick={() =>
-                                        handleDeleteApiKey(apiKey.token)
-                                      }
+                                      onClick={() => handleDeleteApiKey(apiKey.token)}
                                       className={`${
                                         active ? "bg-red-50" : ""
                                       } group flex items-center w-full px-4 py-2 text-sm text-red-600 hover:text-red-700`}
@@ -444,8 +436,8 @@ const ApiKeyPage = () => {
           >
             <div className="space-y-4">
               <p className="text-sm text-gray-500">
-                This action cannot be undone. The API key will be permanently
-                deleted and any applications using it will stop working.
+                This action cannot be undone. The API key will be permanently deleted and
+                any applications using it will stop working.
               </p>
               {deleteMutation.isError && (
                 <div className="text-sm text-red-600 bg-red-50 p-3 rounded">
