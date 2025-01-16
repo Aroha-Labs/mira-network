@@ -1,4 +1,5 @@
 from typing import Any, List, Dict
+import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import func
@@ -121,7 +122,9 @@ def process_user_claims(claims: dict) -> dict:
         "avatar_url": metadata.get("avatar_url"),
         "provider": app_metadata.get("provider", ""),
         "meta": {"user_metadata": metadata, "app_metadata": app_metadata},
-        "custom_claim": {},  # Initialize with empty dict
+        "custom_claim": {
+            "roles": [],
+        },  # Initialize with empty dict
         "credits": 0,  # Initialize with default value
         # "last_login_at": datetime.now(timezone.utc),
     }
@@ -149,15 +152,16 @@ async def add_or_update_user_claim(
         user.updated_at = datetime.now(timezone.utc)
         user.last_login_at = datetime.now(timezone.utc)
     else:
-        # Create new user with validated data
+        # Create new user with all required fields
         user = UserModel(
+            id=uuid.uuid4(),
             user_id=req.user_id,
-            full_name=user_data["full_name"],
-            email=user_data["email"],
-            avatar_url=user_data["avatar_url"],
-            provider=user_data["provider"],
-            meta=user_data["meta"],
-            credits=user_data["credits"],
+            full_name=user_data.get("full_name", ""),
+            email=user_data.get("email", ""),
+            avatar_url=user_data.get("avatar_url", ""),
+            provider=user_data.get("provider", ""),
+            meta=user_data.get("meta", {}),
+            credits=user_data.get("credits", 0),
             last_login_at=datetime.now(timezone.utc),
             created_at=datetime.now(timezone.utc),
             updated_at=datetime.now(timezone.utc),
