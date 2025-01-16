@@ -130,8 +130,13 @@ const fetchChatCompletion = async (
             } else if (data.choices?.[0]?.message?.content) {
               onMessage(data.choices[0].message.content);
             }
-          } catch (error) {
+          } catch (e) {
+            const error = e as Error;
             // Only log if it's not an empty or partial chunk
+
+            // TODO: report to new relic
+            console.error("Error:", error);
+
             if (line.trim() && !line.includes('"content":""')) {
               console.debug("Failed to parse chunk:", line);
             }
