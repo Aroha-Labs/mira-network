@@ -29,7 +29,56 @@ jobs:
           NEXT_PUBLIC_API_BASE_URL: https://mira-network.alts.dev
           NEXT_PUBLIC_LLM_BASE_URL: https://mira-network.alts.dev/v1
           NEXT_PUBLIC_URL: https://console.mira.network
+          NEW_RELIC_APP_NAME: mira-console
+          NEW_RELIC_LICENSE_KEY: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
         run: yarn build
+
+      - name: Upload Sourcemaps to New Relic
+        env:
+          NEW_RELIC_LICENSE_KEY: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
+        run: |
+          node -e "
+          const { readdirSync } = require('fs');
+          const { join } = require('path');
+          const publishSourcemap = require('@newrelic/publish-sourcemap').publishSourcemap;
+
+          const sourcemapDir = join(__dirname, 'out/_next/static');
+          const sourcemapFiles = readdirSync(sourcemapDir, { withFileTypes: true })
+            .filter(dirent => dirent.isDirectory())
+            .flatMap(dirent => {
+              const subDir = join(sourcemapDir, dirent.name);
+              return readdirSync(subDir)
+                .filter(file => file.endsWith('.map'))
+                .map(file => join(subDir, file));
+            });
+
+          sourcemapFiles.forEach(sourcemapPath => {
+            const javascriptUrl = \`https://console.mira.network\${sourcemapPath.replace('out', '').replace('.map', '')}\`;
+
+            publishSourcemap({
+              sourcemapPath,
+              javascriptUrl,
+              applicationId: 1120363591,
+              apiKey: process.env.NEW_RELIC_LICENSE_KEY,
+            }, function (err) {
+              console.log(err || \`Source map upload done for \${sourcemapPath}\`);
+            });
+          });
+          "
+
+      - name: Create New Relic Deployment Marker
+        run: |
+          curl -X POST "https://api.newrelic.com/v2/applications/${{ secrets.NEW_RELIC_APP_ID }}/deployments.json" \
+          -H "X-Api-Key:${{ secrets.NEW_RELIC_LICENSE_KEY }}" \
+          -H "Content-Type: application/json" \
+          -d '{
+            "deployment": {
+              "revision": "${{ github.sha }}",
+              "changelog": "Deployed via GitHub Actions",
+              "description": "Deployment to production",
+              "user": "${{ github.actor }}"
+            }
+          }'
 
       - name: Publish to Cloudflare Pages
         uses: cloudflare/pages-action@v1
@@ -39,5 +88,4 @@ jobs:
           projectName: "console-alts"
           workingDirectory: playground_v2
           directory: out
-          # Optional: Enable this if you want to have GitHub Deployments triggered
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
