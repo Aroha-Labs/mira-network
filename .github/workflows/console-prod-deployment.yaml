@@ -35,7 +35,7 @@ jobs:
 
       - name: Upload Sourcemaps to New Relic
         env:
-          NEW_RELIC_API_KEY: ${{ secrets.NEW_RELIC_API_KEY }}
+          NEW_RELIC_API_KEY: NRBR-af69bcb8e4875e9c1f6
         run: |
           node -e "
           const { readdirSync } = require('fs');
