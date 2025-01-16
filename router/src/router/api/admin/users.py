@@ -9,7 +9,7 @@ from src.router.models.user import UserCreditsHistory
 from src.router.db.session import get_session
 from enum import Enum
 from gotrue.types import User
-from datetime import datetime
+from datetime import datetime, timezone
 from src.router.models.user import User as UserModel  # rename to avoid conflict
 
 router = APIRouter()
@@ -70,40 +70,40 @@ def list_users(
     }
 
 
-class UserMetadata(BaseModel):
-    avatar_url: str
-    custom_claims: Dict[str, str]
-    email: str
-    email_verified: bool
-    full_name: str
-    iss: str
-    name: str
-    phone_verified: bool
-    picture: str
-    provider_id: str
-    sub: str
+# class UserMetadata(BaseModel):
+#     avatar_url: str
+#     custom_claims: Dict[str, str]
+#     email: str
+#     email_verified: bool
+#     full_name: str
+#     iss: str
+#     name: str
+#     phone_verified: bool
+#     picture: str
+#     provider_id: str
+#     sub: str
 
 
-class AppMetadata(BaseModel):
-    provider: str
-    providers: List[str]
+# class AppMetadata(BaseModel):
+#     provider: str
+#     providers: List[str]
 
 
-class Claims(BaseModel):
-    iss: str
-    sub: str
-    aud: str
-    exp: int
-    iat: int
-    email: str
-    phone: str
-    app_metadata: AppMetadata
-    user_metadata: UserMetadata
-    role: str
-    aal: str
-    amr: List[Dict[str, str]]
-    session_id: str
-    is_anonymous: bool
+# class Claims(BaseModel):
+#     iss: str
+#     sub: str
+#     aud: str
+#     exp: int
+#     iat: int
+#     email: str
+#     phone: str
+#     app_metadata: AppMetadata
+#     user_metadata: UserMetadata
+#     role: str
+#     aal: str
+#     amr: List[Dict[str, str]]
+#     session_id: str
+#     is_anonymous: bool
 
 
 class UserClaimWebhook(BaseModel):
@@ -111,7 +111,7 @@ class UserClaimWebhook(BaseModel):
     claims: dict
 
 
-def process_user_claims(claims: Claims) -> dict:
+def process_user_claims(claims: dict) -> dict:
     metadata = claims.get("user_metadata", {})
     app_metadata = claims.get("app_metadata", {})
 
@@ -121,6 +121,9 @@ def process_user_claims(claims: Claims) -> dict:
         "avatar_url": metadata.get("avatar_url"),
         "provider": app_metadata.get("provider", ""),
         "meta": {"user_metadata": metadata, "app_metadata": app_metadata},
+        "custom_claim": {},  # Initialize with empty dict
+        "credits": 0,  # Initialize with default value
+        # "last_login_at": datetime.now(timezone.utc),
     }
 
 
@@ -133,31 +136,32 @@ async def add_or_update_user_claim(
     req: UserClaimWebhook,
     db: Session = Depends(get_session),
 ):
-    # TODO: Implement webhook signature verification
-    # body = await request.body()
-    # signature = request.headers.get("webhook-signature")
-    # # signature = base64.b64decode(signature).decode("utf-8")
-    # verified = verify_supabase_signature(
-    #     payload=body.decode("utf-8"), signature=signature
-    # )
-
-    # user_claim = db.exec(
-    #     select(UserCustomClaim).where(UserCustomClaim.user_id == req.user_id)
-    # ).first()
-
     # Process user information
     user_data = process_user_claims(req.claims)
     user = db.exec(select(UserModel).where(UserModel.user_id == req.user_id)).first()
 
     if user:
-        # Update existing user
-        for key, value in user_data.items():
-            setattr(user, key, value)
-        user.last_login_at = datetime.utcnow()
-        user.updated_at = datetime.utcnow()
+        user.email = user_data["email"]
+        user.full_name = user_data["full_name"]
+        user.avatar_url = user_data["avatar_url"]
+        user.provider = user_data["provider"]
+        user.meta = user_data["meta"]
+        user.updated_at = datetime.now(timezone.utc)
+        user.last_login_at = datetime.now(timezone.utc)
     else:
-        # Create new user
-        user = UserModel(user_id=req.user_id, **user_data)
+        # Create new user with validated data
+        user = UserModel(
+            user_id=req.user_id,
+            full_name=user_data["full_name"],
+            email=user_data["email"],
+            avatar_url=user_data["avatar_url"],
+            provider=user_data["provider"],
+            meta=user_data["meta"],
+            credits=user_data["credits"],
+            last_login_at=datetime.now(timezone.utc),
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
+        )
         db.add(user)
 
     if user.custom_claim:
@@ -272,7 +276,17 @@ def update_users_from_supabase(
     user: User = Depends(verify_admin),
     db: Session = Depends(get_session),
 ):
-    users = supabase.auth.admin.list_users()
+    # get all users from supabase and update the users table
+    users = []
+    page = 1
+    while True:
+        page_users = supabase.auth.admin.list_users(page=page, per_page=100)
+        users.extend(page_users)
+        if len(page_users) < 100:
+            break
+        page += 1
+
+    # users = supabase.auth.admin.list_users(page=1, per_page=100)
 
     for supabase_user in users:
         user_data = {
