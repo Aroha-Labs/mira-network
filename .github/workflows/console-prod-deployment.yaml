@@ -35,7 +35,7 @@ jobs:
 
       - name: Upload Sourcemaps to New Relic
         env:
-          NEW_RELIC_API_KEY: ${{ secrets.NEW_RELIC_API_KEY }}
+          NEW_RELIC_API_KEY: NRAK-OLMQ5LWAZ56R6RGM0V0QUA9WD20
         run: |
           node -e "
           const { readdirSync } = require('fs');
@@ -83,10 +83,12 @@ jobs:
           "
 
       - name: Create New Relic Deployment Marker
+        env:
+          NEW_RELIC_API_KEY: NRAK-OLMQ5LWAZ56R6RGM0V0QUA9WD20
         run: |
           echo "Creating New Relic Deployment Marker"
           response=$(curl -s -o response.txt -w "%{http_code}" -X POST "https://api.newrelic.com/v2/applications/1120363591/deployments.json" \
-          -H "X-Api-Key:${{ secrets.NEW_RELIC_API_KEY }}" \
+          -H "X-Api-Key:NRAK-OLMQ5LWAZ56R6RGM0V0QUA9WD20" \
           -H "Content-Type: application/json" \
           -d '{
             "deployment": {
