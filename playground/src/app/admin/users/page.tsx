@@ -3,56 +3,49 @@
 import api from "src/lib/axios";
 import { useSession } from "src/hooks/useSession";
 import UserCard from "src/components/UserCard";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import Loading from "src/components/PageLoading";
 import { useState, useEffect } from "react";
-import MetricsModal from "src/components/MetricsModal";
-import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
+import { MagnifyingGlassIcon, ArrowPathIcon } from "@heroicons/react/24/outline";
 import { User } from "src/types/user";
 import ErrorMessage from "src/components/ErrorMessage";
 
-const fetchUsers = async ({ pageParam = 1, search = "" }) => {
-  const response = await api.get<{ users: User[] }>("/admin/users", {
-    params: { page: pageParam, search },
+interface UsersResponse {
+  users: User[];
+  total: number;
+  totalPages: number;
+}
+
+const fetchUsers = async (page: number, search: string) => {
+  const response = await api.get<UsersResponse>("/admin/users", {
+    params: { page, search },
   });
-  return response.data.users;
+  return response.data;
 };
 
 const AdminUsers = () => {
   const { data: userSession } = useSession();
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [submittedQuery, setSubmittedQuery] = useState<string>("");
+  const [currentPage, setCurrentPage] = useState(1);
 
-  const {
-    data,
-    isLoading,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-    isError,
-    error,
-    refetch,
-  } = useInfiniteQuery({
-    queryKey: ["users", submittedQuery],
-    queryFn: ({ pageParam }) => fetchUsers({ pageParam, search: submittedQuery }),
+  const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
+    queryKey: ["users", submittedQuery, currentPage],
+    queryFn: () => fetchUsers(currentPage, submittedQuery),
     enabled: !!userSession?.access_token,
-    initialPageParam: 1,
-    getNextPageParam: (lastPage, pages) => {
-      const lastPageLength = lastPage.length;
-      return lastPageLength === 10 ? pages.length + 1 : undefined;
-    },
     retry: 2,
   });
 
   const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setCurrentPage(1);
     setSubmittedQuery(searchQuery);
   };
 
   const handleClearSearch = () => {
     setSearchQuery("");
     setSubmittedQuery("");
+    setCurrentPage(1);
   };
 
   // Add keyboard shortcut
@@ -77,16 +70,33 @@ const AdminUsers = () => {
   }
 
   return (
-    <>
-      <div className="px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
-          <p className="mt-2 text-sm text-gray-600">
-            Manage users, their roles, credits, and view their usage metrics
-          </p>
+    <div className="flex-1">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
+        <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 sm:gap-0">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+              User Management
+            </h1>
+            <p className="mt-1 sm:mt-2 text-sm text-gray-600">
+              Manage users, their roles, credits, and view their usage metrics
+            </p>
+          </div>
+          <button
+            onClick={() => refetch()}
+            disabled={isLoading || isFetching}
+            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed relative"
+            title="Refresh users list"
+          >
+            <ArrowPathIcon className={`w-5 h-5 ${isFetching ? "animate-spin" : ""}`} />
+            {isFetching && (
+              <span className="absolute top-1/2 -translate-y-1/2 -left-24 px-2 py-1 text-xs text-white bg-gray-900 rounded shadow-sm whitespace-nowrap">
+                Refreshing...
+              </span>
+            )}
+          </button>
         </div>
 
-        <form onSubmit={handleSearch} className="mb-8">
+        <form onSubmit={handleSearch} className="mb-6 sm:mb-8">
           <div className="relative max-w-2xl mx-auto">
             <div className="flex items-center bg-white shadow-sm border border-gray-300 rounded-lg hover:shadow-md transition-shadow duration-200">
               <div className="pl-4">
@@ -147,49 +157,53 @@ const AdminUsers = () => {
             />
           </div>
         ) : (
-          <div className="grid gap-6">
+          <div className="grid gap-4 sm:gap-6">
             {isLoading ? (
-              <div className="flex justify-center">
+              <div className="flex justify-center py-12">
                 <Loading />
               </div>
-            ) : data?.pages[0].length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                No users found {submittedQuery && `for "${submittedQuery}"`}
+            ) : data?.users.length === 0 ? (
+              <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
+                <div className="text-gray-500">
+                  No users found {submittedQuery && `for "${submittedQuery}"`}
+                </div>
               </div>
             ) : (
               <>
-                {data?.pages.flatMap((page) =>
-                  page.map((user) => <UserCard key={user.id} user={user} />)
-                )}
-                <div className="mt-8 flex justify-center">
-                  {hasNextPage && (
+                {data?.users.map((user) => (
+                  <UserCard key={user.id} user={user} />
+                ))}
+
+                {/* Pagination Controls */}
+                {data && data.totalPages > 1 && (
+                  <div className="mt-6 flex justify-center items-center gap-3">
                     <button
-                      onClick={() => fetchNextPage()}
-                      className={`px-4 py-2 border rounded-md ${
-                        isFetchingNextPage
-                          ? "bg-gray-100 text-gray-500"
-                          : "bg-white text-gray-700 hover:bg-gray-50"
-                      }`}
-                      disabled={isFetchingNextPage}
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      className="px-4 py-2 bg-white border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
                     >
-                      {isFetchingNextPage ? <Loading size="sm" /> : "Load More"}
+                      Previous
                     </button>
-                  )}
-                </div>
+                    <div className="text-sm text-gray-600">
+                      Page {currentPage} of {data.totalPages}
+                    </div>
+                    <button
+                      onClick={() =>
+                        setCurrentPage((p) => Math.min(data.totalPages, p + 1))
+                      }
+                      disabled={currentPage === data.totalPages}
+                      className="px-4 py-2 bg-white border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
               </>
             )}
           </div>
         )}
       </div>
-
-      {selectedUserId && (
-        <MetricsModal
-          userId={selectedUserId}
-          title={`User Metrics`}
-          onClose={() => setSelectedUserId(null)}
-        />
-      )}
-    </>
+    </div>
   );
 };
 
