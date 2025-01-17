@@ -26,13 +26,11 @@ interface UsersResponse {
   total: number; // Total number of users
   page: number; // Current page number
   per_page: number; // Number of users per page
-  providers: string[];
 }
 
 interface Filters {
   minCredits?: number;
   maxCredits?: number;
-  provider?: string;
 }
 
 const fetchUsers = async (
@@ -49,8 +47,7 @@ const fetchUsers = async (
       sort_by: sortBy,
       sort_order: sortOrder,
       min_credits: filters?.minCredits,
-      max_credits: filters?.maxCredits,
-      provider: filters?.provider
+      max_credits: filters?.maxCredits
     },
   });
   return response.data;
@@ -191,26 +188,6 @@ const AdminUsers = () => {
                   />
                 </div>
               </div>
-
-              {data?.providers && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Provider
-                  </label>
-                  <select
-                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                    value={filters.provider || ''}
-                    onChange={(e) => setFilters(f => ({ ...f, provider: e.target.value || undefined }))}
-                  >
-                    <option value="">All Providers</option>
-                    {data.providers.map((provider) => (
-                      <option key={provider} value={provider}>
-                        {provider}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
 
               <div className="flex justify-end gap-2">
                 <button
