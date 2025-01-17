@@ -9,6 +9,7 @@ import {
   ChartBarSquareIcon,
   UsersIcon,
   Cog6ToothIcon,
+  ComputerDesktopIcon,
 } from "@heroicons/react/24/outline";
 import { useStore } from "@tanstack/react-store";
 import { userRolesState } from "src/state/userRolesState";
@@ -30,6 +31,11 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
       name: "Users",
       href: "/admin/users",
       icon: UsersIcon,
+    },
+    {
+      name: "Machines",
+      href: "/admin/machines",
+      icon: ComputerDesktopIcon,
     },
     {
       name: "Settings",
@@ -60,9 +66,7 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
         <div className="flex flex-col h-full">
           <div className="px-4 py-6 border-b border-gray-200">
             <h2 className="text-xl font-semibold text-gray-800">Admin Panel</h2>
-            <p className="mt-1 text-sm text-gray-500">
-              Manage your application
-            </p>
+            <p className="mt-1 text-sm text-gray-500">Manage your application</p>
           </div>
           <nav className="flex-1 px-2 py-4 space-y-1">
             {navigation.map((item) => {
@@ -78,9 +82,7 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
                   }`}
                 >
                   <item.icon
-                    className={`h-5 w-5 ${
-                      isActive ? "text-blue-600" : "text-gray-400"
-                    }`}
+                    className={`h-5 w-5 ${isActive ? "text-blue-600" : "text-gray-400"}`}
                   />
                   {item.name}
                 </Link>
