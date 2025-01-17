@@ -65,25 +65,24 @@ def list_users(
     user: User = Depends(verify_admin),
     db: Session = Depends(get_session),
 ):
+    def apply_filters(query):
+        if search:
+            search_pattern = f"%{search}%"
+            query = query.where(
+                (UserModel.full_name.ilike(search_pattern)) | (UserModel.email.ilike(search_pattern))
+            )
+        if min_credits is not None:
+            query = query.where(UserModel.credits >= min_credits)
+        if max_credits is not None:
+            query = query.where(UserModel.credits <= max_credits)
+        if provider:
+            query = query.where(UserModel.provider == provider)
+        return query
+
     offset = (page - 1) * per_page
-    query = select(UserModel)
-
-    # Apply search filter
-    if search:
-        search = f"%{search}%"
-        query = query.where(
-            (UserModel.full_name.ilike(search)) | (UserModel.email.ilike(search))
-        )
-
-    # Apply credits range filter
-    if min_credits is not None:
-        query = query.where(UserModel.credits >= min_credits)
-    if max_credits is not None:
-        query = query.where(UserModel.credits <= max_credits)
-
-    # Apply provider filter
-    if provider:
-        query = query.where(UserModel.provider == provider)
+    
+    # Main query for users
+    query = apply_filters(select(UserModel))
 
     # Apply sorting
     if sort_by:
@@ -92,24 +91,19 @@ def list_users(
             sort_column = sort_column.desc()
         query = query.order_by(sort_column)
     else:
-        # Default sorting by created_at DESC
         query = query.order_by(UserModel.created_at.desc())
 
+    # Count query
+    count_query = apply_filters(select(func.count()).select_from(UserModel))
+    total_users = db.exec(count_query).first()
+
     users = db.exec(query.offset(offset).limit(per_page))
-
-    # Get total count for pagination
-    total_users = db.exec(select(func.count(UserModel.id))).first()
-
-    # Get unique providers for filters
-    providers_query = select(func.distinct(UserModel.provider)).where(UserModel.provider.isnot(None))
-    providers = [p[0] for p in db.exec(providers_query).all() if p[0]]
 
     return {
         "users": users.all(),
         "total": total_users,
         "page": page,
         "per_page": per_page,
-        "providers": providers,
     }
 
 
