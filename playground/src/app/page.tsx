@@ -53,7 +53,7 @@ export default function Home() {
       </p>
       <div className="h-0.5 "></div>
       <UserInfo user={userSession?.user}>
-        <AnalyticsSection userSession={userSession} />
+        <AnalyticsSection />
       </UserInfo>
       <div className="bg-white p-4 rounded shadow w-full max-w-md">
         <div className="flex justify-between items-center">
