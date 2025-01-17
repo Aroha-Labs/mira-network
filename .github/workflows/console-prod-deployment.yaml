@@ -35,7 +35,7 @@ jobs:
 
       - name: Upload Sourcemaps to New Relic
         env:
-          NEW_RELIC_API_KEY: NRBR-af69bcb8e4875e9c1f6
+          NEW_RELIC_API_KEY: 7854F6FB8A8661F65D6B1D2DE3282D9B5272A8F4B607A4EF11AAB333EEB16CDF
         run: |
           node -e "
           const { readdirSync } = require('fs');
@@ -63,7 +63,7 @@ jobs:
               sourcemapPath,
               javascriptUrl,
               applicationId: 1120363591,
-              apiKey: 'NRBR-af69bcb8e4875e9c1f6',
+              apiKey: '7854F6FB8A8661F65D6B1D2DE3282D9B5272A8F4B607A4EF11AAB333EEB16CDF',
             }, function (err) {
               console.log(err || \`Source map upload done for \${sourcemapPath}\`);
             });
@@ -74,7 +74,7 @@ jobs:
         run: |
           echo "Creating New Relic Deployment Marker"
           curl -v -X POST "https://api.newrelic.com/v2/applications/1120363591/deployments.json" \
-          -H "X-Api-Key:NRBR-af69bcb8e4875e9c1f6" \
+          -H "X-Api-Key:7854F6FB8A8661F65D6B1D2DE3282D9B5272A8F4B607A4EF11AAB333EEB16CDF" \
           -H "Content-Type: application/json" \
           -d '{
             "deployment": {
