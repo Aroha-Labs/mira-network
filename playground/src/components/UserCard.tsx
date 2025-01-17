@@ -153,7 +153,7 @@ const UserCard = ({ user }: { user: User }) => {
                 {/* Desktop Actions */}
                 <div className="hidden lg:flex items-center gap-1">
                   <button
-                    onClick={() => setSelectedUserId(user.id)}
+                    onClick={() => setSelectedUserId(user.user_id)}
                     className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-md transition-colors"
                     title="View Metrics"
                   >
@@ -196,7 +196,7 @@ const UserCard = ({ user }: { user: User }) => {
           <div className="lg:hidden flex items-center justify-between border-t border-gray-100 pt-3 mt-1">
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setSelectedUserId(user.id)}
+                onClick={() => setSelectedUserId(user.user_id)}
                 className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-md transition-colors"
                 title="View Metrics"
               >
