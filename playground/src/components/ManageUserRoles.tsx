@@ -28,7 +28,7 @@ const ManageUserRoles = ({ user, onClose }: ManageUserRolesProps) => {
     },
     onSuccess: () => {
       toast.success("Roles updated successfully");
-      queryClient.invalidateQueries({ queryKey: ["user", user.user_id] });
+      queryClient.invalidateQueries({ queryKey: ["users"] });
       onClose();
     },
     onError: (error) => {
