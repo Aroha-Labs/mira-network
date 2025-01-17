@@ -35,7 +35,7 @@ jobs:
 
       - name: Upload Sourcemaps to New Relic
         env:
-          NEW_RELIC_API_KEY: 7854F6FB8A8661F65D6B1D2DE3282D9B5272A8F4B607A4EF11AAB333EEB16CDF
+          NEW_RELIC_API_KEY: ${{ secrets.NEW_RELIC_API_KEY }}
         run: |
           node -e "
           const { readdirSync } = require('fs');
@@ -43,38 +43,50 @@ jobs:
           const publishSourcemap = require('@newrelic/publish-sourcemap').publishSourcemap;
 
           const sourcemapDir = join(__dirname, 'out/_next/static');
-          const sourcemapFiles = readdirSync(sourcemapDir, { withFileTypes: true })
-            .filter(dirent => dirent.isDirectory())
-            .flatMap(dirent => {
-              const subDir = join(sourcemapDir, dirent.name);
-              return readdirSync(subDir)
-                .filter(file => file.endsWith('.map'))
-                .map(file => join(subDir, file));
+          try {
+            const sourcemapFiles = readdirSync(sourcemapDir, { withFileTypes: true })
+              .filter(dirent => dirent.isDirectory())
+              .flatMap(dirent => {
+                const subDir = join(sourcemapDir, dirent.name);
+                return readdirSync(subDir)
+                  .filter(file => file.endsWith('.map'))
+                  .map(file => join(subDir, file));
+              });
+
+            if (sourcemapFiles.length === 0) {
+              throw new Error('No sourcemap files found.');
+            }
+
+            console.log('sourcemapDir=', sourcemapDir);
+            console.log('sourcemapFiles=', sourcemapFiles);
+            console.log('process.env.NEW_RELIC_API_KEY=', process.env.NEW_RELIC_API_KEY);
+
+            sourcemapFiles.forEach(sourcemapPath => {
+              const javascriptUrl = \`https://console.mira.network\${sourcemapPath.replace('out', '').replace('.map', '')}\`;
+
+              publishSourcemap({
+                sourcemapPath,
+                javascriptUrl,
+                applicationId: 1120363591,
+                apiKey: process.env.NEW_RELIC_API_KEY,
+              }, function (err) {
+                if (err) {
+                  console.error(\`Error uploading sourcemap for \${sourcemapPath}: \`, err);
+                } else {
+                  console.log(\`Source map upload done for \${sourcemapPath}\`);
+                }
+              });
             });
-
-          console.log('sourcemapDir=', sourcemapDir);
-          console.log('sourcemapFiles=', sourcemapFiles);
-          console.log('NEW_RELIC_API_KEY=', process.env.NEW_RELIC_API_KEY);
-
-          sourcemapFiles.forEach(sourcemapPath => {
-            const javascriptUrl = \`https://console.mira.network\${sourcemapPath.replace('out', '').replace('.map', '')}\`;
-
-            publishSourcemap({
-              sourcemapPath,
-              javascriptUrl,
-              applicationId: 1120363591,
-              apiKey: '7854F6FB8A8661F65D6B1D2DE3282D9B5272A8F4B607A4EF11AAB333EEB16CDF',
-            }, function (err) {
-              console.log(err || \`Source map upload done for \${sourcemapPath}\`);
-            });
-          });
+          } catch (error) {
+            console.error('Error processing sourcemaps:', error);
+          }
           "
 
       - name: Create New Relic Deployment Marker
         run: |
           echo "Creating New Relic Deployment Marker"
-          curl -v -X POST "https://api.newrelic.com/v2/applications/1120363591/deployments.json" \
-          -H "X-Api-Key:7854F6FB8A8661F65D6B1D2DE3282D9B5272A8F4B607A4EF11AAB333EEB16CDF" \
+          response=$(curl -s -o response.txt -w "%{http_code}" -X POST "https://api.newrelic.com/v2/applications/1120363591/deployments.json" \
+          -H "X-Api-Key:${{ secrets.NEW_RELIC_API_KEY }}" \
           -H "Content-Type: application/json" \
           -d '{
             "deployment": {
@@ -83,7 +95,14 @@ jobs:
               "description": "Deployment to production",
               "user": "${{ github.actor }}"
             }
-          }'
+          }')
+
+          if [ "$response" -ne 201 ]; then
+            echo "Failed to create New Relic Deployment Marker. HTTP status: $response"
+            cat response.txt
+          else
+            echo "New Relic Deployment Marker created successfully."
+          fi
 
       - name: Publish to Cloudflare Pages
         uses: cloudflare/pages-action@v1
