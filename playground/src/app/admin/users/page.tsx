@@ -5,22 +5,60 @@ import { useSession } from "src/hooks/useSession";
 import UserCard from "src/components/UserCard";
 import { useQuery } from "@tanstack/react-query";
 import Loading from "src/components/PageLoading";
-import { useState, useEffect } from "react";
-import { MagnifyingGlassIcon, ArrowPathIcon } from "@heroicons/react/24/outline";
-import { User } from "src/types/user";
+import { useState, useEffect, Fragment } from "react";
+import {
+  MagnifyingGlassIcon,
+  ArrowPathIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  FlagIcon,
+  ArrowUpIcon,
+  ArrowDownIcon,
+  FunnelIcon,
+  AdjustmentsHorizontalIcon,
+} from "@heroicons/react/24/outline";
+import { SortField, SortOrder, User } from "src/types/user";
 import ErrorMessage from "src/components/ErrorMessage";
+import { Menu, Transition } from '@headlessui/react';
 
 interface UsersResponse {
   users: User[];
-  total: number;
-  totalPages: number;
+  total: number; // Total number of users
+  page: number; // Current page number
+  per_page: number; // Number of users per page
+  providers: string[];
 }
 
-const fetchUsers = async (page: number, search: string) => {
+interface Filters {
+  minCredits?: number;
+  maxCredits?: number;
+  provider?: string;
+}
+
+const fetchUsers = async (
+  page: number,
+  search: string,
+  sortBy?: SortField,
+  sortOrder?: SortOrder,
+  filters?: Filters
+) => {
   const response = await api.get<UsersResponse>("/admin/users", {
-    params: { page, search },
+    params: {
+      page,
+      search,
+      sort_by: sortBy,
+      sort_order: sortOrder,
+      min_credits: filters?.minCredits,
+      max_credits: filters?.maxCredits,
+      provider: filters?.provider
+    },
   });
   return response.data;
+};
+
+// Add this helper function before the AdminUsers component
+const calculateTotalPages = (total: number, perPage: number) => {
+  return Math.ceil(total / perPage);
 };
 
 const AdminUsers = () => {
@@ -28,10 +66,13 @@ const AdminUsers = () => {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [submittedQuery, setSubmittedQuery] = useState<string>("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortBy, setSortBy] = useState<SortField>('created_at');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+  const [filters, setFilters] = useState<Filters>({});
 
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
-    queryKey: ["users", submittedQuery, currentPage],
-    queryFn: () => fetchUsers(currentPage, submittedQuery),
+    queryKey: ["users", submittedQuery, currentPage, sortBy, sortOrder, filters],
+    queryFn: () => fetchUsers(currentPage, submittedQuery, sortBy, sortOrder, filters),
     enabled: !!userSession?.access_token,
     retry: 2,
   });
@@ -60,6 +101,139 @@ const AdminUsers = () => {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
+
+  const renderSortingAndFilters = () => (
+    <div className="mb-6 flex flex-wrap items-center gap-4">
+      <Menu as="div" className="relative">
+        <Menu.Button className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-white border rounded-lg hover:bg-gray-50">
+          <AdjustmentsHorizontalIcon className="w-4 h-4" />
+          Sort by: {sortBy}
+          {sortOrder === 'asc' ? (
+            <ArrowUpIcon className="w-4 h-4" />
+          ) : (
+            <ArrowDownIcon className="w-4 h-4" />
+          )}
+        </Menu.Button>
+        <Transition
+          as={Fragment}
+          enter="transition ease-out duration-100"
+          enterFrom="transform opacity-0 scale-95"
+          enterTo="transform opacity-100 scale-100"
+          leave="transition ease-in duration-75"
+          leaveFrom="transform opacity-100 scale-100"
+          leaveTo="transform opacity-0 scale-95"
+        >
+          <Menu.Items className="absolute left-0 z-10 mt-2 w-56 origin-top-left rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+            <div className="py-1">
+              {['created_at', 'last_login_at', 'credits', 'email', 'full_name'].map((field) => (
+                <Menu.Item key={field}>
+                  {({ active }) => (
+                    <button
+                      onClick={() => {
+                        setSortBy(field as SortField);
+                        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                      }}
+                      className={`
+                        ${active ? 'bg-gray-100' : ''} 
+                        ${sortBy === field ? 'font-medium' : ''}
+                        block px-4 py-2 text-sm text-gray-700 w-full text-left
+                      `}
+                    >
+                      {field.replace('_', ' ')}
+                    </button>
+                  )}
+                </Menu.Item>
+              ))}
+            </div>
+          </Menu.Items>
+        </Transition>
+      </Menu>
+
+      <Menu as="div" className="relative">
+        <Menu.Button className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-white border rounded-lg hover:bg-gray-50">
+          <FunnelIcon className="w-4 h-4" />
+          Filters
+          {Object.keys(filters).length > 0 && (
+            <span className="ml-1 px-2 py-0.5 text-xs bg-blue-100 text-blue-600 rounded-full">
+              {Object.keys(filters).length}
+            </span>
+          )}
+        </Menu.Button>
+        <Transition
+          as={Fragment}
+          enter="transition ease-out duration-100"
+          enterFrom="transform opacity-0 scale-95"
+          enterTo="transform opacity-100 scale-100"
+          leave="transition ease-in duration-75"
+          leaveFrom="transform opacity-100 scale-100"
+          leaveTo="transform opacity-0 scale-95"
+        >
+          <Menu.Items className="absolute left-0 z-10 mt-2 w-72 origin-top-left rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none p-4">
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Credits Range
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    placeholder="Min"
+                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                    value={filters.minCredits || ''}
+                    onChange={(e) => setFilters(f => ({ ...f, minCredits: Number(e.target.value) || undefined }))}
+                  />
+                  <input
+                    type="number"
+                    placeholder="Max"
+                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                    value={filters.maxCredits || ''}
+                    onChange={(e) => setFilters(f => ({ ...f, maxCredits: Number(e.target.value) || undefined }))}
+                  />
+                </div>
+              </div>
+
+              {data?.providers && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Provider
+                  </label>
+                  <select
+                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                    value={filters.provider || ''}
+                    onChange={(e) => setFilters(f => ({ ...f, provider: e.target.value || undefined }))}
+                  >
+                    <option value="">All Providers</option>
+                    {data.providers.map((provider) => (
+                      <option key={provider} value={provider}>
+                        {provider}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  className="text-sm text-gray-600 hover:text-gray-900"
+                  onClick={() => setFilters({})}
+                >
+                  Clear all
+                </button>
+                <button
+                  type="button"
+                  className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+                  onClick={() => refetch()}
+                >
+                  Apply
+                </button>
+              </div>
+            </div>
+          </Menu.Items>
+        </Transition>
+      </Menu>
+    </div>
+  );
 
   if (!userSession?.access_token) {
     return (
@@ -149,6 +323,8 @@ const AdminUsers = () => {
           )}
         </form>
 
+        {renderSortingAndFilters()}
+
         {isError ? (
           <div className="max-w-2xl mx-auto">
             <ErrorMessage
@@ -169,37 +345,62 @@ const AdminUsers = () => {
                 </div>
               </div>
             ) : (
-              <>
-                {data?.users.map((user) => (
-                  <UserCard key={user.id} user={user} />
-                ))}
-
-                {/* Pagination Controls */}
-                {data && data.totalPages > 1 && (
-                  <div className="mt-6 flex justify-center items-center gap-3">
-                    <button
-                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                      disabled={currentPage === 1}
-                      className="px-4 py-2 bg-white border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
-                    >
-                      Previous
-                    </button>
-                    <div className="text-sm text-gray-600">
-                      Page {currentPage} of {data.totalPages}
-                    </div>
-                    <button
-                      onClick={() =>
-                        setCurrentPage((p) => Math.min(data.totalPages, p + 1))
-                      }
-                      disabled={currentPage === data.totalPages}
-                      className="px-4 py-2 bg-white border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
-                    >
-                      Next
-                    </button>
-                  </div>
-                )}
-              </>
+              data?.users.map((user) => <UserCard key={user.id} user={user} />)
             )}
+          </div>
+        )}
+
+        {/* End of Results Message */}
+        {!isError &&
+          data &&
+          data.total > 0 &&
+          data.page >= calculateTotalPages(data.total, data.per_page) && (
+            <div className="mt-8 mb-6 text-center">
+              <div className="inline-flex items-center gap-3">
+                <div className="h-px w-12 bg-gray-200"></div>
+                <span className="text-sm text-gray-500 font-medium inline-flex items-center gap-1.5">
+                  <FlagIcon className="w-4 h-4" />
+                  End of results
+                </span>
+                <div className="h-px w-12 bg-gray-200"></div>
+              </div>
+            </div>
+          )}
+
+        {/* Pagination Controls */}
+        {!isError && data && (
+          <div className="mt-6 flex justify-center items-center gap-3">
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1 || isLoading}
+              className="px-4 py-2 bg-white border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors inline-flex items-center gap-1"
+            >
+              <ChevronLeftIcon className="w-4 h-4" />
+              Previous
+            </button>
+            <div className="text-sm text-gray-600">
+              {isLoading ? (
+                <Loading size="sm" />
+              ) : !data ? (
+                "No data"
+              ) : data.total === 0 ? (
+                "No results"
+              ) : (
+                `Page ${data.page} of ${calculateTotalPages(data.total, data.per_page)}`
+              )}
+            </div>
+            <button
+              onClick={() => setCurrentPage((p) => p + 1)}
+              disabled={
+                !data ||
+                data.page >= calculateTotalPages(data.total, data.per_page) ||
+                isLoading
+              }
+              className="px-4 py-2 bg-white border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors inline-flex items-center gap-1"
+            >
+              Next
+              <ChevronRightIcon className="w-4 h-4" />
+            </button>
           </div>
         )}
       </div>
