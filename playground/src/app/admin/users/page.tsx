@@ -3,56 +3,90 @@
 import api from "src/lib/axios";
 import { useSession } from "src/hooks/useSession";
 import UserCard from "src/components/UserCard";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import Loading from "src/components/PageLoading";
-import { useState, useEffect } from "react";
-import MetricsModal from "src/components/MetricsModal";
-import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
-import { User } from "src/types/user";
+import { useState, useEffect, Fragment } from "react";
+import {
+  MagnifyingGlassIcon,
+  ArrowPathIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  FlagIcon,
+  ArrowUpIcon,
+  ArrowDownIcon,
+  FunnelIcon,
+  AdjustmentsHorizontalIcon,
+} from "@heroicons/react/24/outline";
+import { SortField, SortOrder, User } from "src/types/user";
 import ErrorMessage from "src/components/ErrorMessage";
+import { Menu, Transition } from '@headlessui/react';
 
-const fetchUsers = async ({ pageParam = 1, search = "" }) => {
-  const response = await api.get<{ users: User[] }>("/admin/users", {
-    params: { page: pageParam, search },
+interface UsersResponse {
+  users: User[];
+  total: number; // Total number of users
+  page: number; // Current page number
+  per_page: number; // Number of users per page
+  providers: string[];
+}
+
+interface Filters {
+  minCredits?: number;
+  maxCredits?: number;
+  provider?: string;
+}
+
+const fetchUsers = async (
+  page: number,
+  search: string,
+  sortBy?: SortField,
+  sortOrder?: SortOrder,
+  filters?: Filters
+) => {
+  const response = await api.get<UsersResponse>("/admin/users", {
+    params: {
+      page,
+      search,
+      sort_by: sortBy,
+      sort_order: sortOrder,
+      min_credits: filters?.minCredits,
+      max_credits: filters?.maxCredits,
+      provider: filters?.provider
+    },
   });
-  return response.data.users;
+  return response.data;
+};
+
+// Add this helper function before the AdminUsers component
+const calculateTotalPages = (total: number, perPage: number) => {
+  return Math.ceil(total / perPage);
 };
 
 const AdminUsers = () => {
   const { data: userSession } = useSession();
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [submittedQuery, setSubmittedQuery] = useState<string>("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [sortBy, setSortBy] = useState<SortField>('created_at');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+  const [filters, setFilters] = useState<Filters>({});
 
-  const {
-    data,
-    isLoading,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-    isError,
-    error,
-    refetch,
-  } = useInfiniteQuery({
-    queryKey: ["users", submittedQuery],
-    queryFn: ({ pageParam }) => fetchUsers({ pageParam, search: submittedQuery }),
+  const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
+    queryKey: ["users", submittedQuery, currentPage, sortBy, sortOrder, filters],
+    queryFn: () => fetchUsers(currentPage, submittedQuery, sortBy, sortOrder, filters),
     enabled: !!userSession?.access_token,
-    initialPageParam: 1,
-    getNextPageParam: (lastPage, pages) => {
-      const lastPageLength = lastPage.length;
-      return lastPageLength === 10 ? pages.length + 1 : undefined;
-    },
     retry: 2,
   });
 
   const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setCurrentPage(1);
     setSubmittedQuery(searchQuery);
   };
 
   const handleClearSearch = () => {
     setSearchQuery("");
     setSubmittedQuery("");
+    setCurrentPage(1);
   };
 
   // Add keyboard shortcut
@@ -68,6 +102,139 @@ const AdminUsers = () => {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
+  const renderSortingAndFilters = () => (
+    <div className="mb-6 flex flex-wrap items-center gap-4">
+      <Menu as="div" className="relative">
+        <Menu.Button className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-white border rounded-lg hover:bg-gray-50">
+          <AdjustmentsHorizontalIcon className="w-4 h-4" />
+          Sort by: {sortBy}
+          {sortOrder === 'asc' ? (
+            <ArrowUpIcon className="w-4 h-4" />
+          ) : (
+            <ArrowDownIcon className="w-4 h-4" />
+          )}
+        </Menu.Button>
+        <Transition
+          as={Fragment}
+          enter="transition ease-out duration-100"
+          enterFrom="transform opacity-0 scale-95"
+          enterTo="transform opacity-100 scale-100"
+          leave="transition ease-in duration-75"
+          leaveFrom="transform opacity-100 scale-100"
+          leaveTo="transform opacity-0 scale-95"
+        >
+          <Menu.Items className="absolute left-0 z-10 mt-2 w-56 origin-top-left rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+            <div className="py-1">
+              {['created_at', 'last_login_at', 'credits', 'email', 'full_name'].map((field) => (
+                <Menu.Item key={field}>
+                  {({ active }) => (
+                    <button
+                      onClick={() => {
+                        setSortBy(field as SortField);
+                        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                      }}
+                      className={`
+                        ${active ? 'bg-gray-100' : ''} 
+                        ${sortBy === field ? 'font-medium' : ''}
+                        block px-4 py-2 text-sm text-gray-700 w-full text-left
+                      `}
+                    >
+                      {field.replace('_', ' ')}
+                    </button>
+                  )}
+                </Menu.Item>
+              ))}
+            </div>
+          </Menu.Items>
+        </Transition>
+      </Menu>
+
+      <Menu as="div" className="relative">
+        <Menu.Button className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-white border rounded-lg hover:bg-gray-50">
+          <FunnelIcon className="w-4 h-4" />
+          Filters
+          {Object.keys(filters).length > 0 && (
+            <span className="ml-1 px-2 py-0.5 text-xs bg-blue-100 text-blue-600 rounded-full">
+              {Object.keys(filters).length}
+            </span>
+          )}
+        </Menu.Button>
+        <Transition
+          as={Fragment}
+          enter="transition ease-out duration-100"
+          enterFrom="transform opacity-0 scale-95"
+          enterTo="transform opacity-100 scale-100"
+          leave="transition ease-in duration-75"
+          leaveFrom="transform opacity-100 scale-100"
+          leaveTo="transform opacity-0 scale-95"
+        >
+          <Menu.Items className="absolute left-0 z-10 mt-2 w-72 origin-top-left rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none p-4">
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Credits Range
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    placeholder="Min"
+                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                    value={filters.minCredits || ''}
+                    onChange={(e) => setFilters(f => ({ ...f, minCredits: Number(e.target.value) || undefined }))}
+                  />
+                  <input
+                    type="number"
+                    placeholder="Max"
+                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                    value={filters.maxCredits || ''}
+                    onChange={(e) => setFilters(f => ({ ...f, maxCredits: Number(e.target.value) || undefined }))}
+                  />
+                </div>
+              </div>
+
+              {data?.providers && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Provider
+                  </label>
+                  <select
+                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                    value={filters.provider || ''}
+                    onChange={(e) => setFilters(f => ({ ...f, provider: e.target.value || undefined }))}
+                  >
+                    <option value="">All Providers</option>
+                    {data.providers.map((provider) => (
+                      <option key={provider} value={provider}>
+                        {provider}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  className="text-sm text-gray-600 hover:text-gray-900"
+                  onClick={() => setFilters({})}
+                >
+                  Clear all
+                </button>
+                <button
+                  type="button"
+                  className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+                  onClick={() => refetch()}
+                >
+                  Apply
+                </button>
+              </div>
+            </div>
+          </Menu.Items>
+        </Transition>
+      </Menu>
+    </div>
+  );
+
   if (!userSession?.access_token) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -77,16 +244,33 @@ const AdminUsers = () => {
   }
 
   return (
-    <>
-      <div className="px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
-          <p className="mt-2 text-sm text-gray-600">
-            Manage users, their roles, credits, and view their usage metrics
-          </p>
+    <div className="flex-1">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
+        <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 sm:gap-0">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+              User Management
+            </h1>
+            <p className="mt-1 sm:mt-2 text-sm text-gray-600">
+              Manage users, their roles, credits, and view their usage metrics
+            </p>
+          </div>
+          <button
+            onClick={() => refetch()}
+            disabled={isLoading || isFetching}
+            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed relative"
+            title="Refresh users list"
+          >
+            <ArrowPathIcon className={`w-5 h-5 ${isFetching ? "animate-spin" : ""}`} />
+            {isFetching && (
+              <span className="absolute top-1/2 -translate-y-1/2 -left-24 px-2 py-1 text-xs text-white bg-gray-900 rounded shadow-sm whitespace-nowrap">
+                Refreshing...
+              </span>
+            )}
+          </button>
         </div>
 
-        <form onSubmit={handleSearch} className="mb-8">
+        <form onSubmit={handleSearch} className="mb-6 sm:mb-8">
           <div className="relative max-w-2xl mx-auto">
             <div className="flex items-center bg-white shadow-sm border border-gray-300 rounded-lg hover:shadow-md transition-shadow duration-200">
               <div className="pl-4">
@@ -139,6 +323,8 @@ const AdminUsers = () => {
           )}
         </form>
 
+        {renderSortingAndFilters()}
+
         {isError ? (
           <div className="max-w-2xl mx-auto">
             <ErrorMessage
@@ -147,49 +333,78 @@ const AdminUsers = () => {
             />
           </div>
         ) : (
-          <div className="grid gap-6">
+          <div className="grid gap-4 sm:gap-6">
             {isLoading ? (
-              <div className="flex justify-center">
+              <div className="flex justify-center py-12">
                 <Loading />
               </div>
-            ) : data?.pages[0].length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                No users found {submittedQuery && `for "${submittedQuery}"`}
+            ) : data?.users.length === 0 ? (
+              <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
+                <div className="text-gray-500">
+                  No users found {submittedQuery && `for "${submittedQuery}"`}
+                </div>
               </div>
             ) : (
-              <>
-                {data?.pages.flatMap((page) =>
-                  page.map((user) => <UserCard key={user.id} user={user} />)
-                )}
-                <div className="mt-8 flex justify-center">
-                  {hasNextPage && (
-                    <button
-                      onClick={() => fetchNextPage()}
-                      className={`px-4 py-2 border rounded-md ${
-                        isFetchingNextPage
-                          ? "bg-gray-100 text-gray-500"
-                          : "bg-white text-gray-700 hover:bg-gray-50"
-                      }`}
-                      disabled={isFetchingNextPage}
-                    >
-                      {isFetchingNextPage ? <Loading size="sm" /> : "Load More"}
-                    </button>
-                  )}
-                </div>
-              </>
+              data?.users.map((user) => <UserCard key={user.id} user={user} />)
             )}
           </div>
         )}
-      </div>
 
-      {selectedUserId && (
-        <MetricsModal
-          userId={selectedUserId}
-          title={`User Metrics`}
-          onClose={() => setSelectedUserId(null)}
-        />
-      )}
-    </>
+        {/* End of Results Message */}
+        {!isError &&
+          data &&
+          data.total > 0 &&
+          data.page >= calculateTotalPages(data.total, data.per_page) && (
+            <div className="mt-8 mb-6 text-center">
+              <div className="inline-flex items-center gap-3">
+                <div className="h-px w-12 bg-gray-200"></div>
+                <span className="text-sm text-gray-500 font-medium inline-flex items-center gap-1.5">
+                  <FlagIcon className="w-4 h-4" />
+                  End of results
+                </span>
+                <div className="h-px w-12 bg-gray-200"></div>
+              </div>
+            </div>
+          )}
+
+        {/* Pagination Controls */}
+        {!isError && data && (
+          <div className="mt-6 flex justify-center items-center gap-3">
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1 || isLoading}
+              className="px-4 py-2 bg-white border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors inline-flex items-center gap-1"
+            >
+              <ChevronLeftIcon className="w-4 h-4" />
+              Previous
+            </button>
+            <div className="text-sm text-gray-600">
+              {isLoading ? (
+                <Loading size="sm" />
+              ) : !data ? (
+                "No data"
+              ) : data.total === 0 ? (
+                "No results"
+              ) : (
+                `Page ${data.page} of ${calculateTotalPages(data.total, data.per_page)}`
+              )}
+            </div>
+            <button
+              onClick={() => setCurrentPage((p) => p + 1)}
+              disabled={
+                !data ||
+                data.page >= calculateTotalPages(data.total, data.per_page) ||
+                isLoading
+              }
+              className="px-4 py-2 bg-white border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors inline-flex items-center gap-1"
+            >
+              Next
+              <ChevronRightIcon className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
   );
 };
 

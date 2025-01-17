@@ -24,8 +24,8 @@ const AddCreditsModal = ({ userId, userName, onClose }: AddCreditsModalProps) =>
     },
     onSuccess: () => {
       toast.success("Credits added successfully");
+      queryClient.invalidateQueries({ queryKey: ["users"] });
       onClose();
-      queryClient.invalidateQueries({ queryKey: ["userCredits", userId] });
     },
     onError: (error) => {
       console.error("Failed to add credits:", error);

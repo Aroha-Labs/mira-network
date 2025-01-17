@@ -1,9 +1,9 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, Response, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from sqlmodel import Session, select
+from sqlmodel import Session, select, update
 from src.router.core.settings_types import SETTINGS_MODELS
 from src.router.core.types import ModelPricing, User
 from src.router.models.logs import ApiLogs
@@ -98,12 +98,12 @@ async def generate(
 ) -> Response:
     timeStart = time.time()
 
-    user_data = db.exec(select(UserModel).where(UserModel.user_id == user.id)).first()
+    user_row = db.exec(select(UserModel).where(UserModel.user_id == user.id)).first()
 
-    if not user_data:
+    if not user_row:
         raise HTTPException(status_code=404, detail="User not found")
 
-    if user_data.credits <= 0:
+    if user_row.credits <= 0:
         raise HTTPException(status_code=402, detail="Insufficient credits")
 
     supported_models = get_supported_models(db)
@@ -202,8 +202,14 @@ async def generate(
 
         cost = prompt_tokens_cost + completion_tokens_cost
 
-        user_data.credits -= cost
-        user_data.updated_at = datetime.utcnow()
+        db.exec(
+            update(UserModel)
+            .where(UserModel.user_id == user.id)
+            .values(
+                credits=user_row.credits - cost,
+                updated_at=datetime.now(timezone.utc),
+            )
+        )
 
         # Update user credit history
         user_credits_history = UserCreditsHistory(
