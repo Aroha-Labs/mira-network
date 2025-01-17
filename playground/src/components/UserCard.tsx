@@ -11,7 +11,7 @@ import ManageUserRoles from "src/components/ManageUserRoles";
 import { USDollar } from "src/utils/currency";
 import MetricsModal from "./MetricsModal";
 import AddCreditsModal from "src/components/AddCreditsModal";
-import { format } from "date-fns";
+import { formatDateTime, formatRelativeTime } from "src/utils/date";
 
 const RoleTag = ({ role }: { role: string }) => {
   const roleStyles = {
@@ -218,14 +218,13 @@ const UserCard = ({ user }: { user: User }) => {
               </button>
             </div>
             <div className="text-xs text-gray-400">
-              <span>Last active: </span>
+              <span>Last login: </span>
               <time
                 dateTime={user.last_login_at || ""}
                 className="text-gray-500 font-medium"
+                title={user.last_login_at ? formatDateTime(user.last_login_at) : ""}
               >
-                {user.last_login_at
-                  ? format(new Date(user.last_login_at), "MMM d, yyyy")
-                  : "Never"}
+                {user.last_login_at ? formatRelativeTime(user.last_login_at) : "Never"}
               </time>
             </div>
           </div>
@@ -234,14 +233,13 @@ const UserCard = ({ user }: { user: User }) => {
         {/* Desktop Footer */}
         <div className="hidden lg:flex items-center justify-between mt-4 pt-3 border-t border-gray-100">
           <div className="text-xs text-gray-400">
-            <span>Last active: </span>
+            <span>Last login: </span>
             <time
               dateTime={user.last_login_at || ""}
               className="text-gray-500 font-medium"
+              title={user.last_login_at ? formatDateTime(user.last_login_at) : ""}
             >
-              {user.last_login_at
-                ? format(new Date(user.last_login_at), "MMM d, yyyy")
-                : "Never"}
+              {user.last_login_at ? formatRelativeTime(user.last_login_at) : "Never"}
             </time>
           </div>
           <div className="flex items-center gap-2 text-xs text-gray-400">
