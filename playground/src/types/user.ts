@@ -1,3 +1,14 @@
+export type SortField = 'created_at' | 'last_login_at' | 'credits' | 'email' | 'full_name';
+export type SortOrder = 'asc' | 'desc';
+
+export interface UsersResponse {
+  users: User[];
+  total: number;
+  page: number;
+  per_page: number;
+  providers: string[];
+}
+
 export interface User {
   id: string;
   user_id: string;
