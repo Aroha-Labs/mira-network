@@ -22,7 +22,43 @@ permissions:
   packages: write
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      router: ${{ steps.filter.outputs.router }}
+      service: ${{ steps.filter.outputs.service }}
+      cli: ${{ steps.filter.outputs.cli }}
+      playground: ${{ steps.filter.outputs.playground }}
+      sdk: ${{ steps.filter.outputs.sdk }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          filters: |
+            router:
+              - 'router/**'
+            service:
+              - 'service/**'
+            cli:
+              - 'cli/**'
+            playground:
+              - 'playground/**'
+            sdk:
+              - 'sdk/**'
+
   create-tag:
+    needs: changes
+    if: |
+      needs.changes.outputs.router == 'true' ||
+      needs.changes.outputs.service == 'true' ||
+      needs.changes.outputs.cli == 'true' ||
+      needs.changes.outputs.playground == 'true' ||
+      needs.changes.outputs.sdk == 'true'
     timeout-minutes: 10
     runs-on: ubuntu-latest
     outputs:
@@ -92,18 +128,17 @@ jobs:
           prerelease: ${{ github.ref != 'refs/heads/main' }}
 
   publish-router:
+    needs: [changes, create-tag]
+    if: needs.changes.outputs.router == 'true'
     timeout-minutes: 15
-    needs: create-tag
-    if: |
-      github.event.head_commit.added != null && contains(join(github.event.head_commit.added, ' '), 'router/') ||
-      github.event.head_commit.modified != null && contains(join(github.event.head_commit.modified, ' '), 'router/') ||
-      github.event.head_commit.removed != null && contains(join(github.event.head_commit.removed, ' '), 'router/')
     runs-on: ubuntu-latest
     env:
       VERSION: ${{ needs.create-tag.outputs.new_tag }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Login to Container Registry
         uses: docker/login-action@v3
@@ -131,18 +166,20 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
+      - name: Clean up Docker images
+        run: docker image prune -f
+
   publish-service:
-    needs: create-tag
-    if: |
-      github.event.head_commit.added != null && contains(join(github.event.head_commit.added, ' '), 'service/') ||
-      github.event.head_commit.modified != null && contains(join(github.event.head_commit.modified, ' '), 'service/') ||
-      github.event.head_commit.removed != null && contains(join(github.event.head_commit.removed, ' '), 'service/')
+    needs: [changes, create-tag]
+    if: needs.changes.outputs.service == 'true'
     runs-on: ubuntu-latest
     env:
       VERSION: ${{ needs.create-tag.outputs.new_tag }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Login to Container Registry
         uses: docker/login-action@v3
@@ -170,18 +207,20 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
+      - name: Clean up Docker images
+        run: docker image prune -f
+
   publish-cli:
-    needs: create-tag
-    if: |
-      github.event.head_commit.added != null && contains(join(github.event.head_commit.added, ' '), 'cli/') ||
-      github.event.head_commit.modified != null && contains(join(github.event.head_commit.modified, ' '), 'cli/') ||
-      github.event.head_commit.removed != null && contains(join(github.event.head_commit.removed, ' '), 'cli/')
+    needs: [changes, create-tag]
+    if: needs.changes.outputs.cli == 'true'
     runs-on: ubuntu-latest
     env:
       VERSION: ${{ needs.create-tag.outputs.new_tag }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -211,11 +250,8 @@ jobs:
             ${{ runner.os }}-go-
 
   deploy-console-testnet:
-    needs: create-tag
-    if: |
-      github.event.head_commit.added != null && contains(join(github.event.head_commit.added, ' '), 'playground/') ||
-      github.event.head_commit.modified != null && contains(join(github.event.head_commit.modified, ' '), 'playground/') ||
-      github.event.head_commit.removed != null && contains(join(github.event.head_commit.removed, ' '), 'playground/')
+    needs: [changes, create-tag]
+    if: needs.changes.outputs.playground == 'true'
     runs-on: ubuntu-latest
     env:
       VERSION: ${{ needs.create-tag.outputs.new_tag }}
@@ -224,6 +260,8 @@ jobs:
         working-directory: ./playground
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install dependencies
         run: yarn
@@ -248,11 +286,8 @@ jobs:
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
 
   sdk-test:
-    needs: create-tag
-    if: |
-      github.event.head_commit.added != null && contains(join(github.event.head_commit.added, ' '), 'sdk/') ||
-      github.event.head_commit.modified != null && contains(join(github.event.head_commit.modified, ' '), 'sdk/') ||
-      github.event.head_commit.removed != null && contains(join(github.event.head_commit.removed, ' '), 'sdk/')
+    needs: [changes, create-tag]
+    if: needs.changes.outputs.sdk == 'true'
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -262,6 +297,8 @@ jobs:
         working-directory: sdk
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -286,17 +323,16 @@ jobs:
           fail_ci_if_error: true
 
   sdk-lint:
-    needs: create-tag
-    if: |
-      github.event.head_commit.added != null && contains(join(github.event.head_commit.added, ' '), 'sdk/') ||
-      github.event.head_commit.modified != null && contains(join(github.event.head_commit.modified, ' '), 'sdk/') ||
-      github.event.head_commit.removed != null && contains(join(github.event.head_commit.removed, ' '), 'sdk/')
+    needs: [changes, create-tag]
+    if: needs.changes.outputs.sdk == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: sdk
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v4
