@@ -8,14 +8,14 @@ updates:
     open-pull-requests-limit: 5
 
   # Playground project - Next.js using Yarn
-  - package-ecosystem: "yarn"
+  - package-ecosystem: "npm"
     directory: "/playground"
     schedule:
       interval: "daily"
     open-pull-requests-limit: 5
 
   # Playground_v2 project - Next.js using Yarn
-  - package-ecosystem: "yarn"
+  - package-ecosystem: "npm"
     directory: "/playground_v2"
     schedule:
       interval: "daily"
