@@ -1,0 +1,52 @@
+version: 2
+updates:
+  # CLI project - Go modules
+  - package-ecosystem: "gomod"
+    directory: "/cli"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 5
+
+  # Playground project - Next.js using Yarn
+  - package-ecosystem: "yarn"
+    directory: "/playground"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 5
+
+  # Playground_v2 project - Next.js using Yarn
+  - package-ecosystem: "yarn"
+    directory: "/playground_v2"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 5
+
+  # Router project - Python using PDM
+  - package-ecosystem: "pip"
+    directory: "/router"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "pdm"
+        versions: ["*"]
+
+  # SDK project - Python using PDM
+  - package-ecosystem: "pip"
+    directory: "/sdk"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "pdm"
+        versions: ["*"]
+
+  # Service project - Python using PDM
+  - package-ecosystem: "pip"
+    directory: "/service"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "pdm"
+        versions: ["*"]
