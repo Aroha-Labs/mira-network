@@ -95,9 +95,9 @@ jobs:
     timeout-minutes: 15
     needs: create-tag
     if: |
-      contains(github.event.head_commit.added, 'router/') ||
-      contains(github.event.head_commit.modified, 'router/') ||
-      contains(github.event.head_commit.removed, 'router/')
+      github.event.head_commit.added != null && contains(join(github.event.head_commit.added, ' '), 'router/') ||
+      github.event.head_commit.modified != null && contains(join(github.event.head_commit.modified, ' '), 'router/') ||
+      github.event.head_commit.removed != null && contains(join(github.event.head_commit.removed, ' '), 'router/')
     runs-on: ubuntu-latest
     env:
       VERSION: ${{ needs.create-tag.outputs.new_tag }}
@@ -134,9 +134,9 @@ jobs:
   publish-service:
     needs: create-tag
     if: |
-      contains(github.event.head_commit.added, 'service/') ||
-      contains(github.event.head_commit.modified, 'service/') ||
-      contains(github.event.head_commit.removed, 'service/')
+      github.event.head_commit.added != null && contains(join(github.event.head_commit.added, ' '), 'service/') ||
+      github.event.head_commit.modified != null && contains(join(github.event.head_commit.modified, ' '), 'service/') ||
+      github.event.head_commit.removed != null && contains(join(github.event.head_commit.removed, ' '), 'service/')
     runs-on: ubuntu-latest
     env:
       VERSION: ${{ needs.create-tag.outputs.new_tag }}
@@ -173,9 +173,9 @@ jobs:
   publish-cli:
     needs: create-tag
     if: |
-      contains(github.event.head_commit.added, 'cli/') ||
-      contains(github.event.head_commit.modified, 'cli/') ||
-      contains(github.event.head_commit.removed, 'cli/')
+      github.event.head_commit.added != null && contains(join(github.event.head_commit.added, ' '), 'cli/') ||
+      github.event.head_commit.modified != null && contains(join(github.event.head_commit.modified, ' '), 'cli/') ||
+      github.event.head_commit.removed != null && contains(join(github.event.head_commit.removed, ' '), 'cli/')
     runs-on: ubuntu-latest
     env:
       VERSION: ${{ needs.create-tag.outputs.new_tag }}
@@ -213,9 +213,9 @@ jobs:
   deploy-console-testnet:
     needs: create-tag
     if: |
-      contains(github.event.head_commit.added, 'playground/') ||
-      contains(github.event.head_commit.modified, 'playground/') ||
-      contains(github.event.head_commit.removed, 'playground/')
+      github.event.head_commit.added != null && contains(join(github.event.head_commit.added, ' '), 'playground/') ||
+      github.event.head_commit.modified != null && contains(join(github.event.head_commit.modified, ' '), 'playground/') ||
+      github.event.head_commit.removed != null && contains(join(github.event.head_commit.removed, ' '), 'playground/')
     runs-on: ubuntu-latest
     env:
       VERSION: ${{ needs.create-tag.outputs.new_tag }}
@@ -250,9 +250,9 @@ jobs:
   sdk-test:
     needs: create-tag
     if: |
-      contains(github.event.head_commit.added, 'sdk/') ||
-      contains(github.event.head_commit.modified, 'sdk/') ||
-      contains(github.event.head_commit.removed, 'sdk/')
+      github.event.head_commit.added != null && contains(join(github.event.head_commit.added, ' '), 'sdk/') ||
+      github.event.head_commit.modified != null && contains(join(github.event.head_commit.modified, ' '), 'sdk/') ||
+      github.event.head_commit.removed != null && contains(join(github.event.head_commit.removed, ' '), 'sdk/')
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -288,9 +288,9 @@ jobs:
   sdk-lint:
     needs: create-tag
     if: |
-      contains(github.event.head_commit.added, 'sdk/') ||
-      contains(github.event.head_commit.modified, 'sdk/') ||
-      contains(github.event.head_commit.removed, 'sdk/')
+      github.event.head_commit.added != null && contains(join(github.event.head_commit.added, ' '), 'sdk/') ||
+      github.event.head_commit.modified != null && contains(join(github.event.head_commit.modified, ' '), 'sdk/') ||
+      github.event.head_commit.removed != null && contains(join(github.event.head_commit.removed, ' '), 'sdk/')
     runs-on: ubuntu-latest
     defaults:
       run:
