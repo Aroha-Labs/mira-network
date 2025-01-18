@@ -195,8 +195,8 @@ export default function ToolEditModal({ tool, onSave, onClose }: ToolEditModalPr
   };
 
   const handleSave = () => {
-    const toolDict = {
-      type: "function",
+    const toolDict: Tool = {
+      type: "function" as const,
       function: {
         name,
         description,

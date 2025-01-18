@@ -68,7 +68,6 @@ async function getAuthHeaders() {
     throw new Error("Not authenticated");
   }
   return {
-    ...api.defaults.headers,
     "Content-Type": "application/json",
     Accept: "text/event-stream",
     "Cache-Control": "no-cache",
@@ -114,15 +113,29 @@ export async function processStream(
             }
             if (parsed.tool_calls) {
               console.log("Received tool calls:", parsed.tool_calls); // Debug log
-              const toolCalls = parsed.tool_calls.map((call: any) => ({
-                id: call.id || "",
-                name: call.function?.name || "",
-                arguments: call.function?.arguments || "",
-                index: call.index || 0,
-              }));
+              const toolCalls = parsed.tool_calls.map(
+                (call: {
+                  id?: string;
+                  function?: {
+                    name?: string;
+                    arguments?: string;
+                  };
+                  index?: number;
+                }) => ({
+                  id: call.id || "",
+                  name: call.function?.name || "",
+                  arguments: call.function?.arguments || "",
+                  index: call.index || 0,
+                })
+              );
 
               // Only send tool calls if they have meaningful data
-              if (toolCalls.some((call) => call.id && call.name && call.arguments)) {
+              if (
+                toolCalls.some(
+                  (call: { id?: string; name?: string; arguments?: string }) =>
+                    call.id && call.name && call.arguments
+                )
+              ) {
                 onMessage({
                   role: "assistant",
                   content: "",
@@ -163,6 +176,22 @@ export async function processStream(
   }
 }
 
+interface ChatRequestBody {
+  messages: Message[];
+  model: string;
+  variables?: Record<string, string>;
+  tools?: Tool[];
+  stream: boolean;
+}
+
+interface FlowRequestBody {
+  req: {
+    system_prompt?: string;
+    name: string;
+  };
+  chat: ChatRequestBody;
+}
+
 export async function streamChatCompletion(
   options: ChatCompletionOptions,
   controller: AbortController,
@@ -186,13 +215,13 @@ export async function streamChatCompletion(
       return JSON.parse(JSON.stringify(toolDict));
     });
 
-    const body: Record<string, any> = flowId
-      ? {
+    const body = flowId
+      ? ({
           ...chatOptions,
           tools: serializedTools,
           stream: true,
-        }
-      : {
+        } as ChatRequestBody)
+      : ({
           req: {
             system_prompt: systemPrompt,
             name: "Test Flow",
@@ -202,7 +231,7 @@ export async function streamChatCompletion(
             tools: serializedTools,
             stream: true,
           },
-        };
+        } as FlowRequestBody);
 
     const response = await fetch(`${api.defaults.baseURL}${endpoint}`, {
       method: "POST",
