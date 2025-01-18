@@ -6,6 +6,10 @@ updates:
     schedule:
       interval: "daily"
     open-pull-requests-limit: 5
+    groups:
+      go-dependencies:
+        patterns:
+          - "*"
 
   # Playground project - Next.js using Yarn
   - package-ecosystem: "npm"
@@ -13,6 +17,19 @@ updates:
     schedule:
       interval: "daily"
     open-pull-requests-limit: 5
+    groups:
+      dependencies:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "next"
+          - "react"
+          - "react-dom"
+      framework:
+        patterns:
+          - "next"
+          - "react"
+          - "react-dom"
 
   # Playground_v2 project - Next.js using Yarn
   - package-ecosystem: "npm"
@@ -20,6 +37,19 @@ updates:
     schedule:
       interval: "daily"
     open-pull-requests-limit: 5
+    groups:
+      dependencies:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "next"
+          - "react"
+          - "react-dom"
+      framework:
+        patterns:
+          - "next"
+          - "react"
+          - "react-dom"
 
   # Router project - Python using PDM
   - package-ecosystem: "pip"
@@ -30,6 +60,10 @@ updates:
     ignore:
       - dependency-name: "pdm"
         versions: ["*"]
+    groups:
+      python-dependencies:
+        patterns:
+          - "*"
 
   # SDK project - Python using PDM
   - package-ecosystem: "pip"
@@ -40,6 +74,10 @@ updates:
     ignore:
       - dependency-name: "pdm"
         versions: ["*"]
+    groups:
+      python-dependencies:
+        patterns:
+          - "*"
 
   # Service project - Python using PDM
   - package-ecosystem: "pip"
@@ -50,3 +88,7 @@ updates:
     ignore:
       - dependency-name: "pdm"
         versions: ["*"]
+    groups:
+      python-dependencies:
+        patterns:
+          - "*"
