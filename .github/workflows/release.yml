@@ -119,6 +119,8 @@ jobs:
 
       - name: Generate Release Notes
         id: release_notes
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           # Install required packages
           npm install openai
@@ -159,17 +161,19 @@ jobs:
               const notes = completion.choices[0].message.content;
               // Escape any special characters for GitHub Actions
               const escapedNotes = notes.replace(/%/g, '%25').replace(/\n/g, '%0A').replace(/\r/g, '%0D');
-              echo "notes=${escapedNotes}" >> $GITHUB_OUTPUT
+              // Write to a temporary file that the shell script will read
+              require('fs').writeFileSync('release_notes.txt', escapedNotes);
             } catch (error) {
               console.error('Error generating release notes:', error);
               // Provide a default message if generation fails
-              echo "notes=This release includes various updates and improvements." >> $GITHUB_OUTPUT
+              require('fs').writeFileSync('release_notes.txt', 'This release includes various updates and improvements.');
               process.exit(0); // Don't fail the workflow
             }
           }
 
           main().catch(error => {
             console.error('Unhandled error:', error);
+            require('fs').writeFileSync('release_notes.txt', 'This release includes various updates and improvements.');
             process.exit(0); // Don't fail the workflow
           });
           EOF
@@ -178,6 +182,10 @@ jobs:
           NEW_TAG=${{ steps.tag_version.outputs.new_tag }} \
           LAST_TAG=$(git describe --tags --abbrev=0 ${{ steps.tag_version.outputs.new_tag }}^) \
           node generate-notes.js
+
+          # Read the notes and write to GITHUB_OUTPUT
+          echo "notes=$(cat release_notes.txt)" >> $GITHUB_OUTPUT
+          rm release_notes.txt  # Clean up
 
       - name: Create Release
         uses: actions/create-release@v1
