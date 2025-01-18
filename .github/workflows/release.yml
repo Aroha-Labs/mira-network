@@ -164,14 +164,32 @@ jobs:
             } catch (error) {
               console.error('Error generating release notes:', error);
               // Provide a default message if generation fails
-              require('fs').writeFileSync('release_notes.txt', '# Release Notes\n\nThis release includes various updates and improvements.');
+              const defaultNotes = `# 🚀 Release ${process.env.NEW_TAG}\n\n` +
+                                 `## ✨ Highlights\n` +
+                                 `This release includes various improvements and updates to enhance overall functionality.\n\n` +
+                                 `## 🎯 New Features & Improvements\n` +
+                                 `- General system improvements\n` +
+                                 `- Enhanced stability updates\n\n` +
+                                 `## 🔧 Technical Enhancements\n` +
+                                 `- Core system updates\n` +
+                                 `- Performance optimizations\n`;
+              require('fs').writeFileSync('release_notes.txt', defaultNotes);
               process.exit(0); // Don't fail the workflow
             }
           }
 
           main().catch(error => {
             console.error('Unhandled error:', error);
-            require('fs').writeFileSync('release_notes.txt', '# Release Notes\n\nThis release includes various updates and improvements.');
+            const defaultNotes = `# 🚀 Release ${process.env.NEW_TAG}\n\n` +
+                               `## ✨ Highlights\n` +
+                               `This release includes various improvements and updates to enhance overall functionality.\n\n` +
+                               `## 🎯 New Features & Improvements\n` +
+                               `- General system improvements\n` +
+                               `- Enhanced stability updates\n\n` +
+                               `## 🔧 Technical Enhancements\n` +
+                               `- Core system updates\n` +
+                               `- Performance optimizations\n`;
+            require('fs').writeFileSync('release_notes.txt', defaultNotes);
             process.exit(0); // Don't fail the workflow
           });
           EOF
