@@ -11,11 +11,7 @@ import ConfirmModal from "src/components/ConfirmModal";
 import { LLM_BASE_URL } from "src/config";
 import { useQuery } from "@tanstack/react-query";
 import { useSession } from "src/hooks/useSession";
-
-interface Message {
-  role: string;
-  content: string;
-}
+import { Message } from "src/utils/chat";
 
 const fetchChatCompletion = async (
   messages: Message[],
@@ -161,8 +157,8 @@ export default function Chat() {
     setIsSending(true);
     setErrorMessage("");
 
-    const userMessage = { role: "user", content: i };
-    const assistantMessage = { role: "assistant", content: "" };
+    const userMessage: Message = { role: "user", content: i };
+    const assistantMessage: Message = { role: "assistant", content: "" };
     const updatedMessages = [...messages, userMessage];
 
     setMessages([...updatedMessages, assistantMessage]);
@@ -233,7 +229,7 @@ export default function Chat() {
     setIsSending(true);
     setErrorMessage("");
 
-    const assistantMessage = { role: "assistant", content: "" };
+    const assistantMessage: Message = { role: "assistant", content: "" };
     const updatedMessages = [...messagesToKeep, assistantMessage];
 
     setMessages(updatedMessages);

@@ -12,8 +12,8 @@ import ConfirmModal from "src/components/ConfirmModal";
 import { User } from "@supabase/supabase-js";
 import { useState } from "react";
 import ProfileImage from "./ProfileImage";
-import { Message } from "src/utils/chat";
 import ToolDisplay from "./ToolDisplay";
+import { Message } from "src/utils/chat";
 
 interface ChatBubbleProps {
   msg: Message;
@@ -48,7 +48,7 @@ export default function ChatBubble({
     setShowConfirmModal(false);
   };
 
-  const isUser = msg.role === "user";
+  // const isUser = msg.role === "user";
 
   return (
     <div
