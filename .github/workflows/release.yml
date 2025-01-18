@@ -119,6 +119,8 @@ jobs:
 
       - name: Generate Release Notes
         id: release_notes
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           # Install required packages
           npm install openai
