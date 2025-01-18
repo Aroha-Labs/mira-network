@@ -380,72 +380,73 @@ jobs:
           echo "## 🚀 Job Status" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          echo "### 🌐 Router" >> $GITHUB_STEP_SUMMARY
+          # Header for the table
+          echo "| Component | Task | Status | Details |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|------|--------|----------|" >> $GITHUB_STEP_SUMMARY
+
+          # Router Status
           if [ "${{ needs.changes.outputs.router }}" != "true" ]; then
-            echo "⏭️ Build & Publish: **Skipped** (No Changes)" >> $GITHUB_STEP_SUMMARY
+            echo "| 🌐 Router | Build & Publish | ⏭️ | **Skipped** (No Changes) |" >> $GITHUB_STEP_SUMMARY
           elif [ "${{ needs.publish-router.result }}" = "success" ]; then
-            echo "✅ Build & Publish: **Successful**" >> $GITHUB_STEP_SUMMARY
+            echo "| 🌐 Router | Build & Publish | ✅ | **Successful** |" >> $GITHUB_STEP_SUMMARY
           elif [ "${{ needs.publish-router.result }}" = "failure" ]; then
-            echo "❌ Build & Publish: **Failed**" >> $GITHUB_STEP_SUMMARY
+            echo "| 🌐 Router | Build & Publish | ❌ | **Failed** |" >> $GITHUB_STEP_SUMMARY
           else
-            echo "⚠️ Build & Publish: **Cancelled**" >> $GITHUB_STEP_SUMMARY
+            echo "| 🌐 Router | Build & Publish | ⚠️ | **Cancelled** |" >> $GITHUB_STEP_SUMMARY
           fi
 
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### ⚙️ Service" >> $GITHUB_STEP_SUMMARY
+          # Service Status
           if [ "${{ needs.changes.outputs.service }}" != "true" ]; then
-            echo "⏭️ Build & Publish: **Skipped** (No Changes)" >> $GITHUB_STEP_SUMMARY
+            echo "| ⚙️ Service | Build & Publish | ⏭️ | **Skipped** (No Changes) |" >> $GITHUB_STEP_SUMMARY
           elif [ "${{ needs.publish-service.result }}" = "success" ]; then
-            echo "✅ Build & Publish: **Successful**" >> $GITHUB_STEP_SUMMARY
+            echo "| ⚙️ Service | Build & Publish | ✅ | **Successful** |" >> $GITHUB_STEP_SUMMARY
           elif [ "${{ needs.publish-service.result }}" = "failure" ]; then
-            echo "❌ Build & Publish: **Failed**" >> $GITHUB_STEP_SUMMARY
+            echo "| ⚙️ Service | Build & Publish | ❌ | **Failed** |" >> $GITHUB_STEP_SUMMARY
           else
-            echo "⚠️ Build & Publish: **Cancelled**" >> $GITHUB_STEP_SUMMARY
+            echo "| ⚙️ Service | Build & Publish | ⚠️ | **Cancelled** |" >> $GITHUB_STEP_SUMMARY
           fi
 
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🔧 CLI" >> $GITHUB_STEP_SUMMARY
+          # CLI Status
           if [ "${{ needs.changes.outputs.cli }}" != "true" ]; then
-            echo "⏭️ Build & Publish: **Skipped** (No Changes)" >> $GITHUB_STEP_SUMMARY
+            echo "| 🔧 CLI | Build & Publish | ⏭️ | **Skipped** (No Changes) |" >> $GITHUB_STEP_SUMMARY
           elif [ "${{ needs.publish-cli.result }}" = "success" ]; then
-            echo "✅ Build & Publish: **Successful**" >> $GITHUB_STEP_SUMMARY
+            echo "| 🔧 CLI | Build & Publish | ✅ | **Successful** |" >> $GITHUB_STEP_SUMMARY
           elif [ "${{ needs.publish-cli.result }}" = "failure" ]; then
-            echo "❌ Build & Publish: **Failed**" >> $GITHUB_STEP_SUMMARY
+            echo "| 🔧 CLI | Build & Publish | ❌ | **Failed** |" >> $GITHUB_STEP_SUMMARY
           else
-            echo "⚠️ Build & Publish: **Cancelled**" >> $GITHUB_STEP_SUMMARY
+            echo "| 🔧 CLI | Build & Publish | ⚠️ | **Cancelled** |" >> $GITHUB_STEP_SUMMARY
           fi
 
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🎮 Playground" >> $GITHUB_STEP_SUMMARY
+          # Playground Status
           if [ "${{ needs.changes.outputs.playground }}" != "true" ]; then
-            echo "⏭️ Deploy to Testnet: **Skipped** (No Changes)" >> $GITHUB_STEP_SUMMARY
+            echo "| 🎮 Playground | Deploy to Testnet | ⏭️ | **Skipped** (No Changes) |" >> $GITHUB_STEP_SUMMARY
           elif [ "${{ needs.deploy-console-testnet.result }}" = "success" ]; then
-            echo "✅ Deploy to Testnet: **Successful**" >> $GITHUB_STEP_SUMMARY
+            echo "| 🎮 Playground | Deploy to Testnet | ✅ | **Successful** |" >> $GITHUB_STEP_SUMMARY
           elif [ "${{ needs.deploy-console-testnet.result }}" = "failure" ]; then
-            echo "❌ Deploy to Testnet: **Failed**" >> $GITHUB_STEP_SUMMARY
+            echo "| 🎮 Playground | Deploy to Testnet | ❌ | **Failed** |" >> $GITHUB_STEP_SUMMARY
           else
-            echo "⚠️ Deploy to Testnet: **Cancelled**" >> $GITHUB_STEP_SUMMARY
+            echo "| 🎮 Playground | Deploy to Testnet | ⚠️ | **Cancelled** |" >> $GITHUB_STEP_SUMMARY
           fi
 
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📦 SDK" >> $GITHUB_STEP_SUMMARY
+          # SDK Status
           if [ "${{ needs.changes.outputs.sdk }}" != "true" ]; then
-            echo "⏭️ Tests & Lint: **Skipped** (No Changes)" >> $GITHUB_STEP_SUMMARY
+            echo "| 📦 SDK | Tests | ⏭️ | **Skipped** (No Changes) |" >> $GITHUB_STEP_SUMMARY
+            echo "| 📦 SDK | Lint | ⏭️ | **Skipped** (No Changes) |" >> $GITHUB_STEP_SUMMARY
           else
             if [ "${{ needs.sdk-test.result }}" = "success" ]; then
-              echo "✅ Tests: **Passed**" >> $GITHUB_STEP_SUMMARY
+              echo "| 📦 SDK | Tests | ✅ | **Passed** |" >> $GITHUB_STEP_SUMMARY
             elif [ "${{ needs.sdk-test.result }}" = "failure" ]; then
-              echo "❌ Tests: **Failed**" >> $GITHUB_STEP_SUMMARY
+              echo "| 📦 SDK | Tests | ❌ | **Failed** |" >> $GITHUB_STEP_SUMMARY
             else
-              echo "⚠️ Tests: **Cancelled**" >> $GITHUB_STEP_SUMMARY
+              echo "| 📦 SDK | Tests | ⚠️ | **Cancelled** |" >> $GITHUB_STEP_SUMMARY
             fi
             
             if [ "${{ needs.sdk-lint.result }}" = "success" ]; then
-              echo "✅ Lint: **Passed**" >> $GITHUB_STEP_SUMMARY
+              echo "| 📦 SDK | Lint | ✅ | **Passed** |" >> $GITHUB_STEP_SUMMARY
             elif [ "${{ needs.sdk-lint.result }}" = "failure" ]; then
-              echo "❌ Lint: **Failed**" >> $GITHUB_STEP_SUMMARY
+              echo "| 📦 SDK | Lint | ❌ | **Failed** |" >> $GITHUB_STEP_SUMMARY
             else
-              echo "⚠️ Lint: **Cancelled**" >> $GITHUB_STEP_SUMMARY
+              echo "| 📦 SDK | Lint | ⚠️ | **Cancelled** |" >> $GITHUB_STEP_SUMMARY
             fi
           fi
 
