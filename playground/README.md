@@ -1,9 +1,29 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Mira Playground
+
+A web interface for interacting with and testing Mira's AI capabilities.
+
+## Features
+
+- Interactive chat interface for testing AI models
+- API key management
+- Usage analytics and logs
+- Network monitoring
+- Admin controls for user and machine management
+- Terminal interface
 
 ## Getting Started
 
+1. Install dependencies:
 
-First, run the development server:
+```bash
+npm install
+# or
+yarn install
+# or
+pnpm install
+```
+
+2. Run the development server:
 
 ```bash
 npm run dev
@@ -11,27 +31,43 @@ npm run dev
 yarn dev
 # or
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+3. Open [http://localhost:3000](http://localhost:3000) with your browser to see the application.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Development
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- The main application code is in `src/app`
+- Components are in `src/components`
+- Utility functions are in `src/utils`
+- Types are in `src/types`
+
+## Key Pages
+
+- `/` - Home/Dashboard
+- `/login` - Authentication
+- `/api-keys` - API key management
+- `/api-logs` - Request logs and analytics
+- `/network` - Network monitoring
+- `/terminal` - Terminal interface
+- `/admin/*` - Admin controls
 
 ## Learn More
 
-To learn more about Next.js, take a look at the following resources:
+- [Mira Documentation](https://docs.mira.ai)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Deployment
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The application is automatically deployed to Cloudflare Pages when changes are pushed to the main branch. The deployment process:
 
-## Deploy on Vercel
+1. Builds the application with required environment variables
+2. Publishes the `out` directory to Cloudflare Pages
+3. Creates a new version tag and GitHub release
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Required environment variables for deployment:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `NEXT_PUBLIC_API_BASE_URL`
+- `NEXT_PUBLIC_LLM_BASE_URL`
+- `NEXT_PUBLIC_VERSION`
