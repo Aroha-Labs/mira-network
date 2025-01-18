@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
-from src.router.schemas.ai import Message
+from src.router.schemas.ai import Message, Tool, Function
 
 
 class FlowRequest(BaseModel):
@@ -15,6 +15,8 @@ class FlowChatCompletion(BaseModel):
     messages: List[Message]
     variables: Optional[Dict[str, Any]] = None
     stream: bool = False
+    tools: Optional[list[Tool]] = Field(None, title="Tools")
+    tool_choice: Optional[str] = Field("auto", title="Tool Choice")
 
 
 class FlowUpdateRequest(BaseModel):

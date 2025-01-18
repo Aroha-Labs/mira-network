@@ -32,34 +32,79 @@ ROUTER_BASE_URL = os.getenv(
 logging.basicConfig(level=logging.INFO)
 
 
+class Message(BaseModel):
+    role: str
+    content: str
+
+    def model_dump(self):
+        return {"role": self.role, "content": self.content}
+
+
+class FunctionCall(BaseModel):
+    name: str
+    arguments: str
+
+
+class Function(BaseModel):
+    name: str
+    description: str
+    parameters: dict = Field(
+        default_factory=lambda: {"type": "object", "properties": {}, "required": []}
+    )
+
+    def dict(self):
+        return {
+            "name": self.name,
+            "description": self.description,
+            "parameters": self.parameters,
+        }
+
+
+class Tool(BaseModel):
+    type: str = "function"
+    function: Function
+
+    def model_dump(self):
+        return {"type": self.type, "function": self.function.dict()}
+
+
 class ModelProvider(BaseModel):
     base_url: str
     api_key: str
+    provider_name: str
+
+
+class AiRequest(BaseModel):
+    model: str = Field(title="Model", default="")
+    model_provider: Optional[ModelProvider] = Field(None, title="Model Provider")
+    messages: List[Message] = Field(None, title="Chat History")
+    stream: Optional[bool] = Field(False, title="Stream")
+    tools: Optional[list[Tool]] = Field(None, title="Tools")
+    tool_choice: Optional[str] = Field("auto", title="Tool Choice")
 
 
 model_providers = {
     "openai": ModelProvider(
         base_url="https://api.openai.com/v1",
         api_key=os.getenv("OPENAI_API_KEY"),
+        provider_name="openai",
     ),
     "openrouter": ModelProvider(
         base_url="https://openrouter.ai/api/v1",
         api_key=os.getenv("OPENROUTER_API_KEY"),
+        provider_name="openrouter",
     ),
     "anthropic": ModelProvider(
         base_url="https://api.anthropic.com/v1",
         api_key=os.getenv("ANTHROPIC_API_KEY"),
+        provider_name="anthropic",
     ),
     "mira": ModelProvider(
         base_url=os.getenv("MIRA_BASE_URL", "https://ollama.alts.dev/v1"),
         api_key=os.getenv("MIRA_API_KEY"),
+        provider_name="mira",
     ),
 }
-
-
-class Message(BaseModel):
-    role: str
-    content: str
 
 
 def get_model_provider(
@@ -88,35 +133,103 @@ def get_llm_completion(
     model_provider: ModelProvider,
     messages: list[Message],
     stream: bool = False,
+    tools: list[Tool] = None,
+    tool_choice: str = "auto",
 ):
-    req = requests.post(
-        url=f"{model_provider.base_url}/chat/completions",
-        headers={
+    """
+    Get completion from LLM with support for function/tool calling across different providers
+    """
+    payload = {
+        "model": model,
+        "messages": [msg.model_dump() for msg in messages],
+        "stream": stream,
+    }
+
+    # Add tools/functions if provided
+    if tools:
+        if model_provider.provider_name == "anthropic":
+            # Convert OpenAI tool format to Anthropic's format
+            payload["tools"] = [tool.model_dump() for tool in tools]
+        # elif model_provider.provider_name == "google":
+        #     # Convert OpenAI tool format to Google's format
+        #     payload["tools"] = [
+        #         {
+        #             "function_declarations": [
+        #                 {
+        #                     "name": tool.function.name,
+        #                     "description": tool.function.description,
+        #                     "parameters": tool.function.parameters,
+        #                 }
+        #                 for tool in tools
+        #             ]
+        #         }
+        #     ]
+        else:
+            # Default OpenAI format (works for OpenAI and OpenRouter)
+            payload["tools"] = [tool.model_dump() for tool in tools]
+            if tool_choice != "auto":
+                payload["tool_choice"] = tool_choice
+
+    try:
+        headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {model_provider.api_key}",
             "Accept-Encoding": "identity",
-        },
-        json={
-            "model": model,
-            "messages": [
-                {"role": msg["role"], "content": msg["content"]} for msg in messages
-            ],
-            "stream": stream,
-        },
-        stream=stream,
-    )
+        }
 
-    if stream is True:
-        return StreamingResponse(
-            req.iter_content(chunk_size=1024),
-            media_type="text/event-stream",
+        req = requests.post(
+            url=f"{model_provider.base_url}/chat/completions",
+            headers=headers,
+            json=payload,
+            stream=stream,
+        )
+        req.raise_for_status()
+
+        if stream:
+            return StreamingResponse(
+                req.iter_content(chunk_size=1024),
+                media_type="text/event-stream",
+            )
+
+        # Convert provider-specific response to OpenAI format if needed
+        response_data = req.json()
+        if model_provider.provider_name == "anthropic":
+            # Convert Anthropic response to OpenAI format
+            if "tool_calls" in response_data.get("content", []):
+                response_data["choices"][0]["message"]["function_call"] = {
+                    "name": response_data["content"][0]["tool_calls"][0]["function"][
+                        "name"
+                    ],
+                    "arguments": response_data["content"][0]["tool_calls"][0][
+                        "function"
+                    ]["arguments"],
+                }
+        # elif model_provider.provider_name == "google":
+        #     # Convert Google response to OpenAI format
+        #     if "functionCall" in response_data.get("candidates", [{}])[0]:
+        #         response_data["choices"] = [
+        #             {
+        #                 "message": {
+        #                     "function_call": {
+        #                         "name": response_data["candidates"][0]["functionCall"][
+        #                             "name"
+        #                         ],
+        #                         "arguments": response_data["candidates"][0][
+        #                             "functionCall"
+        #                         ]["args"],
+        #                     }
+        #                 }
+        #             }
+        #         ]
+
+        return Response(
+            content=json.dumps(response_data),
+            status_code=req.status_code,
+            headers=dict(req.headers),
         )
 
-    return Response(
-        content=req.text,
-        status_code=req.status_code,
-        headers=dict(req.headers),
-    )
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(status_code=500, detail=f"Error calling LLM API: {str(e)}")
 
 
 @app.get("/health")
@@ -166,13 +279,6 @@ async def evaluate(req: EvaluationRequest) -> str:
     return output.getvalue()
 
 
-class AiRequest(BaseModel):
-    model: str = Field(title="Model", default="")
-    model_provider: Optional[ModelProvider] = Field(None, title="Model Provider")
-    messages: List[Message] = Field(None, title="Chat History")
-    stream: Optional[bool] = Field(False, title="Stream")
-
-
 @app.post("/v1/chat/completions")
 async def generate(req: AiRequest):
     if not req.messages or not any(msg.role == "user" for msg in req.messages):
@@ -188,8 +294,10 @@ async def generate(req: AiRequest):
     return get_llm_completion(
         model,
         model_provider,
-        messages=messages,
+        messages=[Message(**msg) for msg in messages],
         stream=req.stream,
+        tools=req.tools,
+        tool_choice=req.tool_choice,
     )
 
 
@@ -258,7 +366,7 @@ async def verify(req: VerifyRequest):
     res = get_llm_completion(
         model=model,
         model_provider=model_provider,
-        messages=messages,
+        messages=[Message(**msg) for msg in messages],
         stream=False,
     )
 

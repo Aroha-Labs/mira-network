@@ -5,12 +5,13 @@ from sqlmodel import Session, select
 from src.router.api.v1.network import generate
 from src.router.core.security import verify_user
 from src.router.core.types import User
-from src.router.schemas.ai import AiRequest, Message
+from src.router.schemas.ai import AiRequest, Message, Function, Tool
 from src.router.models.flows import Flows
 from src.router.schemas.flows import FlowRequest, FlowChatCompletion
 from src.router.db.session import get_session
 from src.router.utils.network import get_random_machines, PROXY_PORT
 import requests
+import json
 
 router = APIRouter()
 
@@ -114,15 +115,14 @@ async def generate_with_flow_id(
 
     req.messages.insert(0, Message(role="system", content=system_prompt))
 
-    machine = get_random_machines(1)[0]
-    # proxy_url = f"http://{machine.network_ip}:{PROXY_PORT}/v1/chat/completions"
-
     response = await generate(
         req=AiRequest(
             model=req.model,
             messages=req.messages,
             stream=req.stream,
             model_provider=None,
+            tools=req.tools,
+            tool_choice=req.tool_choice,
         ),
         user=user,
         db=db,
@@ -171,6 +171,8 @@ async def try_flow(
             messages=chat.messages,
             stream=chat.stream,
             model_provider=None,
+            tools=chat.tools,
+            tool_choice=chat.tool_choice,
         ),
         user=user,
         db=db,
