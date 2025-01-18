@@ -199,11 +199,10 @@ jobs:
           LAST_TAG=$(git describe --tags --abbrev=0 ${{ steps.tag_version.outputs.new_tag }}^) \
           node generate-notes.js
 
-          # Read the notes and write to GITHUB_OUTPUT with a unique delimiter
-          delimiter="RELEASE_NOTES_EOF"
-          echo "notes<<$delimiter" >> $GITHUB_OUTPUT
-          cat release_notes.txt >> $GITHUB_OUTPUT
-          echo "$delimiter" >> $GITHUB_OUTPUT
+          # Use GitHub Actions commands to set output
+          echo "RELEASE_NOTES<<ENDRELEASENOTES" >> "$GITHUB_ENV"
+          cat release_notes.txt >> "$GITHUB_ENV"
+          echo "ENDRELEASENOTES" >> "$GITHUB_ENV"
           rm release_notes.txt  # Clean up
 
       - name: Create Release
@@ -213,7 +212,7 @@ jobs:
         with:
           tag_name: ${{ steps.tag_version.outputs.new_tag }}
           release_name: Release ${{ steps.tag_version.outputs.new_tag }}
-          body: ${{ steps.release_notes.outputs.notes }}
+          body: ${{ env.RELEASE_NOTES }}
           draft: false
           prerelease: ${{ github.ref != 'refs/heads/main' }}
 
