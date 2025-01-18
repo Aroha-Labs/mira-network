@@ -199,20 +199,17 @@ jobs:
           LAST_TAG=$(git describe --tags --abbrev=0 ${{ steps.tag_version.outputs.new_tag }}^) \
           node generate-notes.js
 
-          # Use GitHub Actions commands to set output
-          echo "RELEASE_NOTES<<ENDRELEASENOTES" >> "$GITHUB_ENV"
-          cat release_notes.txt >> "$GITHUB_ENV"
-          echo "ENDRELEASENOTES" >> "$GITHUB_ENV"
-          rm release_notes.txt  # Clean up
+          # Save the release notes path as output
+          mv release_notes.txt release_notes_${{ steps.tag_version.outputs.new_tag }}.md
 
       - name: Create Release
-        uses: actions/create-release@v1
+        uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ steps.tag_version.outputs.new_tag }}
-          release_name: Release ${{ steps.tag_version.outputs.new_tag }}
-          body: ${{ env.RELEASE_NOTES }}
+          name: Release ${{ steps.tag_version.outputs.new_tag }}
+          body_path: release_notes_${{ steps.tag_version.outputs.new_tag }}.md
           draft: false
           prerelease: ${{ github.ref != 'refs/heads/main' }}
 
