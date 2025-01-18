@@ -162,6 +162,8 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: router
+          build-args: |
+            IMAGE_VERSION=${{ env.VERSION }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -203,6 +205,8 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: service
+          build-args: |
+            IMAGE_VERSION=${{ env.VERSION }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
