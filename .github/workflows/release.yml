@@ -159,21 +159,19 @@ jobs:
               });
               
               const notes = completion.choices[0].message.content;
-              // Escape any special characters for GitHub Actions
-              const escapedNotes = notes.replace(/%/g, '%25').replace(/\n/g, '%0A').replace(/\r/g, '%0D');
-              // Write to a temporary file that the shell script will read
-              require('fs').writeFileSync('release_notes.txt', escapedNotes);
+              // Write notes directly without escaping
+              require('fs').writeFileSync('release_notes.txt', notes);
             } catch (error) {
               console.error('Error generating release notes:', error);
               // Provide a default message if generation fails
-              require('fs').writeFileSync('release_notes.txt', 'This release includes various updates and improvements.');
+              require('fs').writeFileSync('release_notes.txt', '# Release Notes\n\nThis release includes various updates and improvements.');
               process.exit(0); // Don't fail the workflow
             }
           }
 
           main().catch(error => {
             console.error('Unhandled error:', error);
-            require('fs').writeFileSync('release_notes.txt', 'This release includes various updates and improvements.');
+            require('fs').writeFileSync('release_notes.txt', '# Release Notes\n\nThis release includes various updates and improvements.');
             process.exit(0); // Don't fail the workflow
           });
           EOF
@@ -183,8 +181,12 @@ jobs:
           LAST_TAG=$(git describe --tags --abbrev=0 ${{ steps.tag_version.outputs.new_tag }}^) \
           node generate-notes.js
 
-          # Read the notes and write to GITHUB_OUTPUT
-          echo "notes=$(cat release_notes.txt)" >> $GITHUB_OUTPUT
+          # Read the notes and write to GITHUB_OUTPUT, preserving newlines
+          {
+            echo 'notes<<EOF'
+            cat release_notes.txt
+            echo EOF
+          } >> $GITHUB_OUTPUT
           rm release_notes.txt  # Clean up
 
       - name: Create Release
