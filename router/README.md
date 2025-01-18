@@ -26,12 +26,14 @@ A robust FastAPI-based dashboard service for the Mira Network client interface.
 ## 🛠 Installation
 
 1. Clone the repository:
+
    ```bash
    git clone https://github.com/Aroha-Labs/mira-network/
    cd mira-network/router
    ```
 
 2. Install dependencies using PDM:
+
    ```bash
    pdm install
    ```
@@ -49,11 +51,13 @@ A robust FastAPI-based dashboard service for the Mira Network client interface.
 ## 🚀 Usage
 
 ### Development
+
 ```bash
 pdm run dev
 ```
 
 ### Production
+
 ```bash
 pdm run prod
 ```
@@ -63,6 +67,7 @@ The server will start at `http://0.0.0.0:8000`
 ## 📚 API Documentation
 
 Once the server is running, you can access:
+
 - Interactive API documentation: `http://localhost:8000/docs`
 - Alternative API documentation: `http://localhost:8000/redoc`
 
@@ -96,6 +101,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 📞 Support
 
 For support, email contact@hamidraza.com or open an issue in the repository.
-
----
-Last updated: January 5, 2025
