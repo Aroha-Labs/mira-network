@@ -63,6 +63,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       new_tag: ${{ steps.tag_version.outputs.new_tag }}
+      notes: ${{ steps.release_notes.outputs.notes }}
 
     steps:
       - uses: actions/checkout@v4
@@ -116,14 +117,76 @@ jobs:
             exit 1
           fi
 
+      - name: Generate Release Notes
+        id: release_notes
+        run: |
+          # Install required packages
+          npm install openai
+
+          # Create and run the release notes generator script
+          cat > generate-notes.js << 'EOF'
+          const OpenAI = require('openai');
+
+          async function main() {
+            try {
+              const openai = new OpenAI({
+                apiKey: process.env.OPENAI_API_KEY
+              });
+              
+              // Get git diff
+              const { execSync } = require('child_process');
+              const diff = execSync(`git diff ${process.env.LAST_TAG} ${process.env.NEW_TAG} --stat`).toString();
+              
+              if (!diff) {
+                throw new Error('No diff found between tags');
+              }
+              
+              // Generate release notes using OpenAI
+              const completion = await openai.chat.completions.create({
+                model: "gpt-4-1106-preview",
+                messages: [
+                  {
+                    role: "system",
+                    content: "You are a helpful assistant that generates clear and concise release notes from git diffs. Focus on user-facing changes and important technical updates."
+                  },
+                  {
+                    role: "user",
+                    content: `Generate release notes from this git diff:\n\n${diff}`
+                  }
+                ]
+              });
+              
+              const notes = completion.choices[0].message.content;
+              // Escape any special characters for GitHub Actions
+              const escapedNotes = notes.replace(/%/g, '%25').replace(/\n/g, '%0A').replace(/\r/g, '%0D');
+              echo "notes=${escapedNotes}" >> $GITHUB_OUTPUT
+            } catch (error) {
+              console.error('Error generating release notes:', error);
+              // Provide a default message if generation fails
+              echo "notes=This release includes various updates and improvements." >> $GITHUB_OUTPUT
+              process.exit(0); // Don't fail the workflow
+            }
+          }
+
+          main().catch(error => {
+            console.error('Unhandled error:', error);
+            process.exit(0); // Don't fail the workflow
+          });
+          EOF
+
+          # Run the script
+          NEW_TAG=${{ steps.tag_version.outputs.new_tag }} \
+          LAST_TAG=$(git describe --tags --abbrev=0 ${{ steps.tag_version.outputs.new_tag }}^) \
+          node generate-notes.js
+
       - name: Create Release
-        id: create_release
-        uses: softprops/action-gh-release@v1
+        uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ steps.tag_version.outputs.new_tag }}
-          name: Release ${{ steps.tag_version.outputs.new_tag }}
+          release_name: Release ${{ steps.tag_version.outputs.new_tag }}
+          body: ${{ steps.release_notes.outputs.notes }}
           draft: false
           prerelease: ${{ github.ref != 'refs/heads/main' }}
 
