@@ -1,25 +1,17 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { useUser } from "src/hooks/useUser";
+import { useState, useRef, useEffect, useMemo } from "react";
 import Link from "next/link";
 import ChatBubble from "src/components/ChatBubble";
 // import SystemPromptInput from "src/components/SystemPromptInput";
-import {
-  ChatBubbleBottomCenterIcon,
-  StopIcon,
-} from "@heroicons/react/24/outline";
-import Loading, { Spinner } from "src/components/Loading";
+import { ChatBubbleBottomCenterIcon, StopIcon } from "@heroicons/react/24/outline";
+import Loading, { Spinner } from "src/components/PageLoading";
 import AutoGrowTextarea from "src/components/AutoGrowTextarea";
 import ConfirmModal from "src/components/ConfirmModal";
 import { LLM_BASE_URL } from "src/config";
 import { useQuery } from "@tanstack/react-query";
 import { useSession } from "src/hooks/useSession";
-
-interface Message {
-  role: string;
-  content: string;
-}
+import { Message } from "src/utils/chat";
 
 const fetchChatCompletion = async (
   messages: Message[],
@@ -46,9 +38,7 @@ const fetchChatCompletion = async (
   if (!response.ok) {
     try {
       const data = await response.json();
-      throw new Error(
-        data.detail || data.error.message || "Failed to send message"
-      );
+      throw new Error(data.detail || data.error.message || "Failed to send message");
     } catch (error) {
       throw error;
     }
@@ -117,7 +107,7 @@ export default function Chat() {
     data: supportedModelsData,
     error: supportedModelsError,
     isLoading: isModelsLoading,
-  } = useQuery({
+  } = useQuery<string[]>({
     queryKey: ["supportedModels"],
     queryFn: fetchSupportedModels,
   });
@@ -131,6 +121,14 @@ export default function Chat() {
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
   };
+
+  const supportedModelsOptions = useMemo(() => {
+    if (!supportedModelsData) return [];
+    return supportedModelsData.map((m) => {
+      const s = m.split("/");
+      return { value: m, label: s[s.length - 1] };
+    });
+  }, [supportedModelsData]);
 
   // const handleSystemPromptChange = (v: string) => {
   //   setSystemPrompt(v);
@@ -159,8 +157,8 @@ export default function Chat() {
     setIsSending(true);
     setErrorMessage("");
 
-    const userMessage = { role: "user", content: i };
-    const assistantMessage = { role: "assistant", content: "" };
+    const userMessage: Message = { role: "user", content: i };
+    const assistantMessage: Message = { role: "assistant", content: "" };
     const updatedMessages = [...messages, userMessage];
 
     setMessages([...updatedMessages, assistantMessage]);
@@ -184,10 +182,7 @@ export default function Chat() {
         newMessages,
         (chunk) => {
           assistantMessage.content += chunk;
-          setMessages((prevMessages) => [
-            ...prevMessages.slice(0, -1),
-            assistantMessage,
-          ]);
+          setMessages((prevMessages) => [...prevMessages.slice(0, -1), assistantMessage]);
         },
         abortControllerRef.current,
         selectedModel,
@@ -199,9 +194,7 @@ export default function Chat() {
         console.error("Failed to send message:", error);
         setMessages((prevMessages) => prevMessages.slice(0, -2));
         setInput(userMessage.content);
-        setErrorMessage(
-          err.message || "Failed to send message. Please try again."
-        );
+        setErrorMessage(err.message || "Failed to send message. Please try again.");
       }
     } finally {
       setIsSending(false);
@@ -236,7 +229,7 @@ export default function Chat() {
     setIsSending(true);
     setErrorMessage("");
 
-    const assistantMessage = { role: "assistant", content: "" };
+    const assistantMessage: Message = { role: "assistant", content: "" };
     const updatedMessages = [...messagesToKeep, assistantMessage];
 
     setMessages(updatedMessages);
@@ -259,10 +252,7 @@ export default function Chat() {
         newMessages,
         (chunk) => {
           assistantMessage.content += chunk;
-          setMessages((prevMessages) => [
-            ...prevMessages.slice(0, -1),
-            assistantMessage,
-          ]);
+          setMessages((prevMessages) => [...prevMessages.slice(0, -1), assistantMessage]);
         },
         abortControllerRef.current,
         selectedModel,
@@ -299,11 +289,7 @@ export default function Chat() {
   };
 
   if (isLoading || isModelsLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <Loading />
-      </div>
-    );
+    return <Loading fullPage />;
   }
 
   if (supportedModelsError) {
@@ -334,15 +320,15 @@ export default function Chat() {
 
   return (
     <div className="flex flex-col items-center bg-gray-100 flex-1">
-      <div className="w-full p-4 bg-white border-b border-gray-300 flex justify-center">
+      <div className="m-1 p-1 bg-white flex justify-center self-start">
         <select
           value={selectedModel}
           onChange={handleModelChange}
-          className="border border-gray-300 p-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="border border-gray-300 p-1 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 "
         >
-          {supportedModelsData.map((model: string) => (
-            <option key={model} value={model}>
-              {model}
+          {supportedModelsOptions.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
             </option>
           ))}
         </select>
@@ -420,9 +406,7 @@ export default function Chat() {
           )}
         </div>
         {errorMessage && (
-          <div className="text-red-500 text-sm mt-2 text-center">
-            {errorMessage}
-          </div>
+          <div className="text-red-500 text-sm mt-2 text-center">{errorMessage}</div>
         )}
       </div>
       {showConfirmModal && (

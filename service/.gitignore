@@ -1,1 +1,4 @@
 client.properties
+.pdm-python
+.env
+__pycache__

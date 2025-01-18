@@ -1,0 +1,15 @@
+import redis
+import os
+
+redis_client = redis.Redis(
+    host=os.getenv("REDIS_HOST"),
+    port=int(os.getenv("REDIS_PORT", 6379)),
+    db=int(os.getenv("REDIS_DB", 0)),
+)
+
+
+def get_online_machines() -> list[str]:
+    return [
+        key.decode("utf-8").split(":")[1]
+        for key in redis_client.keys(pattern="liveness:*")
+    ]
