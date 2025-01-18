@@ -9,7 +9,6 @@ import ConfirmModal from "./ConfirmModal";
 import ChatBubble from "./ChatBubble";
 import { Spinner } from "./PageLoading";
 import api from "src/lib/axios";
-import { API_BASE_URL } from "src/config";
 import { Message, streamChatCompletion, Tool } from "src/utils/chat";
 import ToolEditModal from "./ToolEditModal";
 
@@ -129,7 +128,12 @@ export default function FlowChat({ flow, onClose }: FlowChatProps) {
     setIsLoading(true);
     setErrorMessage("");
 
-    const assistantMessage = { role: "assistant", content: "" } as Message;
+    const assistantMessage: Message = {
+      role: "assistant",
+      content: "",
+      tool_calls: [],
+      tool_responses: [],
+    };
     const updatedMessages = [...messagesToKeep, assistantMessage];
     setMessages(updatedMessages);
 
@@ -197,7 +201,12 @@ export default function FlowChat({ flow, onClose }: FlowChatProps) {
       setIsLoading(true);
       setErrorMessage("");
       const userMessage = { role: "user" as const, content: messageToSend };
-      const assistantMessage = { role: "assistant" as const, content: "" };
+      const assistantMessage: Message = {
+        role: "assistant",
+        content: "",
+        tool_calls: [],
+        tool_responses: [],
+      };
       const updatedMessages = [...messages, userMessage];
 
       setMessages([...updatedMessages, assistantMessage]);
@@ -286,7 +295,7 @@ export default function FlowChat({ flow, onClose }: FlowChatProps) {
 
   const handleSaveTool = (tool: Tool) => {
     if (editingTool) {
-      const index = tools.findIndex((t) => t.name === editingTool.name);
+      const index = tools.findIndex((t) => t.function.name === editingTool.function.name);
       if (index !== -1) {
         const newTools = [...tools];
         newTools[index] = tool;

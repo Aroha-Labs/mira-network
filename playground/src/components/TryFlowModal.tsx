@@ -6,8 +6,6 @@ import { XMarkIcon, StopIcon } from "@heroicons/react/24/outline";
 import { useQuery } from "@tanstack/react-query";
 import api from "src/lib/axios";
 import { Message, streamChatCompletion } from "src/utils/chat";
-import { isAxiosError } from "axios";
-import { supabase } from "src/utils/supabase/client";
 
 interface TryFlowModalProps {
   onClose: () => void;
@@ -22,7 +20,7 @@ const fetchSupportedModels = async () => {
 
 const fetchChatCompletion = async (
   messages: Message[],
-  onMessage: (chunk: string) => void,
+  onMessage: (chunk: string | Message) => void,
   controller: AbortController,
   model: string,
   variables: Record<string, string>,
@@ -93,11 +91,14 @@ export default function TryFlowModal({ onClose, onSave }: TryFlowModalProps) {
       await fetchChatCompletion(
         updatedMessages,
         (chunk) => {
-          assistantMessage.content += chunk;
-          setMessages((prevMessages) => [
-            ...prevMessages.slice(0, -1),
-            { ...assistantMessage },
-          ]);
+          if (typeof chunk === "string") {
+            assistantMessage.content += chunk;
+            setMessages((prevMessages) => [
+              ...prevMessages.slice(0, -1),
+              { ...assistantMessage },
+            ]);
+          }
+          // If chunk is a Message object, we don't need to handle it in this component
         },
         abortControllerRef.current,
         selectedModel,
