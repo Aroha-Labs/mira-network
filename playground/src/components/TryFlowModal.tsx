@@ -5,19 +5,13 @@ import AutoGrowTextarea from "./AutoGrowTextarea";
 import { XMarkIcon, StopIcon } from "@heroicons/react/24/outline";
 import { useQuery } from "@tanstack/react-query";
 import api from "src/lib/axios";
+import { Message, streamChatCompletion } from "src/utils/chat";
+import { isAxiosError } from "axios";
+import { supabase } from "src/utils/supabase/client";
 
 interface TryFlowModalProps {
   onClose: () => void;
-  onSave: (flow: {
-    name: string;
-    system_prompt: string;
-    variables: string[];
-  }) => void;
-}
-
-interface Message {
-  role: "user" | "assistant" | "system";
-  content: string;
+  onSave: (flow: { name: string; system_prompt: string; variables: string[] }) => void;
 }
 
 const fetchSupportedModels = async () => {
@@ -34,67 +28,23 @@ const fetchChatCompletion = async (
   variables: Record<string, string>,
   systemPrompt: string
 ) => {
-  const response = await api.post(
-    "/flows/try",
+  await streamChatCompletion(
     {
-      req: {
-        system_prompt: systemPrompt,
-        name: "Test Flow",
-      },
-      chat: {
-        model,
-        messages,
-        variables,
-        stream: true,
-      },
+      messages,
+      model,
+      variables,
+      systemPrompt,
+      endpoint: "/flows/try",
     },
+    controller,
     {
-      signal: controller.signal,
-      responseType: "stream",
+      onMessage,
+      onError: (error) => {
+        console.error("Chat completion error:", error);
+        throw error;
+      },
     }
   );
-
-  if (response.status !== 200) {
-    throw new Error("Failed to send message");
-  }
-
-  const reader = response.data.getReader();
-  const decoder = new TextDecoder();
-
-  try {
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-
-      const chunk = decoder.decode(value, { stream: true });
-      const lines = chunk.split("\n");
-
-      for (const line of lines) {
-        if (line.startsWith("data: ")) {
-          const data = line.slice(6);
-          if (data === "[DONE]") continue;
-
-          try {
-            const parsed = JSON.parse(data);
-            if (parsed.choices?.[0]?.delta?.content) {
-              onMessage(parsed.choices[0].delta.content);
-            }
-          } catch (error) {
-            console.log("Error:", error);
-            console.warn("Failed to parse chunk:", data);
-          }
-        }
-      }
-    }
-  } catch (error) {
-    if ((error as Error).name === "AbortError") {
-      throw error;
-    }
-    console.error("Error processing stream:", error);
-    throw error;
-  } finally {
-    reader.releaseLock();
-  }
 };
 
 export default function TryFlowModal({ onClose, onSave }: TryFlowModalProps) {
@@ -160,9 +110,7 @@ export default function TryFlowModal({ onClose, onSave }: TryFlowModalProps) {
         console.error("Failed to send message:", error);
         setMessages((prev) => prev.slice(0, -2));
         setUserInput(userInput);
-        setErrorMessage(
-          err.message || "Failed to send message. Please try again."
-        );
+        setErrorMessage(err.message || "Failed to send message. Please try again.");
       }
     } finally {
       setIsLoading(false);
@@ -186,112 +134,117 @@ export default function TryFlowModal({ onClose, onSave }: TryFlowModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="w-full max-w-4xl h-[80vh] p-6 bg-white rounded-lg flex flex-col">
+      <div className="flex flex-col w-full h-[90vh] max-w-6xl p-6 bg-white rounded-lg shadow-xl">
+        {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-4">
-            <h2 className="text-xl font-semibold">Try New Flow</h2>
+            <h2 className="text-xl font-semibold">Try Flow</h2>
             <select
               value={selectedModel}
               onChange={(e) => setSelectedModel(e.target.value)}
-              className="p-1 border border-gray-300 rounded-md"
+              className="px-3 py-1 border border-gray-300 rounded-md"
             >
               <option value="">Select Model</option>
               {supportedModelsData?.map((model) => (
                 <option key={model} value={model}>
-                  {model.split("/").pop()}
+                  {model}
                 </option>
               ))}
             </select>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700"
-          >
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
             <XMarkIcon className="w-6 h-6" />
           </button>
         </div>
 
-        <div className="flex flex-1 gap-4 overflow-hidden">
-          {/* Left Panel */}
-          <div className="w-1/3 space-y-4">
-            <div>
-              <label className="block mb-1 text-sm font-medium text-gray-700">
-                System Prompt
-              </label>
-              <AutoGrowTextarea
-                value={systemPrompt}
-                onChange={handlePromptChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                placeholder="Enter system prompt with variables like {{variable_name}}"
-              />
+        <div className="flex flex-1 gap-4 min-h-0">
+          {/* Left Panel - System Prompt and Variables */}
+          <div className="flex flex-col w-1/3 min-h-0">
+            <div className="flex-1 overflow-y-auto pr-2">
+              <div className="space-y-4">
+                <div>
+                  <label className="block mb-1 text-sm font-medium text-gray-700">
+                    System Prompt
+                  </label>
+                  <AutoGrowTextarea
+                    value={systemPrompt}
+                    onChange={handlePromptChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    placeholder="Enter system prompt with variables like {{variable_name}}"
+                  />
+                </div>
+
+                {extractedVariables.length > 0 && (
+                  <div>
+                    <label className="block mb-2 text-sm font-medium text-gray-700">
+                      Variables:
+                    </label>
+                    <div className="space-y-2">
+                      {extractedVariables.map((variable) => (
+                        <div key={variable}>
+                          <label className="block text-sm text-gray-600">
+                            {variable}
+                          </label>
+                          <input
+                            type="text"
+                            value={variables[variable] || ""}
+                            onChange={(e) =>
+                              setVariables((prev) => ({
+                                ...prev,
+                                [variable]: e.target.value,
+                              }))
+                            }
+                            className="w-full px-2 py-1 border border-gray-300 rounded"
+                            placeholder={`Enter ${variable}`}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
-            {extractedVariables.length > 0 && (
-              <div>
-                <label className="block mb-2 text-sm font-medium text-gray-700">
-                  Variables:
-                </label>
+            {/* Save Flow Button/Form - Fixed at bottom */}
+            <div className="pt-4 mt-4 border-t">
+              {!showSaveForm ? (
+                <button
+                  onClick={() => setShowSaveForm(true)}
+                  className="w-full px-4 py-2 text-white bg-green-500 rounded-md hover:bg-green-600"
+                >
+                  Save Flow
+                </button>
+              ) : (
                 <div className="space-y-2">
-                  {extractedVariables.map((variable) => (
-                    <div key={variable}>
-                      <label className="block text-sm text-gray-600">
-                        {variable}
-                      </label>
-                      <input
-                        type="text"
-                        value={variables[variable] || ""}
-                        onChange={(e) =>
-                          setVariables((prev) => ({
-                            ...prev,
-                            [variable]: e.target.value,
-                          }))
-                        }
-                        className="w-full px-2 py-1 border border-gray-300 rounded"
-                        placeholder={`Enter ${variable}`}
-                      />
-                    </div>
-                  ))}
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    placeholder="Enter flow name"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleSave}
+                      disabled={!name.trim() || !systemPrompt.trim()}
+                      className="flex-1 px-4 py-2 text-white bg-green-500 rounded-md hover:bg-green-600 disabled:opacity-50"
+                    >
+                      Confirm Save
+                    </button>
+                    <button
+                      onClick={() => setShowSaveForm(false)}
+                      className="px-4 py-2 text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
-
-            {!showSaveForm ? (
-              <button
-                onClick={() => setShowSaveForm(true)}
-                className="w-full px-4 py-2 text-white bg-green-500 rounded-md hover:bg-green-600"
-              >
-                Save Flow
-              </button>
-            ) : (
-              <div className="space-y-2">
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                  placeholder="Enter flow name"
-                />
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleSave}
-                    disabled={!name.trim() || !systemPrompt.trim()}
-                    className="flex-1 px-4 py-2 text-white bg-green-500 rounded-md hover:bg-green-600 disabled:opacity-50"
-                  >
-                    Confirm Save
-                  </button>
-                  <button
-                    onClick={() => setShowSaveForm(false)}
-                    className="px-4 py-2 text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
           {/* Right Panel - Chat */}
-          <div className="flex flex-col flex-1">
+          <div className="flex flex-col flex-1 min-h-0">
             <div className="flex-1 p-4 mb-4 overflow-y-auto border rounded-lg">
               {messages.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-gray-500">
@@ -303,15 +256,11 @@ export default function TryFlowModal({ onClose, onSave }: TryFlowModalProps) {
                   return (
                     <div
                       key={index}
-                      className={`mb-4 ${
-                        msg.role === "assistant" ? "pl-4" : "pr-4"
-                      }`}
+                      className={`mb-4 ${msg.role === "assistant" ? "pl-4" : "pr-4"}`}
                     >
                       <div
                         className={`p-3 rounded-lg ${
-                          msg.role === "assistant"
-                            ? "bg-gray-100"
-                            : "bg-blue-100"
+                          msg.role === "assistant" ? "bg-gray-100" : "bg-blue-100"
                         }`}
                       >
                         <p className="text-sm">{msg.content}</p>

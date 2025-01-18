@@ -1,0 +1,233 @@
+import { supabase } from "src/utils/supabase/client";
+import api from "src/lib/axios";
+
+export interface Message {
+  role: "user" | "assistant" | "system";
+  content: string;
+  tool_calls?: ToolCall[];
+  tool_responses?: ToolResponse[];
+}
+
+interface StreamProcessor {
+  onMessage: (chunk: string | Message) => void;
+  onError?: (error: Error) => void;
+  onDone?: () => void;
+}
+
+export interface ToolParameter {
+  type: "string" | "number" | "boolean" | "array" | "object";
+  description: string;
+  items?: {
+    type: string;
+  };
+}
+
+export interface FunctionDefinition {
+  name: string;
+  description: string;
+  parameters: {
+    type: "object";
+    properties: Record<string, ToolParameter>;
+    required: string[];
+  };
+}
+
+export interface Tool {
+  type: "function";
+  function: FunctionDefinition;
+}
+
+interface ChatCompletionOptions {
+  messages: Message[];
+  model: string;
+  variables?: Record<string, string>;
+  systemPrompt?: string;
+  flowId?: number;
+  endpoint: string;
+  tools?: Tool[];
+}
+
+export interface ToolCall {
+  id: string;
+  name: string;
+  arguments: string;
+  index: number;
+  response?: string;
+}
+
+export interface ToolResponse {
+  tool_call_id: string;
+  content: string;
+}
+
+async function getAuthHeaders() {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session?.access_token) {
+    throw new Error("Not authenticated");
+  }
+  return {
+    ...api.defaults.headers,
+    "Content-Type": "application/json",
+    Accept: "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+    Authorization: `Bearer ${session.access_token}`,
+  };
+}
+
+export async function processStream(
+  response: Response,
+  { onMessage, onError, onDone }: StreamProcessor
+) {
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error("No reader available");
+  }
+
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        const trimmedLine = line.trim();
+        if (!trimmedLine || trimmedLine === "") continue;
+
+        if (trimmedLine.startsWith("data: ")) {
+          const data = trimmedLine.slice(5).trim();
+          if (data === "[DONE]") continue;
+
+          try {
+            const parsed = JSON.parse(data);
+            console.log("Parsed SSE data:", parsed); // Debug log
+            if (parsed.content) {
+              onMessage(parsed.content);
+            }
+            if (parsed.tool_calls) {
+              console.log("Received tool calls:", parsed.tool_calls); // Debug log
+              const toolCalls = parsed.tool_calls.map((call: any) => ({
+                id: call.id || "",
+                name: call.function?.name || "",
+                arguments: call.function?.arguments || "",
+                index: call.index || 0,
+              }));
+
+              // Only send tool calls if they have meaningful data
+              if (toolCalls.some((call) => call.id && call.name && call.arguments)) {
+                onMessage({
+                  role: "assistant",
+                  content: "",
+                  tool_calls: toolCalls,
+                } as Message);
+              }
+            }
+            if (parsed.tool_response) {
+              onMessage({
+                role: "assistant",
+                content: "",
+                tool_responses: [
+                  {
+                    content: parsed.tool_response.content,
+                    tool_call_id: parsed.tool_response.tool_call_id || "",
+                  },
+                ],
+              } as Message);
+            }
+          } catch (error) {
+            console.warn("Parse error for line:", {
+              line: trimmedLine,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+        }
+      }
+    }
+    onDone?.();
+  } catch (error) {
+    console.error("Stream processing error:", error);
+    if ((error as Error).name === "AbortError") {
+      throw error;
+    }
+    onError?.(error as Error);
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+export async function streamChatCompletion(
+  options: ChatCompletionOptions,
+  controller: AbortController,
+  handlers: StreamProcessor
+) {
+  try {
+    const headers = await getAuthHeaders();
+    const { endpoint, flowId, systemPrompt, tools, ...chatOptions } = options;
+
+    // Convert tools to match backend's Tool model exactly
+    const serializedTools = tools?.map((tool) => {
+      const toolDict = {
+        type: "function",
+        function: {
+          name: tool.function.name,
+          description: tool.function.description,
+          parameters: tool.function.parameters,
+        },
+      };
+      // Convert to a plain object to ensure no class instances
+      return JSON.parse(JSON.stringify(toolDict));
+    });
+
+    const body: Record<string, any> = flowId
+      ? {
+          ...chatOptions,
+          tools: serializedTools,
+          stream: true,
+        }
+      : {
+          req: {
+            system_prompt: systemPrompt,
+            name: "Test Flow",
+          },
+          chat: {
+            ...chatOptions,
+            tools: serializedTools,
+            stream: true,
+          },
+        };
+
+    const response = await fetch(`${api.defaults.baseURL}${endpoint}`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(
+        errorData.detail ||
+          errorData.message ||
+          `Request failed with status ${response.status}`
+      );
+    }
+
+    await processStream(response, handlers);
+  } catch (error) {
+    console.error("Chat completion error:", error);
+    if (error instanceof Error) {
+      handlers.onError?.(error);
+    } else {
+      handlers.onError?.(new Error("Unknown error occurred"));
+    }
+    throw error;
+  }
+}

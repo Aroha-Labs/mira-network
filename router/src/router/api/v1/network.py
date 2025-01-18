@@ -126,6 +126,8 @@ async def generate(
     def generate():
         usage = {}
         result_text = ""
+        # Track tool calls
+        current_tool_calls = {}
 
         # Time to first token
         ttfs: Optional[float] = None
@@ -140,17 +142,58 @@ async def generate(
                     choice = json_line["choices"][0]
                     if "delta" in choice:
                         delta = choice["delta"]
-                        if "content" in delta:
+                        if "content" in delta and delta["content"] is not None:
                             result_text += delta["content"]
+                            yield f"data: {json.dumps({'content': delta['content']})}\n\n"
+                        if "tool_calls" in delta:
+                            for tool_call in delta["tool_calls"]:
+                                index = tool_call.get("index", 0)
+                                if index not in current_tool_calls:
+                                    current_tool_calls[index] = {
+                                        "id": tool_call.get("id", ""),
+                                        "type": tool_call.get("type", "function"),
+                                        "function": {
+                                            "name": tool_call.get("function", {}).get(
+                                                "name", ""
+                                            ),
+                                            "arguments": tool_call.get(
+                                                "function", {}
+                                            ).get("arguments", ""),
+                                        },
+                                        "index": index,
+                                    }
+                                else:
+                                    # Update existing tool call
+                                    if "id" in tool_call:
+                                        current_tool_calls[index]["id"] = tool_call[
+                                            "id"
+                                        ]
+                                    if "function" in tool_call:
+                                        if "name" in tool_call["function"]:
+                                            current_tool_calls[index]["function"][
+                                                "name"
+                                            ] = tool_call["function"]["name"]
+                                        if "arguments" in tool_call["function"]:
+                                            current_tool_calls[index]["function"][
+                                                "arguments"
+                                            ] += tool_call["function"]["arguments"]
+
+                            # Send the current state of tool calls
+                            yield f"data: {json.dumps({'tool_calls': list(current_tool_calls.values())})}\n\n"
                 if "usage" in json_line:
                     usage = json_line["usage"]
-            except json.JSONDecodeError as e:
-                # print(e)
+            except json.JSONDecodeError:
+                pass
+            except TypeError:
+                # Handle potential TypeError when concatenating
                 pass
 
             if ttfs is None:
                 ttfs = time.time() - timeStart
-            yield line
+
+            # Format response as SSE data
+            if l.strip():
+                yield f"data: {l}\n\n"
 
         sm = get_setting_value(
             db,

@@ -10,6 +10,8 @@ import ChatBubble from "./ChatBubble";
 import { Spinner } from "./PageLoading";
 import api from "src/lib/axios";
 import { API_BASE_URL } from "src/config";
+import { Message, streamChatCompletion, Tool } from "src/utils/chat";
+import ToolEditModal from "./ToolEditModal";
 
 interface FlowChatProps {
   flow: {
@@ -17,13 +19,9 @@ interface FlowChatProps {
     name: string;
     system_prompt: string;
     variables: string[];
+    tools?: Tool[];
   };
   onClose: () => void;
-}
-
-interface Message {
-  role: "user" | "assistant";
-  content: string;
 }
 
 const fetchSupportedModels = async () => {
@@ -32,125 +30,51 @@ const fetchSupportedModels = async () => {
   return response.data.data.map((model: { id: string }) => model.id);
 };
 
-// const processStreamResponse = async (
-//   response: Response,
-//   onChunk: (chunk: string) => void
-// ) => {
-//   const reader = response.body?.getReader();
-//   if (!reader) throw new Error("No reader available");
-
-//   const decoder = new TextDecoder();
-//   let buffer = "";
-
-//   try {
-//     while (true) {
-//       const { done, value } = await reader.read();
-//       if (done) break;
-
-//       // Decode the chunk and add it to buffer
-//       buffer += decoder.decode(value, { stream: true });
-
-//       // Split on double newlines which typically separate SSE messages
-//       const lines = buffer.split("\n\n");
-//       // Keep the last (potentially incomplete) part in the buffer
-//       buffer = lines.pop() || "";
-
-//       for (const line of lines) {
-//         // Skip empty lines
-//         if (!line.trim()) continue;
-
-//         // Handle lines that start with "data: "
-//         if (line.includes("data: ")) {
-//           const data = line.replace(/^data: /, "").trim();
-//           if (data === "[DONE]") continue;
-
-//           try {
-//             const parsed = JSON.parse(data);
-//             // Check for OPENROUTER PROCESSING message
-//             if (parsed.choices?.[0]?.delta?.content) {
-//               onChunk(parsed.choices[0].delta.content);
-//             }
-//           } catch (e) {
-//             console.warn("Failed to parse chunk:", data);
-//           }
-//         }
-//       }
-//     }
-//   } catch (error) {
-//     if ((error as Error).name === "AbortError") {
-//       throw error;
-//     }
-//     console.error("Error processing stream:", error);
-//   } finally {
-//     reader.releaseLock();
-//   }
-// };
 const fetchChatCompletion = async (
   messages: Message[],
-  onMessage: (chunk: string) => void,
+  onMessage: (chunk: string | Message) => void,
   controller: AbortController,
   model: string,
   variables: Record<string, string>,
-  flowId: number
+  flowId: number,
+  tools: Tool[]
 ) => {
-  const response = await api.post(
-    `${API_BASE_URL}/v1/flow/${flowId}/chat/completions`,
+  await streamChatCompletion(
     {
-      model,
       messages,
+      model,
       variables,
-      stream: true,
+      flowId,
+      endpoint: `/v1/flow/${flowId}/chat/completions`,
+      tools,
     },
+    controller,
     {
-      signal: controller.signal,
-      responseType: "text",
-      onDownloadProgress: (progressEvent) => {
-        const text = progressEvent.event.target.responseText;
-        const newText = text.substring(progressEvent.loaded);
-
-        // Split on data: and process each SSE message
-        const lines = newText.split("data: ");
-        for (const line of lines) {
-          if (!line.trim()) continue;
-
-          // Skip known non-content messages
-          if (
-            line.includes("[DONE]") ||
-            line.includes("OPENROUTER PROCESSING") ||
-            line.includes('"finish_reason":"stop"')
-          ) {
-            continue;
-          }
-
-          try {
-            const data = JSON.parse(line);
-            // Extract content from the delta or message
-            if (data.choices?.[0]?.delta?.content) {
-              onMessage(data.choices[0].delta.content);
-            } else if (data.choices?.[0]?.message?.content) {
-              onMessage(data.choices[0].message.content);
-            }
-          } catch (e) {
-            const error = e as Error;
-            // Only log if it's not an empty or partial chunk
-
-            // TODO: report to new relic
-            console.error("Error:", error);
-
-            if (line.trim() && !line.includes('"content":""')) {
-              console.debug("Failed to parse chunk:", line);
-            }
-          }
-        }
+      onMessage,
+      onError: (error) => {
+        console.error("Chat completion error:", error);
+        throw error;
       },
     }
   );
-
-  if (response.status !== 200) {
-    const data = response.data;
-    throw new Error(data.detail || data.error?.message || "Failed to send message");
-  }
 };
+
+interface ToolItemProps {
+  tool: Tool;
+  onDelete: () => void;
+}
+
+const ToolItem: React.FC<ToolItemProps> = ({ tool, onDelete }) => (
+  <div className="flex items-center justify-between p-2 bg-gray-50 rounded-md mb-2">
+    <div>
+      <div className="font-medium">{tool.function.name}</div>
+      <div className="text-sm text-gray-600">{tool.function.description}</div>
+    </div>
+    <button onClick={onDelete} className="text-red-600 hover:text-red-800">
+      Remove
+    </button>
+  </div>
+);
 
 export default function FlowChat({ flow, onClose }: FlowChatProps) {
   const [variables, setVariables] = useState<Record<string, string>>({});
@@ -160,6 +84,9 @@ export default function FlowChat({ flow, onClose }: FlowChatProps) {
   const [selectedModel, setSelectedModel] = useState("");
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [tools, setTools] = useState<Tool[]>(flow.tools || []);
+  const [editingTool, setEditingTool] = useState<Tool | undefined>();
+  const [showToolModal, setShowToolModal] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const { data: supportedModelsData } = useQuery<string[]>({
@@ -213,13 +140,32 @@ export default function FlowChat({ flow, onClose }: FlowChatProps) {
         messagesToKeep,
         (chunk) => {
           console.log("Received refresh chunk:", chunk);
-          assistantMessage.content += chunk;
+          if (typeof chunk === "string") {
+            assistantMessage.content += chunk;
+          } else {
+            // Handle Message object with tool_calls
+            if (chunk.content) {
+              assistantMessage.content += chunk.content;
+            }
+            if (chunk.tool_calls) {
+              assistantMessage.tool_calls = chunk.tool_calls;
+            }
+            if (chunk.tool_responses) {
+              assistantMessage.tool_responses = chunk.tool_responses;
+            }
+          }
           setMessages((prevMessages) => {
             const lastMessage = prevMessages[prevMessages.length - 1];
             if (lastMessage.role === "assistant") {
               return [
                 ...prevMessages.slice(0, -1),
-                { ...lastMessage, content: assistantMessage.content },
+                {
+                  ...lastMessage,
+                  content: assistantMessage.content,
+                  tool_calls: assistantMessage.tool_calls || lastMessage.tool_calls,
+                  tool_responses:
+                    assistantMessage.tool_responses || lastMessage.tool_responses,
+                },
               ];
             }
             return [...prevMessages, assistantMessage];
@@ -228,7 +174,8 @@ export default function FlowChat({ flow, onClose }: FlowChatProps) {
         abortControllerRef.current,
         selectedModel,
         variables,
-        flow.id
+        flow.id,
+        tools
       );
     } catch (error) {
       const err = error as Error;
@@ -262,13 +209,32 @@ export default function FlowChat({ flow, onClose }: FlowChatProps) {
         updatedMessages,
         (chunk) => {
           console.log("Received chunk:", chunk);
-          assistantMessage.content += chunk;
+          if (typeof chunk === "string") {
+            assistantMessage.content += chunk;
+          } else {
+            // Handle Message object with tool_calls
+            if (chunk.content) {
+              assistantMessage.content += chunk.content;
+            }
+            if (chunk.tool_calls) {
+              assistantMessage.tool_calls = chunk.tool_calls;
+            }
+            if (chunk.tool_responses) {
+              assistantMessage.tool_responses = chunk.tool_responses;
+            }
+          }
           setMessages((prevMessages) => {
             const lastMessage = prevMessages[prevMessages.length - 1];
             if (lastMessage.role === "assistant") {
               return [
                 ...prevMessages.slice(0, -1),
-                { ...lastMessage, content: assistantMessage.content },
+                {
+                  ...lastMessage,
+                  content: assistantMessage.content,
+                  tool_calls: assistantMessage.tool_calls || lastMessage.tool_calls,
+                  tool_responses:
+                    assistantMessage.tool_responses || lastMessage.tool_responses,
+                },
               ];
             }
             return [...prevMessages, assistantMessage];
@@ -277,7 +243,8 @@ export default function FlowChat({ flow, onClose }: FlowChatProps) {
         abortControllerRef.current,
         selectedModel,
         variables,
-        flow.id
+        flow.id,
+        tools
       );
     } catch (error) {
       const err = error as Error;
@@ -305,6 +272,37 @@ export default function FlowChat({ flow, onClose }: FlowChatProps) {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
+  };
+
+  const handleAddTool = () => {
+    setEditingTool(undefined);
+    setShowToolModal(true);
+  };
+
+  const handleEditTool = (tool: Tool) => {
+    setEditingTool(tool);
+    setShowToolModal(true);
+  };
+
+  const handleSaveTool = (tool: Tool) => {
+    if (editingTool) {
+      const index = tools.findIndex((t) => t.name === editingTool.name);
+      if (index !== -1) {
+        const newTools = [...tools];
+        newTools[index] = tool;
+        setTools(newTools);
+      }
+    } else {
+      setTools([...tools, tool]);
+    }
+    setEditingTool(undefined);
+    setShowToolModal(false);
+  };
+
+  const handleRemoveTool = (index: number) => {
+    const newTools = [...tools];
+    newTools.splice(index, 1);
+    setTools(newTools);
   };
 
   return (
@@ -355,6 +353,29 @@ export default function FlowChat({ flow, onClose }: FlowChatProps) {
                     />
                   </div>
                 ))}
+              </div>
+            </div>
+
+            <div className="mb-6">
+              <h3 className="mb-2 text-sm font-medium text-gray-700">Tools</h3>
+              <div className="space-y-2">
+                {tools.map((tool, index) => (
+                  <div key={index}>
+                    <ToolItem tool={tool} onDelete={() => handleRemoveTool(index)} />
+                    <button
+                      onClick={() => handleEditTool(tool)}
+                      className="w-full py-2 px-4 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
+                    >
+                      Edit Tool
+                    </button>
+                  </div>
+                ))}
+                <button
+                  onClick={handleAddTool}
+                  className="w-full py-2 px-4 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
+                >
+                  Add Tool
+                </button>
               </div>
             </div>
           </div>
@@ -455,6 +476,13 @@ export default function FlowChat({ flow, onClose }: FlowChatProps) {
         >
           Are you sure you want to clear the chat history?
         </ConfirmModal>
+      )}
+      {showToolModal && (
+        <ToolEditModal
+          tool={editingTool}
+          onSave={handleSaveTool}
+          onClose={() => setShowToolModal(false)}
+        />
       )}
     </div>
   );
