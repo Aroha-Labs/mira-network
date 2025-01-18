@@ -2,10 +2,6 @@
 
 <div align="center">
 
-[![Deploy Status](https://img.shields.io/github/actions/workflow/status/Aroha-Labs/mira-client/release.yml?label=deploy)](https://github.com/Aroha-Labs/mira-client/actions/workflows/release.yml)
-[![Latest Release](https://img.shields.io/github/v/release/Aroha-Labs/mira-client)](https://github.com/Aroha-Labs/mira-client/releases)
-[![License](https://img.shields.io/github/license/Aroha-Labs/mira-client)](LICENSE)
-
 _A powerful web interface for interacting with and testing Mira's AI capabilities_
 
 [Documentation](https://docs.mira.ai) • [Live Demo](https://playground.mira.network) • [Report Bug](https://github.com/Aroha-Labs/mira-client/issues)
