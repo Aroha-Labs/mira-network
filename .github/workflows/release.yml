@@ -162,6 +162,8 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: router
+          build-args: |
+            IMAGE_VERSION=${{ env.VERSION }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -203,6 +205,8 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: service
+          build-args: |
+            IMAGE_VERSION=${{ env.VERSION }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -349,3 +353,102 @@ jobs:
 
       - name: Lint with Ruff
         run: ruff check ./
+
+  summary:
+    needs:
+      [
+        changes,
+        create-tag,
+        publish-router,
+        publish-service,
+        publish-cli,
+        deploy-console-testnet,
+        sdk-test,
+        sdk-lint,
+      ]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate Job Summary
+        run: |
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "# 📋 Final Workflow Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 🏷️ Tag Information" >> $GITHUB_STEP_SUMMARY
+          echo "**New Release:** \`${{ needs.create-tag.outputs.new_tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 🚀 Job Status" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Header for the table
+          echo "| Component | Task | Status | Details |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|------|--------|----------|" >> $GITHUB_STEP_SUMMARY
+
+          # Router Status
+          if [ "${{ needs.changes.outputs.router }}" != "true" ]; then
+            echo "| 🌐 Router | Build & Publish | ⏭️ | **Skipped** (No Changes) |" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.publish-router.result }}" = "success" ]; then
+            echo "| 🌐 Router | Build & Publish | ✅ | **Successful** |" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.publish-router.result }}" = "failure" ]; then
+            echo "| 🌐 Router | Build & Publish | ❌ | **Failed** |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| 🌐 Router | Build & Publish | ⚠️ | **Cancelled** |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Service Status
+          if [ "${{ needs.changes.outputs.service }}" != "true" ]; then
+            echo "| ⚙️ Service | Build & Publish | ⏭️ | **Skipped** (No Changes) |" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.publish-service.result }}" = "success" ]; then
+            echo "| ⚙️ Service | Build & Publish | ✅ | **Successful** |" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.publish-service.result }}" = "failure" ]; then
+            echo "| ⚙️ Service | Build & Publish | ❌ | **Failed** |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| ⚙️ Service | Build & Publish | ⚠️ | **Cancelled** |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # CLI Status
+          if [ "${{ needs.changes.outputs.cli }}" != "true" ]; then
+            echo "| 🔧 CLI | Build & Publish | ⏭️ | **Skipped** (No Changes) |" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.publish-cli.result }}" = "success" ]; then
+            echo "| 🔧 CLI | Build & Publish | ✅ | **Successful** |" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.publish-cli.result }}" = "failure" ]; then
+            echo "| 🔧 CLI | Build & Publish | ❌ | **Failed** |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| 🔧 CLI | Build & Publish | ⚠️ | **Cancelled** |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Playground Status
+          if [ "${{ needs.changes.outputs.playground }}" != "true" ]; then
+            echo "| 🎮 Playground | Deploy to Testnet | ⏭️ | **Skipped** (No Changes) |" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.deploy-console-testnet.result }}" = "success" ]; then
+            echo "| 🎮 Playground | Deploy to Testnet | ✅ | **Successful** |" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.deploy-console-testnet.result }}" = "failure" ]; then
+            echo "| 🎮 Playground | Deploy to Testnet | ❌ | **Failed** |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| 🎮 Playground | Deploy to Testnet | ⚠️ | **Cancelled** |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # SDK Status
+          if [ "${{ needs.changes.outputs.sdk }}" != "true" ]; then
+            echo "| 📦 SDK | Tests | ⏭️ | **Skipped** (No Changes) |" >> $GITHUB_STEP_SUMMARY
+            echo "| 📦 SDK | Lint | ⏭️ | **Skipped** (No Changes) |" >> $GITHUB_STEP_SUMMARY
+          else
+            if [ "${{ needs.sdk-test.result }}" = "success" ]; then
+              echo "| 📦 SDK | Tests | ✅ | **Passed** |" >> $GITHUB_STEP_SUMMARY
+            elif [ "${{ needs.sdk-test.result }}" = "failure" ]; then
+              echo "| 📦 SDK | Tests | ❌ | **Failed** |" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "| 📦 SDK | Tests | ⚠️ | **Cancelled** |" >> $GITHUB_STEP_SUMMARY
+            fi
+            
+            if [ "${{ needs.sdk-lint.result }}" = "success" ]; then
+              echo "| 📦 SDK | Lint | ✅ | **Passed** |" >> $GITHUB_STEP_SUMMARY
+            elif [ "${{ needs.sdk-lint.result }}" = "failure" ]; then
+              echo "| 📦 SDK | Lint | ❌ | **Failed** |" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "| 📦 SDK | Lint | ⚠️ | **Cancelled** |" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
