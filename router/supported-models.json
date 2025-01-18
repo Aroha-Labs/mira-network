@@ -1,5 +1,4 @@
 [
-  "mira/llama3.2",
   "openrouter/meta-llama/llama-3.3-70b-instruct",
   "openai/gpt-4o",
   "openrouter/anthropic/claude-3.5-sonnet"

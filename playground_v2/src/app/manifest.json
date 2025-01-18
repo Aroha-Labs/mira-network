@@ -1,0 +1,16 @@
+{
+  "name": "Mira Flows",
+  "short_name": "Mira",
+  "description": "Effortless AI workflows to power your next big idea",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4F95FF",
+  "icons": [
+    {
+      "src": "/icons/logo-dark.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

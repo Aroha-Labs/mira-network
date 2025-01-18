@@ -5,7 +5,7 @@ description = "Default template for PDM package"
 authors = [
     {name = "Hamid Raza", email = "contact@hamidraza.com"},
 ]
-dependencies = ["fastapi>=0.115.5", "uvicorn>=0.32.1", "sqlmodel>=0.0.22", "redis>=5.2.0", "httpx>=0.27.2", "requests>=2.32.3", "prometheus-fastapi-instrumentator>=7.0.0", "supabase>=2.10.0", "newrelic"]
+dependencies = ["fastapi>=0.115.5", "uvicorn>=0.32.1", "sqlmodel>=0.0.22", "redis>=5.2.0", "httpx>=0.27.2", "requests>=2.32.3", "prometheus-fastapi-instrumentator>=7.0.0", "supabase>=2.10.0", "newrelic", "psycopg2-binary>=2.9.10", "PyJWT>=2.10.1", "scalar-fastapi>=1.0.3", "alembic>=1.14.0"]
 requires-python = "==3.11.*"
 readme = "README.md"
 license = {text = "MIT"}
@@ -15,6 +15,25 @@ license = {text = "MIT"}
 distribution = false
 
 [tool.pdm.scripts]
-_.env_file = ".env"
-dev = "newrelic-admin run-python -m uvicorn src.mira_client_dashboard.main:app --host 0.0.0.0 --reload"
-prod = "newrelic-admin run-python -m uvicorn src.mira_client_dashboard.main:app --host 0.0.0.0"
+# Server commands
+dev = {cmd = "uvicorn src.router.main:app --host 0.0.0.0 --port 8000 --reload", env_file = ".env.local"}
+test = {cmd = "uvicorn src.router.main:app --host 0.0.0.0 --port 8001", env_file = ".env.test"}
+prod = {cmd = "newrelic-admin run-python -m uvicorn src.router.main:app --host 0.0.0.0 --port 8000", env_file = ".env.prod"}
+
+# Migration commands for local development
+dev-migrate = {cmd = "alembic", env_file = ".env.local"}
+dev-migrate-gen = "pdm run dev-migrate revision --autogenerate -m"
+dev-migrate-up = "pdm run dev-migrate upgrade head"
+dev-migrate-down = "pdm run dev-migrate downgrade -1"
+
+# Migration commands for test
+test-migrate = {cmd = "alembic", env_file = ".env.test"}
+test-migrate-gen = "pdm run test-migrate revision --autogenerate -m"
+test-migrate-up = "pdm run test-migrate upgrade head"
+test-migrate-down = "pdm run test-migrate downgrade -1"
+
+# Migration commands for production
+prod-migrate = {cmd = "alembic", env_file = ".env.prod"}
+prod-migrate-gen = "pdm run prod-migrate revision --autogenerate -m"
+prod-migrate-up = "pdm run prod-migrate upgrade head"
+prod-migrate-down = "pdm run prod-migrate downgrade -1"

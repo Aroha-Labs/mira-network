@@ -1,0 +1,19 @@
+.tooltip {
+  position: relative;
+  display: inline-block;
+
+  .tooltiptext {
+    display: none;
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
+    transform: translateY(-10px);
+  }
+
+  &:hover {
+    .tooltiptext {
+      display: flex;
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}

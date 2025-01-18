@@ -1,36 +1,101 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🎮 Mira Playground
 
-## Getting Started
+<div align="center">
 
-First, run the development server:
+_A powerful web interface for interacting with and testing Mira's AI capabilities_
+
+[Documentation](https://docs.mira.network) • [Live Demo](https://console.mira.network) • [Report Bug](https://feedback.mira.network)
+
+</div>
+
+---
+
+## ✨ Features
+
+- 🤖 Interactive chat interface for testing AI models
+- 🔑 API key management and authentication
+- 📊 Comprehensive usage analytics and logs
+- 🌐 Real-time network monitoring
+- 👥 Advanced admin controls for user management
+- 💻 Integrated terminal interface
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Node.js 18.x or higher
+- Yarn package manager
+
+### Installation
+
+1. Install dependencies:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+yarn install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Run the development server:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+yarn dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+3. Open [http://localhost:3000](http://localhost:3000) with your browser to see the application.
 
-## Learn More
+## 🏗️ Development
 
-To learn more about Next.js, take a look at the following resources:
+### Project Structure
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```
+src/
+├── app/          # Main application code
+├── components/   # Reusable components
+├── utils/        # Utility functions
+└── types/        # TypeScript type definitions
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Key Pages
 
-## Deploy on Vercel
+| Route       | Description                |
+| ----------- | -------------------------- |
+| `/`         | Home/Dashboard             |
+| `/login`    | Authentication             |
+| `/api-keys` | API key management         |
+| `/api-logs` | Request logs and analytics |
+| `/network`  | Network monitoring         |
+| `/terminal` | Terminal interface         |
+| `/admin/*`  | Admin controls             |
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 📚 Documentation
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+For more information about Mira and its capabilities, visit our [Documentation](https://docs.mira.ai).
+
+## 🚢 Deployment
+
+The application is automatically deployed to Cloudflare Pages when changes are pushed to the main branch.
+
+### Deployment Process
+
+1. Builds the application with required environment variables
+2. Publishes the `out` directory to Cloudflare Pages
+3. Creates a new version tag and GitHub release
+
+### Environment Variables
+
+The following environment variables are required for deployment:
+
+| Variable                        | Description            |
+| ------------------------------- | ---------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`      | Supabase project URL   |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anonymous key |
+| `NEXT_PUBLIC_API_BASE_URL`      | Mira API base URL      |
+| `NEXT_PUBLIC_LLM_BASE_URL`      | LLM API base URL       |
+| `NEXT_PUBLIC_VERSION`           | Application version    |
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
