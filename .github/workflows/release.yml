@@ -1,0 +1,282 @@
+name: Create Tags and Publish Images
+
+on:
+  push:
+    branches: ["main", "develop"]
+    paths:
+      - "router/**"
+      - "playground/**"
+      - "service/**"
+      - "cli/**"
+      - "sdk/**"
+      - ".github/workflows/release.yml"
+
+env:
+  REGISTRY: ghcr.io
+  ROUTER_IMAGE: Aroha-Labs/mira-client-router
+  SERVICE_IMAGE: Aroha-Labs/mira-client-service
+
+permissions:
+  contents: write
+  deployments: write
+
+jobs:
+  create-tag:
+    runs-on: ubuntu-latest
+    outputs:
+      new_tag: ${{ steps.tag_version.outputs.new_tag }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get latest tag
+        id: get_latest_tag
+        run: |
+          latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "latest_tag=${latest_tag}" >> $GITHUB_OUTPUT
+
+      - name: Bump version and push tag
+        id: tag_version
+        run: |
+          latest_tag=${{ steps.get_latest_tag.outputs.latest_tag }}
+          latest_ver=${latest_tag#v}
+          IFS='.' read -r major minor patch <<< "$latest_ver"
+          new_patch=$((patch + 1))
+
+          # Function to check if tag exists
+          tag_exists() {
+            git rev-parse "$1" >/dev/null 2>&1
+          }
+
+          # Find next available tag
+          while true; do
+            if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+              new_tag="v$major.$minor.$new_patch"
+            else
+              new_tag="v$major.$minor.$new_patch-dev"
+            fi
+
+            if ! tag_exists "$new_tag"; then
+              break
+            fi
+            new_patch=$((new_patch + 1))
+          done
+
+          echo "new_tag=${new_tag}" >> $GITHUB_OUTPUT
+          echo "Creating new tag: $new_tag"
+
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+          # Create and push tag with error handling
+          if git tag -a $new_tag -m "Release $new_tag" && git push origin $new_tag; then
+            echo "Successfully created and pushed tag $new_tag"
+          else
+            echo "Failed to create or push tag"
+            exit 1
+          fi
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.tag_version.outputs.new_tag }}
+          name: Release ${{ steps.tag_version.outputs.new_tag }}
+          draft: false
+          prerelease: ${{ github.ref != 'refs/heads/main' }}
+
+  publish-router:
+    needs: create-tag
+    if: contains(github.event.head_commit.modified, 'router/')
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.create-tag.outputs.new_tag }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Router
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.ROUTER_IMAGE }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=,format=short
+            type=raw,value=latest
+            type=raw,value=${{ needs.create-tag.outputs.new_tag }}
+
+      - name: Build and push Router image
+        uses: docker/build-push-action@v6
+        with:
+          context: router
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  publish-service:
+    needs: create-tag
+    if: contains(github.event.head_commit.modified, 'service/')
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.create-tag.outputs.new_tag }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Service
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.SERVICE_IMAGE }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=,format=short
+            type=raw,value=latest
+            type=raw,value=${{ needs.create-tag.outputs.new_tag }}
+
+      - name: Build and push Service image
+        uses: docker/build-push-action@v6
+        with:
+          context: service
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  publish-cli:
+    needs: create-tag
+    if: contains(github.event.head_commit.modified, 'cli/')
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.create-tag.outputs.new_tag }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.23.2
+
+      - name: Build project
+        working-directory: cli
+        run: make build VERSION=${{ env.VERSION }}
+
+      - name: Upload binaries to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: cli/bin/*
+          tag: ${{ env.VERSION }}
+          overwrite: true
+          file_glob: true
+
+  deploy-console-testnet:
+    needs: create-tag
+    if: contains(github.event.head_commit.modified, 'playground/')
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.create-tag.outputs.new_tag }}
+    defaults:
+      run:
+        working-directory: ./playground
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://atmocsvasyapsvwsustd.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_API_BASE_URL: https://apis.mira.network
+          NEXT_PUBLIC_LLM_BASE_URL: https://apis.mira.network/v1
+          NEXT_PUBLIC_VERSION: ${{ env.VERSION }}
+        run: yarn build
+
+      - name: Publish to Cloudflare Pages
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: "b9d9855d1fdfcd9fb504dc752c05499f"
+          projectName: "mira-playground"
+          workingDirectory: playground
+          directory: out
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+
+  sdk-test:
+    needs: create-tag
+    if: contains(github.event.head_commit.modified, 'sdk/')
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sdk
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pdm
+          pdm install --dev
+
+      - name: Run tests
+        run: |
+          pdm run pytest tests/ --cov=./ --cov-report=xml
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: sdk/coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
+
+  sdk-lint:
+    needs: create-tag
+    if: contains(github.event.head_commit.modified, 'sdk/')
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sdk
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pdm ruff black
+
+      - name: Check formatting with Black
+        run: black --check ./
+
+      - name: Lint with Ruff
+        run: ruff check ./
