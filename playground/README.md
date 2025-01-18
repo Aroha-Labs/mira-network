@@ -4,7 +4,7 @@
 
 _A powerful web interface for interacting with and testing Mira's AI capabilities_
 
-[Documentation](https://docs.mira.ai) • [Live Demo](https://playground.mira.network) • [Report Bug](https://github.com/Aroha-Labs/mira-client/issues)
+[Documentation](https://docs.mira.network) • [Live Demo](https://console.mira.network) • [Report Bug](https://feedback.mira.network)
 
 </div>
 
