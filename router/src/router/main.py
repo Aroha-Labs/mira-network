@@ -5,6 +5,7 @@ from src.router.api.admin import router as admin_router
 import uvicorn
 from prometheus_fastapi_instrumentator import Instrumentator
 from scalar_fastapi import get_scalar_api_reference
+import os
 
 
 app = FastAPI(
@@ -57,7 +58,7 @@ def read_root():
 
 @app.get("/health")
 def health_check():
-    return {"status": "ok"}
+    return {"status": "ok", "version": os.getenv("VERSION", "0.0.0")}
 
 
 @app.get("/docs", include_in_schema=False)
