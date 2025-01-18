@@ -1,6 +1,6 @@
 [project]
 authors = [
-  {name = "sarim2000", email = "sarimbleedblue@gmail.com"},
+  {name = "mira-network", email = "sdk@mira.network"},
 ]
 dependencies = [
   "httpx>=0.28.1",
