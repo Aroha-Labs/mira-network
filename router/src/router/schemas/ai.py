@@ -1,13 +1,34 @@
 from pydantic import BaseModel, Field
 from typing import Optional
 
+
 class ModelProvider(BaseModel):
     base_url: str
     api_key: str
 
+
 class Message(BaseModel):
     role: str
     content: str
+
+
+class FunctionCall(BaseModel):
+    name: str
+    arguments: str
+
+
+class Function(BaseModel):
+    name: str
+    description: str
+    parameters: dict = Field(
+        default_factory=lambda: {"type": "object", "properties": {}, "required": []}
+    )
+
+
+class Tool(BaseModel):
+    type: str = "function"
+    function: Function
+
 
 class AiRequest(BaseModel):
     model: str = Field("mira/llama3.1", title="Model")
@@ -16,13 +37,12 @@ class AiRequest(BaseModel):
     )
     messages: list[Message] = Field([], title="Messages")
     stream: Optional[bool] = Field(False, title="Stream")
-    model_config = {
-        'protected_namespaces': ()  # This disables the warning
-    }
+    tools: Optional[list[Tool]] = Field(None, title="Tools")
+    tool_choice: Optional[str] = Field("auto", title="Tool Choice")
+    model_config = {"protected_namespaces": ()}  # This disables the warning
+
 
 class VerifyRequest(BaseModel):
     messages: list[Message] = Field([], title="Messages")
     models: list[str] = Field(["mira/llama3.1"], title="Models")
     min_yes: int = Field(3, title="Minimum yes")
-
-
