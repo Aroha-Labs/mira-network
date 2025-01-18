@@ -199,12 +199,11 @@ jobs:
           LAST_TAG=$(git describe --tags --abbrev=0 ${{ steps.tag_version.outputs.new_tag }}^) \
           node generate-notes.js
 
-          # Read the notes and write to GITHUB_OUTPUT, preserving newlines
-          {
-            echo 'notes<<EOF'
-            cat release_notes.txt
-            echo EOF
-          } >> $GITHUB_OUTPUT
+          # Read the notes and write to GITHUB_OUTPUT with a unique delimiter
+          delimiter="RELEASE_NOTES_EOF"
+          echo "notes<<$delimiter" >> $GITHUB_OUTPUT
+          cat release_notes.txt >> $GITHUB_OUTPUT
+          echo "$delimiter" >> $GITHUB_OUTPUT
           rm release_notes.txt  # Clean up
 
       - name: Create Release
