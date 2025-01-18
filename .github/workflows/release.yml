@@ -19,9 +19,11 @@ env:
 permissions:
   contents: write
   deployments: write
+  packages: write
 
 jobs:
   create-tag:
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     outputs:
       new_tag: ${{ steps.tag_version.outputs.new_tag }}
@@ -90,8 +92,12 @@ jobs:
           prerelease: ${{ github.ref != 'refs/heads/main' }}
 
   publish-router:
+    timeout-minutes: 15
     needs: create-tag
-    if: contains(github.event.head_commit.modified, 'router/')
+    if: |
+      contains(github.event.head_commit.added, 'router/') ||
+      contains(github.event.head_commit.modified, 'router/') ||
+      contains(github.event.head_commit.removed, 'router/')
     runs-on: ubuntu-latest
     env:
       VERSION: ${{ needs.create-tag.outputs.new_tag }}
@@ -127,7 +133,10 @@ jobs:
 
   publish-service:
     needs: create-tag
-    if: contains(github.event.head_commit.modified, 'service/')
+    if: |
+      contains(github.event.head_commit.added, 'service/') ||
+      contains(github.event.head_commit.modified, 'service/') ||
+      contains(github.event.head_commit.removed, 'service/')
     runs-on: ubuntu-latest
     env:
       VERSION: ${{ needs.create-tag.outputs.new_tag }}
@@ -163,7 +172,10 @@ jobs:
 
   publish-cli:
     needs: create-tag
-    if: contains(github.event.head_commit.modified, 'cli/')
+    if: |
+      contains(github.event.head_commit.added, 'cli/') ||
+      contains(github.event.head_commit.modified, 'cli/') ||
+      contains(github.event.head_commit.removed, 'cli/')
     runs-on: ubuntu-latest
     env:
       VERSION: ${{ needs.create-tag.outputs.new_tag }}
@@ -174,7 +186,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: 1.23.2
+          go-version: "1.23.4"
 
       - name: Build project
         working-directory: cli
@@ -189,9 +201,21 @@ jobs:
           overwrite: true
           file_glob: true
 
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
   deploy-console-testnet:
     needs: create-tag
-    if: contains(github.event.head_commit.modified, 'playground/')
+    if: |
+      contains(github.event.head_commit.added, 'playground/') ||
+      contains(github.event.head_commit.modified, 'playground/') ||
+      contains(github.event.head_commit.removed, 'playground/')
     runs-on: ubuntu-latest
     env:
       VERSION: ${{ needs.create-tag.outputs.new_tag }}
@@ -225,8 +249,14 @@ jobs:
 
   sdk-test:
     needs: create-tag
-    if: contains(github.event.head_commit.modified, 'sdk/')
+    if: |
+      contains(github.event.head_commit.added, 'sdk/') ||
+      contains(github.event.head_commit.modified, 'sdk/') ||
+      contains(github.event.head_commit.removed, 'sdk/')
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11"]
     defaults:
       run:
         working-directory: sdk
@@ -236,7 +266,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
         run: |
@@ -257,7 +287,10 @@ jobs:
 
   sdk-lint:
     needs: create-tag
-    if: contains(github.event.head_commit.modified, 'sdk/')
+    if: |
+      contains(github.event.head_commit.added, 'sdk/') ||
+      contains(github.event.head_commit.modified, 'sdk/') ||
+      contains(github.event.head_commit.removed, 'sdk/')
     runs-on: ubuntu-latest
     defaults:
       run:
