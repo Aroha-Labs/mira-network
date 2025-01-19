@@ -234,7 +234,7 @@ def get_llm_completion(
 
 @app.get("/health")
 async def health() -> Dict[str, str]:
-    return {"status": "healthy"}
+    return {"status": "ok", "version": os.getenv("VERSION", "0.0.0")}
 
 
 class EvaluationRequest(BaseModel):
