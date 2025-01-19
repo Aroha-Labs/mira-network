@@ -90,6 +90,88 @@ async def list_models(db: Session = Depends(get_session)) -> ModelListRes:
     }
 
 
+def save_log(
+    db: Session,
+    user: User,
+    user_row: UserModel,
+    req: AiRequest,
+    original_req_model: str,
+    result_text: str,
+    usage: dict,
+    ttfs: Optional[float],
+    timeStart: float,
+    machine_uid: str,
+) -> None:
+    sm = get_setting_value(
+        db,
+        "SUPPORTED_MODELS",
+        SETTINGS_MODELS["SUPPORTED_MODELS"],
+    )
+
+    model_p = sm.root.get(original_req_model)
+
+    if model_p is None:
+        raise HTTPException(
+            status_code=500, detail="Supported model not found in settings"
+        )
+
+    model_pricing = ModelPricing(
+        model=req.model,
+        prompt_token=model_p.prompt_token,
+        completion_token=model_p.completion_token,
+    )
+
+    req.model = original_req_model
+
+    # Log the request
+    api_log = ApiLogs(
+        user_id=user.id,
+        api_key_id=user.api_key_id,
+        payload=req.model_dump_json(),
+        request_payload=req.model_dump(),
+        ttft=ttfs,
+        response=result_text,
+        prompt_tokens=usage.get("prompt_tokens", 0),
+        completion_tokens=usage.get("completion_tokens", 0),
+        total_tokens=usage.get("total_tokens", 0),
+        total_response_time=time.time() - timeStart,
+        model=req.model,
+        model_pricing=model_pricing,
+        machine_id=machine_uid,
+    )
+
+    db.add(api_log)
+
+    # Calculate cost and reduce user credits
+    prompt_tokens = usage.get("prompt_tokens", 0)
+    completion_tokens = usage.get("completion_tokens", 0)
+    total_tokens = usage.get("total_tokens", 0)
+
+    prompt_tokens_cost = prompt_tokens * model_p.prompt_token
+    completion_tokens_cost = completion_tokens * model_p.completion_token
+
+    cost = prompt_tokens_cost + completion_tokens_cost
+
+    db.exec(
+        update(UserModel)
+        .where(UserModel.user_id == user.id)
+        .values(
+            credits=user_row.credits - cost,
+            updated_at=datetime.now(timezone.utc),
+        )
+    )
+
+    # Update user credit history
+    user_credits_history = UserCreditsHistory(
+        user_id=user.id,
+        amount=-cost,
+        description=f"Used {total_tokens} tokens. Prompt tokens: {prompt_tokens}, Completion tokens: {completion_tokens}",
+    )
+    db.add(user_credits_history)
+
+    db.commit()
+
+
 @router.post("/v1/chat/completions")
 async def generate(
     req: AiRequest,
@@ -195,78 +277,40 @@ async def generate(
             if l.strip():
                 yield f"data: {l}\n\n"
 
-        sm = get_setting_value(
-            db,
-            "SUPPORTED_MODELS",
-            SETTINGS_MODELS["SUPPORTED_MODELS"],
+        save_log(
+            db=db,
+            user=user,
+            user_row=user_row,
+            req=req,
+            original_req_model=original_req_model,
+            result_text=result_text,
+            usage=usage,
+            ttfs=ttfs,
+            timeStart=timeStart,
+            machine_uid=machine.machine_uid,
         )
-
-        model_p = sm.root.get(original_req_model)
-
-        if model_p is None:
-            raise HTTPException(
-                status_code=500, detail="Supported model not found in settings"
-            )
-
-        model_pricing = ModelPricing(
-            model=req.model,
-            prompt_token=model_p.prompt_token,
-            completion_token=model_p.completion_token,
-        )
-
-        req.model = original_req_model
-
-        # Log the request
-        api_log = ApiLogs(
-            user_id=user.id,
-            api_key_id=user.api_key_id,
-            payload=req.model_dump_json(),
-            request_payload=req.model_dump(),
-            ttft=ttfs,
-            response=result_text,
-            prompt_tokens=usage.get("prompt_tokens", 0),
-            completion_tokens=usage.get("completion_tokens", 0),
-            total_tokens=usage.get("total_tokens", 0),
-            total_response_time=time.time() - timeStart,
-            model=req.model,
-            model_pricing=model_pricing,
-            machine_id=machine.machine_uid,
-        )
-
-        db.add(api_log)
-
-        # Calculate cost and reduce user credits
-        prompt_tokens = usage.get("prompt_tokens", 0)
-        completion_tokens = usage.get("completion_tokens", 0)
-        total_tokens = usage.get("total_tokens", 0)
-
-        prompt_tokens_cost = prompt_tokens * model_p.prompt_token
-        completion_tokens_cost = completion_tokens * model_p.completion_token
-
-        cost = prompt_tokens_cost + completion_tokens_cost
-
-        db.exec(
-            update(UserModel)
-            .where(UserModel.user_id == user.id)
-            .values(
-                credits=user_row.credits - cost,
-                updated_at=datetime.now(timezone.utc),
-            )
-        )
-
-        # Update user credit history
-        user_credits_history = UserCreditsHistory(
-            user_id=user.id,
-            amount=-cost,
-            description=f"Used {total_tokens} tokens. Prompt tokens: {prompt_tokens}, Completion tokens: {completion_tokens}",
-        )
-        db.add(user_credits_history)
-
-        db.commit()
 
     if req.stream:
         res = StreamingResponse(generate(), media_type="text/event-stream")
     else:
+        response_json = llmres.json()
+        result_text = response_json["choices"][0]["message"]["content"]
+        ttfs = time.time() - timeStart
+        usage = response_json.get("usage", {})
+
+        save_log(
+            db=db,
+            user=user,
+            user_row=user_row,
+            req=req,
+            original_req_model=original_req_model,
+            result_text=result_text,
+            usage=usage,
+            ttfs=ttfs,
+            timeStart=timeStart,
+            machine_uid=machine.machine_uid,
+        )
+
         return Response(
             content=llmres.text,
             status_code=llmres.status_code,
