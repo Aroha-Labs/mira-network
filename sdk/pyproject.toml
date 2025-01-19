@@ -32,3 +32,8 @@ test = [
   "pytest-asyncio>=0.25.0",
   "pytest-cov>=6.0.0",
 ]
+
+[tool.pdm.scripts]
+lint = "ruff check ."
+format = "ruff format ."
+format-check = "ruff format . --check"
