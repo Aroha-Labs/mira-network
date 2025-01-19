@@ -33,7 +33,7 @@ const LayoutChildren = ({ children }: LayoutChildrenProps) => {
             </div>
             <div className="mt-8 flex gap-[6px]">
               <Link
-                href="https://discord.com/invite/mira-network"
+                href="https://discord.gg/4Xq6nMYu"
                 target="_blank"
                 className="px-4 py-2 text-white bg-black"
               >
