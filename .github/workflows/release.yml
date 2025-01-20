@@ -24,11 +24,11 @@ permissions:
 
 jobs:
   changes:
-    uses: ./.github/workflows/jobs/changes.yml
+    uses: ./.github/workflows/changes.yml
 
   create-tag:
     needs: changes
-    uses: ./.github/workflows/jobs/create-tag.yml
+    uses: ./.github/workflows/create-tag.yml
     if: |
       needs.changes.outputs.router == 'true' ||
       needs.changes.outputs.service == 'true' ||
@@ -39,44 +39,44 @@ jobs:
   publish-router:
     needs: [changes, create-tag]
     if: needs.changes.outputs.router == 'true'
-    uses: ./.github/workflows/jobs/publish-router.yml
+    uses: ./.github/workflows/publish-router.yml
     with:
       version: ${{ needs.create-tag.outputs.new_tag }}
 
   publish-service:
     needs: [changes, create-tag]
     if: needs.changes.outputs.service == 'true'
-    uses: ./.github/workflows/jobs/publish-service.yml
+    uses: ./.github/workflows/publish-service.yml
     with:
       version: ${{ needs.create-tag.outputs.new_tag }}
 
   publish-cli:
     needs: [changes, create-tag]
-    uses: ./.github/workflows/jobs/publish-cli.yml
+    uses: ./.github/workflows/publish-cli.yml
     with:
       version: ${{ needs.create-tag.outputs.new_tag }}
 
   deploy-console-testnet:
     needs: [changes, create-tag]
     if: needs.changes.outputs.playground == 'true'
-    uses: ./.github/workflows/jobs/deploy-console-testnet.yml
+    uses: ./.github/workflows/deploy-console-testnet.yml
     with:
       version: ${{ needs.create-tag.outputs.new_tag }}
 
   sdk-test:
     needs: [changes, create-tag]
     if: needs.changes.outputs.sdk == 'true'
-    uses: ./.github/workflows/jobs/sdk-test.yml
+    uses: ./.github/workflows/sdk-test.yml
 
   sdk-lint:
     needs: [changes, create-tag]
     if: needs.changes.outputs.sdk == 'true'
-    uses: ./.github/workflows/jobs/sdk-lint.yml
+    uses: ./.github/workflows/sdk-lint.yml
 
   sonarqube:
     needs: [changes, create-tag]
     if: needs.changes.outputs.sdk == 'true'
-    uses: ./.github/workflows/jobs/sonarqube.yml
+    uses: ./.github/workflows/sonarqube.yml
 
   summary:
     needs:
@@ -91,7 +91,7 @@ jobs:
         sdk-lint,
       ]
     if: always()
-    uses: ./.github/workflows/jobs/summary.yml
+    uses: ./.github/workflows/summary.yml
     with:
       new_tag: ${{ needs.create-tag.outputs.new_tag }}
       router_result: ${{ needs.publish-router.result }}
