@@ -22,7 +22,16 @@ def extract_variables(system_prompt: str) -> List[str]:
     return variables
 
 
-@router.post("/flows")
+@router.post(
+    "/flows",
+    summary="Create New Flow",
+    description="Creates a new flow with a system prompt and extracts any variables from it.",
+    response_description="Returns the created flow object",
+    responses={
+        200: {"description": "Successfully created flow"},
+        400: {"description": "Invalid request body"},
+    },
+)
 def create_flow(flow: FlowRequest, db: Session = Depends(get_session)):
     variables = extract_variables(flow.system_prompt)
 
@@ -37,13 +46,30 @@ def create_flow(flow: FlowRequest, db: Session = Depends(get_session)):
     return new_flow
 
 
-@router.get("/flows")
+@router.get(
+    "/flows",
+    summary="List All Flows",
+    description="Retrieves a list of all available flows.",
+    response_description="Returns an array of flow objects",
+    responses={
+        200: {"description": "Successfully retrieved flows"},
+    },
+)
 def list_all_flows(db: Session = Depends(get_session)):
     flows = db.query(Flows).all()
     return flows
 
 
-@router.get("/flows/{flow_id}")
+@router.get(
+    "/flows/{flow_id}",
+    summary="Get Flow by ID",
+    description="Retrieves a specific flow by its ID.",
+    response_description="Returns the requested flow object",
+    responses={
+        200: {"description": "Successfully retrieved flow"},
+        404: {"description": "Flow not found"},
+    },
+)
 def get_flow(flow_id: str, db: Session = Depends(get_session)):
     flow = db.exec(select(Flows).where(Flows.id == flow_id)).first()
     if not flow:
@@ -51,7 +77,16 @@ def get_flow(flow_id: str, db: Session = Depends(get_session)):
     return flow
 
 
-@router.put("/flows/{flow_id}")
+@router.put(
+    "/flows/{flow_id}",
+    summary="Update Flow",
+    description="Updates an existing flow's system prompt and name.",
+    response_description="Returns the updated flow object",
+    responses={
+        200: {"description": "Successfully updated flow"},
+        404: {"description": "Flow not found"},
+    },
+)
 def update_flow(flow_id: str, flow: FlowRequest, db: Session = Depends(get_session)):
     existing_flow = db.query(Flows).filter(Flows.id == flow_id).first()
     if not existing_flow:
@@ -65,7 +100,16 @@ def update_flow(flow_id: str, flow: FlowRequest, db: Session = Depends(get_sessi
     return existing_flow
 
 
-@router.delete("/flows/{flow_id}")
+@router.delete(
+    "/flows/{flow_id}",
+    summary="Delete Flow",
+    description="Deletes a specific flow by its ID.",
+    response_description="Returns a success message",
+    responses={
+        200: {"description": "Successfully deleted flow"},
+        404: {"description": "Flow not found"},
+    },
+)
 def delete_flow(flow_id: str, db: Session = Depends(get_session)):
     existing_flow = db.query(Flows).filter(Flows.id == flow_id).first()
     if not existing_flow:
@@ -76,7 +120,17 @@ def delete_flow(flow_id: str, db: Session = Depends(get_session)):
     return {"message": "Flow deleted successfully"}
 
 
-@router.post("/v1/flow/{flow_id}/chat/completions")
+@router.post(
+    "/v1/flow/{flow_id}/chat/completions",
+    summary="Generate Chat Completion with Flow",
+    description="Generates a chat completion using a specific flow's system prompt and variables.",
+    response_description="Returns the chat completion response",
+    responses={
+        200: {"description": "Successfully generated completion"},
+        400: {"description": "Invalid request or missing variables"},
+        404: {"description": "Flow not found"},
+    },
+)
 async def generate_with_flow_id(
     flow_id: str,
     req: FlowChatCompletion,
@@ -131,7 +185,16 @@ async def generate_with_flow_id(
     return response
 
 
-@router.post("/flows/try")
+@router.post(
+    "/flows/try",
+    summary="Try Flow",
+    description="Tests a flow configuration without saving it.",
+    response_description="Returns the chat completion response using the test flow",
+    responses={
+        200: {"description": "Successfully tested flow"},
+        400: {"description": "Invalid request or missing variables"},
+    },
+)
 async def try_flow(
     req: FlowRequest,
     chat: FlowChatCompletion,

@@ -10,7 +10,21 @@ from sqlalchemy import func
 router = APIRouter()
 
 
-@router.get("/api-logs")
+@router.get(
+    "/api-logs",
+    summary="List API Logs",
+    description="""
+    Retrieves paginated API logs for the authenticated user. 
+    Admins can query logs for any user by providing a user_id.
+    Supports filtering by date range, machine, model, and API key.
+    """,
+    response_description="Returns a paginated list of API logs with total count",
+    responses={
+        200: {"description": "Successfully retrieved logs"},
+        401: {"description": "Unauthorized - Invalid or missing authentication"},
+        403: {"description": "Forbidden - Non-admin trying to access other user's logs"},
+    },
+)
 def list_all_logs(
     db: Session = Depends(get_session),
     user: User = Depends(verify_user),
@@ -91,7 +105,16 @@ def list_all_logs(
     }
 
 
-@router.get("/total-inference-calls")
+@router.get(
+    "/total-inference-calls",
+    summary="Get Total Inference Calls",
+    description="Returns the total number of inference API calls made by the authenticated user",
+    response_description="Returns the total count of inference calls",
+    responses={
+        200: {"description": "Successfully retrieved total count"},
+        401: {"description": "Unauthorized - Invalid or missing authentication"},
+    },
+)
 def total_inference_calls(
     db: Session = Depends(get_session),
     user: User = Depends(verify_user),

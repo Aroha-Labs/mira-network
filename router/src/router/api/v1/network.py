@@ -22,7 +22,20 @@ from src.router.utils.settings import get_supported_models
 router = APIRouter()
 
 
-@router.post("/v1/verify", tags=["network"])
+@router.post(
+    "/v1/verify",
+    summary="Verify Model Response",
+    description="""
+    Verifies responses from multiple models against a given prompt.
+    Requires a minimum number of 'yes' responses to pass verification.
+    Distributes requests across available machines.
+    """,
+    response_description="Returns verification results from all models",
+    responses={
+        200: {"description": "Successfully verified responses"},
+        400: {"description": "Invalid request - Missing models or invalid min_yes value"},
+    },
+)
 async def verify(req: VerifyRequest):
     if len(req.models) < 1:
         raise HTTPException(status_code=400, detail="At least one model is required")
@@ -78,7 +91,15 @@ class ModelListRes(BaseModel):
     data: list[ModelListResItem]
 
 
-@router.get("/v1/models", tags=["network"])
+@router.get(
+    "/v1/models",
+    summary="List Available Models",
+    description="Retrieves a list of all supported language models in the system.",
+    response_description="Returns an array of available model information",
+    responses={
+        200: {"description": "Successfully retrieved models list"},
+    },
+)
 async def list_models(db: Session = Depends(get_session)) -> ModelListRes:
     supported_models = get_supported_models(db)
     return {
@@ -172,7 +193,22 @@ def save_log(
     db.commit()
 
 
-@router.post("/v1/chat/completions")
+@router.post(
+    "/v1/chat/completions",
+    summary="Generate Chat Completion",
+    description="""
+    Generates a chat completion using the specified model.
+    Supports streaming responses and tool calls.
+    Tracks usage, credits, and performance metrics.
+    """,
+    response_description="Returns the model's completion response",
+    responses={
+        200: {"description": "Successfully generated completion"},
+        400: {"description": "Invalid request or unsupported model"},
+        402: {"description": "Insufficient credits"},
+        404: {"description": "User not found"},
+    },
+)
 async def generate(
     req: AiRequest,
     user: User = Depends(verify_user),

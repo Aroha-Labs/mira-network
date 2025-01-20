@@ -16,7 +16,19 @@ router = APIRouter()
 SessionDep = Annotated[Session, Depends(get_session)]
 
 
-@router.post("/machines/register")
+@router.post(
+    "/machines/register",
+    summary="Register New Machine",
+    description="""
+    Registers a new machine in the system.
+    Generates a unique machine ID and stores machine details including network IP and name.
+    """,
+    response_description="Returns the registered machine details",
+    responses={
+        200: {"description": "Successfully registered machine"},
+        400: {"description": "Machine already registered"},
+    },
+)
 def register_machine(
     request: RegisterMachineRequest,
     session: SessionDep,
@@ -51,7 +63,16 @@ def register_machine(
     }
 
 
-@router.get("/liveness/{machine_uid}")
+@router.get(
+    "/liveness/{machine_uid}",
+    summary="Check Machine Liveness",
+    description="Checks if a specific machine is currently online and responding.",
+    response_description="Returns the machine's current status",
+    responses={
+        200: {"description": "Successfully retrieved machine status"},
+        404: {"description": "Machine not found"},
+    },
+)
 def check_liveness(machine_uid: str, session: SessionDep):
     machine = session.exec(
         select(Machine).where(Machine.network_machine_uid == machine_uid)
@@ -66,7 +87,19 @@ def check_liveness(machine_uid: str, session: SessionDep):
         return {"machine_uid": machine_uid, "status": "offline"}
 
 
-@router.post("/liveness/{machine_uid}")
+@router.post(
+    "/liveness/{machine_uid}",
+    summary="Update Machine Liveness",
+    description="""
+    Updates the liveness status of a machine.
+    Sets TTL for liveness check and stores current network information.
+    """,
+    response_description="Returns the updated machine status",
+    responses={
+        200: {"description": "Successfully updated machine status"},
+        404: {"description": "Machine not found"},
+    },
+)
 def set_liveness(machine_uid: str, session: SessionDep):
     now = time.time()
     redis_client.setnx(f"liveness-start:{machine_uid}", now)
@@ -97,7 +130,19 @@ def set_liveness(machine_uid: str, session: SessionDep):
     return {"machine_uid": machine_uid, "status": "online"}
 
 
-@router.get("/machines")
+@router.get(
+    "/machines",
+    summary="List All Machines",
+    description="""
+    Retrieves a list of all registered machines with their current status.
+    Includes information about online/offline status and last seen timestamp.
+    """,
+    response_description="Returns an array of machine details",
+    responses={
+        200: {"description": "Successfully retrieved machines list"},
+        401: {"description": "Unauthorized - Invalid or missing authentication"},
+    },
+)
 def list_all_machines(session: SessionDep, user: User = Depends(verify_user)):
     machines = session.exec(select(Machine)).all()
     online_machines = get_online_machines()
@@ -127,13 +172,32 @@ def list_all_machines(session: SessionDep, user: User = Depends(verify_user)):
     ]
 
 
-@router.get("/machines/online")
+@router.get(
+    "/machines/online",
+    summary="List Online Machines",
+    description="Retrieves a list of currently online machines.",
+    response_description="Returns an array of online machine IDs",
+    responses={
+        200: {"description": "Successfully retrieved online machines"},
+        401: {"description": "Unauthorized - Invalid or missing authentication"},
+    },
+)
 def list_online_machines(user: User = Depends(verify_user)):
     online_machines = get_online_machines()
     return [{"machine_uid": key} for key in online_machines]
 
 
-@router.put("/machines/{machine_uid}")
+@router.put(
+    "/machines/{machine_uid}",
+    summary="Update Machine Details",
+    description="Updates the details of an existing machine including network IP, name, and description.",
+    response_description="Returns the updated machine details",
+    responses={
+        200: {"description": "Successfully updated machine"},
+        404: {"description": "Machine not found"},
+        401: {"description": "Unauthorized - Invalid or missing authentication"},
+    },
+)
 def update_machine(
     machine_uid: str,
     request: RegisterMachineRequest,

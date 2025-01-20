@@ -9,7 +9,21 @@ router = APIRouter()
 IMAGE_CACHE_DIR = "image_cache"
 os.makedirs(IMAGE_CACHE_DIR, exist_ok=True)
 
-@router.get("/proxy-image")
+@router.get(
+    "/proxy-image",
+    summary="Proxy and Cache Images",
+    description="""
+    Proxies image requests and caches them locally.
+    Downloads images from external URLs and serves them from local cache if available.
+    Supports various image formats based on content-type header.
+    """,
+    response_description="Returns the requested image file",
+    responses={
+        200: {"description": "Successfully retrieved image"},
+        404: {"description": "Image not found or failed to download"},
+        400: {"description": "Invalid image URL"},
+    },
+)
 async def proxy_image(url: str):
     # Generate a unique filename based on the URL
     filename = md5(url.encode()).hexdigest()

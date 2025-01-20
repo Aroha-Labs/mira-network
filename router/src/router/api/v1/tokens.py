@@ -11,7 +11,21 @@ import os
 router = APIRouter()
 
 
-@router.post("/api-tokens")
+@router.post(
+    "/api-tokens",
+    summary="Create API Token",
+    description="""
+    Creates a new API token for the authenticated user.
+    Generates a secure random token with 'sk-mira-' prefix.
+    Stores token details including description and creation timestamp.
+    """,
+    response_description="Returns the created API token details",
+    responses={
+        200: {"description": "Successfully created API token"},
+        401: {"description": "Unauthorized - Invalid or missing authentication"},
+        500: {"description": "Internal server error while creating token"},
+    },
+)
 def create_api_token(
     request: ApiTokenRequest,
     db: Session = Depends(get_session),
@@ -39,7 +53,16 @@ def create_api_token(
     }
 
 
-@router.get("/api-tokens")
+@router.get(
+    "/api-tokens",
+    summary="List API Tokens",
+    description="Retrieves all active API tokens for the authenticated user.",
+    response_description="Returns an array of API token details",
+    responses={
+        200: {"description": "Successfully retrieved API tokens"},
+        401: {"description": "Unauthorized - Invalid or missing authentication"},
+    },
+)
 def list_api_tokens(
     db: Session = Depends(get_session), user: User = Depends(verify_user)
 ):
@@ -59,7 +82,20 @@ def list_api_tokens(
     ]
 
 
-@router.delete("/api-tokens/{token}")
+@router.delete(
+    "/api-tokens/{token}",
+    summary="Delete API Token",
+    description="""
+    Soft deletes an API token by setting its deleted_at timestamp.
+    Only allows deletion of tokens owned by the authenticated user.
+    """,
+    response_description="Returns success message",
+    responses={
+        200: {"description": "Successfully deleted API token"},
+        401: {"description": "Unauthorized - Invalid or missing authentication"},
+        404: {"description": "Token not found"},
+    },
+)
 def delete_api_token(
     token: str, db: Session = Depends(get_session), user: User = Depends(verify_user)
 ):
