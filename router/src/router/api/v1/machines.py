@@ -5,11 +5,12 @@ from src.router.core.types import User
 from src.router.db.session import get_session
 from src.router.utils.redis import redis_client
 import time
-from src.router.schemas.machine import RegisterMachineRequest
+from src.router.schemas.machine import RegisterMachineRequest, MachineAuthToken
 from src.router.models.machines import Machine
 from typing import Annotated
 from src.router.utils.redis import redis_client, get_online_machines
 import uuid
+import secrets
 
 router = APIRouter()
 
@@ -72,21 +73,19 @@ SessionDep = Annotated[Session, Depends(get_session)]
                         "description": "Main production server",
                         "created_at": "2024-01-15T10:30:00Z",
                         "disabled": False,
-                        "status": "registered"
+                        "status": "registered",
                     }
                 }
-            }
+            },
         },
         400: {
             "description": "Machine already registered",
             "content": {
                 "application/json": {
-                    "example": {
-                        "detail": "Machine already registered"
-                    }
+                    "example": {"detail": "Machine already registered"}
                 }
-            }
-        }
+            },
+        },
     },
 )
 def register_machine(
@@ -159,21 +158,17 @@ def register_machine(
                 "application/json": {
                     "example": {
                         "machine_uid": "550e8400-e29b-41d4-a716-446655440000",
-                        "status": "online"
+                        "status": "online",
                     }
                 }
-            }
+            },
         },
         404: {
             "description": "Machine not found",
             "content": {
-                "application/json": {
-                    "example": {
-                        "detail": "Machine not found"
-                    }
-                }
-            }
-        }
+                "application/json": {"example": {"detail": "Machine not found"}}
+            },
+        },
     },
 )
 def check_liveness(machine_uid: str, session: SessionDep):
@@ -227,21 +222,17 @@ def check_liveness(machine_uid: str, session: SessionDep):
                 "application/json": {
                     "example": {
                         "machine_uid": "550e8400-e29b-41d4-a716-446655440000",
-                        "status": "online"
+                        "status": "online",
                     }
                 }
-            }
+            },
         },
         404: {
             "description": "Machine not found",
             "content": {
-                "application/json": {
-                    "example": {
-                        "detail": "Machine not found"
-                    }
-                }
-            }
-        }
+                "application/json": {"example": {"detail": "Machine not found"}}
+            },
+        },
     },
 )
 def set_liveness(machine_uid: str, session: SessionDep):
@@ -322,29 +313,29 @@ def set_liveness(machine_uid: str, session: SessionDep):
             "description": "Successfully retrieved machines list",
             "content": {
                 "application/json": {
-                    "example": [{
-                        "machine_uid": "550e8400-e29b-41d4-a716-446655440000",
-                        "network_ip": "192.168.1.100",
-                        "name": "Production Server 1",
-                        "description": "Main production server",
-                        "created_at": "2024-01-15T10:30:00Z",
-                        "disabled": False,
-                        "status": "online",
-                        "last_seen": 1705312200
-                    }]
+                    "example": [
+                        {
+                            "machine_uid": "550e8400-e29b-41d4-a716-446655440000",
+                            "network_ip": "192.168.1.100",
+                            "name": "Production Server 1",
+                            "description": "Main production server",
+                            "created_at": "2024-01-15T10:30:00Z",
+                            "disabled": False,
+                            "status": "online",
+                            "last_seen": 1705312200,
+                        }
+                    ]
                 }
-            }
+            },
         },
         401: {
             "description": "Unauthorized - Invalid or missing authentication",
             "content": {
                 "application/json": {
-                    "example": {
-                        "detail": "Could not validate credentials"
-                    }
+                    "example": {"detail": "Could not validate credentials"}
                 }
-            }
-        }
+            },
+        },
     },
 )
 def list_all_machines(session: SessionDep, user: User = Depends(verify_user)):
@@ -359,6 +350,7 @@ def list_all_machines(session: SessionDep, user: User = Depends(verify_user)):
             "description": machine.description,
             "created_at": machine.created_at.isoformat(),
             "disabled": machine.disabled,
+            "auth_tokens": machine.auth_tokens,
             "status": (
                 "online"
                 if machine.network_machine_uid in online_machines
@@ -411,22 +403,18 @@ def list_all_machines(session: SessionDep, user: User = Depends(verify_user)):
             "description": "Successfully retrieved online machines",
             "content": {
                 "application/json": {
-                    "example": [{
-                        "machine_uid": "550e8400-e29b-41d4-a716-446655440000"
-                    }]
+                    "example": [{"machine_uid": "550e8400-e29b-41d4-a716-446655440000"}]
                 }
-            }
+            },
         },
         401: {
             "description": "Unauthorized - Invalid or missing authentication",
             "content": {
                 "application/json": {
-                    "example": {
-                        "detail": "Could not validate credentials"
-                    }
+                    "example": {"detail": "Could not validate credentials"}
                 }
-            }
-        }
+            },
+        },
     },
 )
 def list_online_machines(user: User = Depends(verify_user)):
@@ -486,28 +474,22 @@ Returns the complete updated machine object.
                         "disabled": False,
                     }
                 }
-            }
+            },
         },
         404: {
             "description": "Machine not found",
             "content": {
-                "application/json": {
-                    "example": {
-                        "detail": "Machine not found"
-                    }
-                }
-            }
+                "application/json": {"example": {"detail": "Machine not found"}}
+            },
         },
         401: {
             "description": "Unauthorized - Invalid or missing authentication",
             "content": {
                 "application/json": {
-                    "example": {
-                        "detail": "Could not validate credentials"
-                    }
+                    "example": {"detail": "Could not validate credentials"}
                 }
-            }
-        }
+            },
+        },
     },
 )
 def update_machine(
@@ -532,3 +514,74 @@ def update_machine(
     session.refresh(machine)
 
     return machine
+
+
+@router.post(
+    "/machines/{machine_uid}/auth-tokens",
+    summary="Create Auth Token",
+    response_model=dict,
+)
+def create_auth_token(
+    machine_uid: str,
+    token: MachineAuthToken,
+    session: SessionDep,
+    user: User = Depends(verify_user),
+):
+    print(f"Received token creation request for machine {machine_uid}")
+    print(f"Token data: {token.model_dump()}")
+
+    machine = session.exec(
+        select(Machine).where(Machine.network_machine_uid == machine_uid)
+    ).first()
+    if not machine:
+        raise HTTPException(status_code=404, detail="Machine not found")
+
+    # Initialize auth_tokens if it doesn't exist
+    if machine.auth_tokens is None:
+        machine.auth_tokens = {}
+
+    token_id = secrets.token_urlsafe(16)
+
+    # Create new token entry
+    machine.auth_tokens = {
+        **machine.auth_tokens,
+        token_id: {"description": token.description},
+    }
+
+    try:
+        session.add(machine)
+        session.commit()
+        session.refresh(machine)
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to save token: {str(e)}")
+
+    return machine.model_dump()
+
+
+@router.delete(
+    "/machines/{machine_uid}/auth-tokens/{token_id}",
+    summary="Delete Auth Token",
+    status_code=204,
+)
+def delete_auth_token(
+    machine_uid: str,
+    token_id: str,
+    session: SessionDep,
+    user: User = Depends(verify_user),
+):
+    machine = session.exec(
+        select(Machine).where(Machine.network_machine_uid == machine_uid)
+    ).first()
+    if not machine:
+        raise HTTPException(status_code=404, detail="Machine not found")
+
+    if token_id not in machine.auth_tokens:
+        raise HTTPException(status_code=404, detail="Token not found")
+
+    del machine.auth_tokens[token_id]
+
+    session.add(machine)
+    session.commit()
+
+    return None
