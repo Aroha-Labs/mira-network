@@ -157,7 +157,7 @@ export const Header = () => {
               onClick={() => setIsMobileMenuOpen(false)}
             >
               <ChatBubbleBottomCenterTextIcon className="h-5 w-5" />
-              Console
+              Chat
             </Link>
             <Link
               href="/terminal"
