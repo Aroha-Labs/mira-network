@@ -19,25 +19,99 @@ jobs:
       run:
         working-directory: ./playground_v2
     steps:
-      - name: Checkout and Install
-        uses: ./.github/workflows/steps/checkout-and-install.yml
-        with:
-          working-directory: ./playground_v2
-
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: yarn
       - name: Build
-        uses: ./.github/workflows/steps/build.yml
-        with:
-          working-directory: ./playground_v2
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://atmocsvasyapsvwsustd.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_API_BASE_URL: https://mira-network.alts.dev
+          NEXT_PUBLIC_LLM_BASE_URL: https://mira-network.alts.dev/v1
+          NEXT_PUBLIC_URL: https://console.mira.network
+          NEW_RELIC_APP_NAME: mira-console
+          NEW_RELIC_LICENSE_KEY: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
+        run: yarn build
 
-      - name: Upload Sourcemaps
-        uses: ./.github/workflows/steps/upload-sourcemaps.yml
-        with:
-          working-directory: ./playground_v2
+      - name: Upload Sourcemaps to New Relic
+        env:
+          NEW_RELIC_API_KEY: NRAK-OLMQ5LWAZ56R6RGM0V0QUA9WD20
+        run: |
+          node -e "
+          const { readdirSync } = require('fs');
+          const { join } = require('path');
+          const publishSourcemap = require('@newrelic/publish-sourcemap').publishSourcemap;
 
-      - name: Create Deployment Marker
-        uses: ./.github/workflows/steps/create-deployment-marker.yml
+          const sourcemapDir = join(__dirname, 'out/_next/static');
+          try {
+            const sourcemapFiles = readdirSync(sourcemapDir, { withFileTypes: true })
+              .filter(dirent => dirent.isDirectory())
+              .flatMap(dirent => {
+                const subDir = join(sourcemapDir, dirent.name);
+                return readdirSync(subDir)
+                  .filter(file => file.endsWith('.map'))
+                  .map(file => join(subDir, file));
+              });
 
-      - name: Publish to Cloudflare
-        uses: ./.github/workflows/steps/publish-to-cloudflare.yml
+            if (sourcemapFiles.length === 0) {
+              throw new Error('No sourcemap files found.');
+            }
+
+            console.log('sourcemapDir=', sourcemapDir);
+            console.log('sourcemapFiles=', sourcemapFiles);
+            console.log('process.env.NEW_RELIC_API_KEY=', process.env.NEW_RELIC_API_KEY);
+
+            sourcemapFiles.forEach(sourcemapPath => {
+              const javascriptUrl = \`https://console.mira.network\${sourcemapPath.replace('out', '').replace('.map', '')}\`;
+
+              publishSourcemap({
+                sourcemapPath,
+                javascriptUrl,
+                applicationId: 1120363591,
+                apiKey: process.env.NEW_RELIC_API_KEY,
+              }, function (err) {
+                if (err) {
+                  console.error(\`Error uploading sourcemap for \${sourcemapPath}: \`, err);
+                } else {
+                  console.log(\`Source map upload done for \${sourcemapPath}\`);
+                }
+              });
+            });
+          } catch (error) {
+            console.error('Error processing sourcemaps:', error);
+          }
+          "
+
+      - name: Create New Relic Deployment Marker
+        env:
+          NEW_RELIC_API_KEY: NRAK-OLMQ5LWAZ56R6RGM0V0QUA9WD20
+        run: |
+          echo "Creating New Relic Deployment Marker"
+          response=$(curl -s -o response.txt -w "%{http_code}" -X POST "https://api.newrelic.com/v2/applications/1120363591/deployments.json" \
+          -H "X-Api-Key:NRAK-OLMQ5LWAZ56R6RGM0V0QUA9WD20" \
+          -H "Content-Type: application/json" \
+          -d '{
+            "deployment": {
+              "revision": "${{ github.sha }}",
+              "changelog": "Deployed via GitHub Actions",
+              "description": "Deployment to production",
+              "user": "${{ github.actor }}"
+            }
+          }')
+
+          if [ "$response" -ne 201 ]; then
+            echo "Failed to create New Relic Deployment Marker. HTTP status: $response"
+            cat response.txt
+          else
+            echo "New Relic Deployment Marker created successfully."
+          fi
+
+      - name: Publish to Cloudflare Pages
+        uses: cloudflare/pages-action@v1
         with:
-          working-directory: ./playground_v2
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: "b9d9855d1fdfcd9fb504dc752c05499f"
+          projectName: "console-alts"
+          workingDirectory: playground_v2
+          directory: out
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
