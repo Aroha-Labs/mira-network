@@ -3551,7 +3551,7 @@ react-chartjs-2@^5.3.0:
 
 react-code-blocks@^0.1.6:
   version "0.1.6"
-  resolved "https://registry.npmjs.org/react-code-blocks/-/react-code-blocks-0.1.6.tgz"
+  resolved "https://registry.yarnpkg.com/react-code-blocks/-/react-code-blocks-0.1.6.tgz#ec64e7899223d3e910eb916465a66d95ce1ae1b2"
   integrity sha512-ENNuxG07yO+OuX1ChRje3ieefPRz6yrIpHmebQlaFQgzcAHbUfVeTINpOpoI9bSRSObeYo/OdHsporeToZ7fcg==
   dependencies:
     "@babel/runtime" "^7.10.4"
