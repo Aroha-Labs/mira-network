@@ -1,0 +1,18 @@
+name: Build
+
+on: workflow_call
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://atmocsvasyapsvwsustd.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_API_BASE_URL: https://mira-network.alts.dev
+          NEXT_PUBLIC_LLM_BASE_URL: https://mira-network.alts.dev/v1
+          NEXT_PUBLIC_URL: https://console.mira.network
+          NEW_RELIC_APP_NAME: mira-console
+          NEW_RELIC_LICENSE_KEY: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
+        run: yarn build
