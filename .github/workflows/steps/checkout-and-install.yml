@@ -1,0 +1,11 @@
+name: Checkout and Install Dependencies
+
+on: workflow_call
+
+jobs:
+  checkout_and_install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: yarn

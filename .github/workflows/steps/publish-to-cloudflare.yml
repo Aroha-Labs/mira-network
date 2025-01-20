@@ -1,0 +1,17 @@
+name: Publish to Cloudflare Pages
+
+on: workflow_call
+
+jobs:
+  publish_to_cloudflare:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish to Cloudflare Pages
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: "b9d9855d1fdfcd9fb504dc752c05499f"
+          projectName: "console-alts"
+          workingDirectory: playground_v2
+          directory: out
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
