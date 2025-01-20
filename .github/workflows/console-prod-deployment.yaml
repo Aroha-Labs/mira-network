@@ -21,15 +21,23 @@ jobs:
     steps:
       - name: Checkout and Install
         uses: ./.github/workflows/steps/checkout-and-install.yml
+        with:
+          working-directory: ./playground_v2
 
       - name: Build
         uses: ./.github/workflows/steps/build.yml
+        with:
+          working-directory: ./playground_v2
 
       - name: Upload Sourcemaps
         uses: ./.github/workflows/steps/upload-sourcemaps.yml
+        with:
+          working-directory: ./playground_v2
 
       - name: Create Deployment Marker
         uses: ./.github/workflows/steps/create-deployment-marker.yml
 
       - name: Publish to Cloudflare
         uses: ./.github/workflows/steps/publish-to-cloudflare.yml
+        with:
+          working-directory: ./playground_v2

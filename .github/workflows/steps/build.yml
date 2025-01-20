@@ -1,6 +1,11 @@
 name: Build
 
-on: workflow_call
+on:
+  workflow_call:
+    inputs:
+      working-directory:
+        required: true
+        type: string
 
 jobs:
   build:
@@ -16,3 +21,4 @@ jobs:
           NEW_RELIC_APP_NAME: mira-console
           NEW_RELIC_LICENSE_KEY: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
         run: yarn build
+        working-directory: ${{ inputs.working-directory }}

@@ -1,6 +1,11 @@
 name: Publish to Cloudflare Pages
 
-on: workflow_call
+on:
+  workflow_call:
+    inputs:
+      working-directory:
+        required: true
+        type: string
 
 jobs:
   publish_to_cloudflare:
@@ -12,6 +17,6 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: "b9d9855d1fdfcd9fb504dc752c05499f"
           projectName: "console-alts"
-          workingDirectory: playground_v2
+          workingDirectory: ${{ inputs.working-directory }}
           directory: out
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}

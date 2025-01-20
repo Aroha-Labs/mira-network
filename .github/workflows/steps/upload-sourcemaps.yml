@@ -1,6 +1,11 @@
 name: Upload Sourcemaps to New Relic
 
-on: workflow_call
+on:
+  workflow_call:
+    inputs:
+      working-directory:
+        required: true
+        type: string
 
 jobs:
   upload_sourcemaps:
@@ -50,3 +55,4 @@ jobs:
             console.error('Error processing sourcemaps:', error);
           }
           "
+        working-directory: ${{ inputs.working-directory }}
