@@ -1,0 +1,44 @@
+name: Changes
+
+on:
+  workflow_call:
+    outputs:
+      router:
+        value: ${{ jobs.changes.outputs.router }}
+      service:
+        value: ${{ jobs.changes.outputs.service }}
+      cli:
+        value: ${{ jobs.changes.outputs.cli }}
+      playground:
+        value: ${{ jobs.changes.outputs.playground }}
+      sdk:
+        value: ${{ jobs.changes.outputs.sdk }}
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      router: ${{ steps.filter.outputs.router }}
+      service: ${{ steps.filter.outputs.service }}
+      cli: ${{ steps.filter.outputs.cli }}
+      playground: ${{ steps.filter.outputs.playground }}
+      sdk: ${{ steps.filter.outputs.sdk }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            router:
+              - 'router/**'
+            service:
+              - 'service/**'
+            cli:
+              - 'cli/**'
+            playground:
+              - 'playground/**'
+            sdk:
+              - 'sdk/**'
