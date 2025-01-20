@@ -12,16 +12,78 @@ os.makedirs(IMAGE_CACHE_DIR, exist_ok=True)
 @router.get(
     "/proxy-image",
     summary="Proxy and Cache Images",
-    description="""
-    Proxies image requests and caches them locally.
-    Downloads images from external URLs and serves them from local cache if available.
-    Supports various image formats based on content-type header.
-    """,
-    response_description="Returns the requested image file",
+    description="""Proxies and caches image requests from external URLs.
+
+### Query Parameters
+- `url`: The URL of the image to proxy and cache
+
+### Response Format
+Returns the image file directly with appropriate content-type header
+
+### Technical Details
+- Images are cached locally using MD5 hash of URL as filename
+- File extension is determined from content-type header
+- Cached images are served directly without re-downloading
+- Supports all standard image formats (jpg, png, gif, webp, etc.)
+
+### Caching Behavior
+- First request downloads and caches the image
+- Subsequent requests serve from local cache
+- Cache is persistent across server restarts
+- Files are stored in the 'image_cache' directory
+
+### Error Responses
+- `400 Bad Request`:
+    ```json
+    {
+        "detail": "Invalid image URL"
+    }
+    ```
+- `404 Not Found`:
+    ```json
+    {
+        "detail": "Failed to fetch image"
+    }
+    ```
+
+### Notes
+- No authentication required
+- Cache directory is created automatically if it doesn't exist
+- Original content-type is preserved
+- Useful for serving images from sources that don't support CORS""",
+    response_description="Returns the cached image file with appropriate content-type",
     responses={
-        200: {"description": "Successfully retrieved image"},
-        404: {"description": "Image not found or failed to download"},
-        400: {"description": "Invalid image URL"},
+        200: {
+            "description": "Successfully retrieved image",
+            "content": {
+                "image/*": {
+                    "schema": {
+                        "type": "string",
+                        "format": "binary"
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "Invalid image URL",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Invalid image URL"
+                    }
+                }
+            }
+        },
+        404: {
+            "description": "Image not found or failed to download",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Failed to fetch image"
+                    }
+                }
+            }
+        }
     },
 )
 async def proxy_image(url: str):

@@ -19,14 +19,74 @@ SessionDep = Annotated[Session, Depends(get_session)]
 @router.post(
     "/machines/register",
     summary="Register New Machine",
-    description="""
-    Registers a new machine in the system.
-    Generates a unique machine ID and stores machine details including network IP and name.
-    """,
+    description="""Registers a new machine in the system.
+
+### Request Body
+```json
+{
+    "network_ip": string,
+    "name": string,
+    "description": string | null
+}
+```
+
+### Response Format
+```json
+{
+    "machine_uid": string,
+    "network_ip": string,
+    "name": string,
+    "description": string | null,
+    "created_at": string (ISO 8601 datetime),
+    "disabled": boolean,
+    "status": "registered"
+}
+```
+
+### Fields Description
+- `machine_uid`: Automatically generated UUID for the machine
+- `network_ip`: IP address of the machine
+- `name`: Display name for the machine
+- `description`: Optional description
+- `created_at`: Timestamp of registration
+- `disabled`: Whether the machine is disabled
+- `status`: Always "registered" for new machines
+
+### Error Responses
+- `400 Bad Request`:
+    ```json
+    {
+        "detail": "Machine already registered"
+    }
+    ```""",
     response_description="Returns the registered machine details",
     responses={
-        200: {"description": "Successfully registered machine"},
-        400: {"description": "Machine already registered"},
+        200: {
+            "description": "Successfully registered machine",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "machine_uid": "550e8400-e29b-41d4-a716-446655440000",
+                        "network_ip": "192.168.1.100",
+                        "name": "Production Server 1",
+                        "description": "Main production server",
+                        "created_at": "2024-01-15T10:30:00Z",
+                        "disabled": False,
+                        "status": "registered"
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "Machine already registered",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Machine already registered"
+                    }
+                }
+            }
+        }
     },
 )
 def register_machine(
@@ -66,11 +126,54 @@ def register_machine(
 @router.get(
     "/liveness/{machine_uid}",
     summary="Check Machine Liveness",
-    description="Checks if a specific machine is currently online and responding.",
+    description="""Checks if a specific machine is currently online and responding.
+
+### Path Parameters
+- `machine_uid`: UUID of the machine to check
+
+### Response Format
+```json
+{
+    "machine_uid": string,
+    "status": "online" | "offline"
+}
+```
+
+### Error Responses
+- `404 Not Found`:
+    ```json
+    {
+        "detail": "Machine not found"
+    }
+    ```
+
+### Notes
+- Status is determined by checking Redis cache
+- "online" indicates the machine has recently sent a heartbeat
+- "offline" indicates no recent heartbeat received""",
     response_description="Returns the machine's current status",
     responses={
-        200: {"description": "Successfully retrieved machine status"},
-        404: {"description": "Machine not found"},
+        200: {
+            "description": "Successfully retrieved machine status",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "machine_uid": "550e8400-e29b-41d4-a716-446655440000",
+                        "status": "online"
+                    }
+                }
+            }
+        },
+        404: {
+            "description": "Machine not found",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Machine not found"
+                    }
+                }
+            }
+        }
     },
 )
 def check_liveness(machine_uid: str, session: SessionDep):
@@ -90,14 +193,55 @@ def check_liveness(machine_uid: str, session: SessionDep):
 @router.post(
     "/liveness/{machine_uid}",
     summary="Update Machine Liveness",
-    description="""
-    Updates the liveness status of a machine.
-    Sets TTL for liveness check and stores current network information.
-    """,
+    description="""Updates the liveness status of a machine.
+
+### Path Parameters
+- `machine_uid`: UUID of the machine to update
+
+### Response Format
+```json
+{
+    "machine_uid": string,
+    "status": "online"
+}
+```
+
+### Technical Details
+- Sets TTL for liveness check
+- Stores current network information in Redis
+- Updates timestamp of last seen
+- TTL is calculated based on initial registration time
+
+### Error Responses
+- `404 Not Found`:
+    ```json
+    {
+        "detail": "Machine not found"
+    }
+    ```""",
     response_description="Returns the updated machine status",
     responses={
-        200: {"description": "Successfully updated machine status"},
-        404: {"description": "Machine not found"},
+        200: {
+            "description": "Successfully updated machine status",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "machine_uid": "550e8400-e29b-41d4-a716-446655440000",
+                        "status": "online"
+                    }
+                }
+            }
+        },
+        404: {
+            "description": "Machine not found",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Machine not found"
+                    }
+                }
+            }
+        }
     },
 )
 def set_liveness(machine_uid: str, session: SessionDep):
@@ -133,14 +277,74 @@ def set_liveness(machine_uid: str, session: SessionDep):
 @router.get(
     "/machines",
     summary="List All Machines",
-    description="""
-    Retrieves a list of all registered machines with their current status.
-    Includes information about online/offline status and last seen timestamp.
-    """,
+    description="""Retrieves a list of all registered machines with their current status.
+
+### Authentication
+- Requires a valid authentication token
+- Token must be passed in the Authorization header
+
+### Response Format
+```json
+[
+    {
+        "machine_uid": string,
+        "network_ip": string,
+        "name": string,
+        "description": string | null,
+        "created_at": string (ISO 8601 datetime),
+        "disabled": boolean,
+        "status": "online" | "offline",
+        "last_seen": number | null
+    }
+]
+```
+
+### Fields Description
+- `machine_uid`: Unique identifier for the machine
+- `network_ip`: IP address of the machine
+- `name`: Display name for the machine
+- `description`: Optional description
+- `created_at`: Registration timestamp
+- `disabled`: Whether the machine is disabled
+- `status`: Current online/offline status
+- `last_seen`: Unix timestamp of last heartbeat (null if offline)
+
+### Error Responses
+- `401 Unauthorized`:
+    ```json
+    {
+        "detail": "Could not validate credentials"
+    }
+    ```""",
     response_description="Returns an array of machine details",
     responses={
-        200: {"description": "Successfully retrieved machines list"},
-        401: {"description": "Unauthorized - Invalid or missing authentication"},
+        200: {
+            "description": "Successfully retrieved machines list",
+            "content": {
+                "application/json": {
+                    "example": [{
+                        "machine_uid": "550e8400-e29b-41d4-a716-446655440000",
+                        "network_ip": "192.168.1.100",
+                        "name": "Production Server 1",
+                        "description": "Main production server",
+                        "created_at": "2024-01-15T10:30:00Z",
+                        "disabled": False,
+                        "status": "online",
+                        "last_seen": 1705312200
+                    }]
+                }
+            }
+        },
+        401: {
+            "description": "Unauthorized - Invalid or missing authentication",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Could not validate credentials"
+                    }
+                }
+            }
+        }
     },
 )
 def list_all_machines(session: SessionDep, user: User = Depends(verify_user)):
@@ -175,11 +379,54 @@ def list_all_machines(session: SessionDep, user: User = Depends(verify_user)):
 @router.get(
     "/machines/online",
     summary="List Online Machines",
-    description="Retrieves a list of currently online machines.",
+    description="""Retrieves a list of currently online machines.
+
+### Authentication
+- Requires a valid authentication token
+- Token must be passed in the Authorization header
+
+### Response Format
+```json
+[
+    {
+        "machine_uid": string
+    }
+]
+```
+
+### Notes
+- Only returns machines that have sent a heartbeat recently
+- Empty array if no machines are online
+
+### Error Responses
+- `401 Unauthorized`:
+    ```json
+    {
+        "detail": "Could not validate credentials"
+    }
+    ```""",
     response_description="Returns an array of online machine IDs",
     responses={
-        200: {"description": "Successfully retrieved online machines"},
-        401: {"description": "Unauthorized - Invalid or missing authentication"},
+        200: {
+            "description": "Successfully retrieved online machines",
+            "content": {
+                "application/json": {
+                    "example": [{
+                        "machine_uid": "550e8400-e29b-41d4-a716-446655440000"
+                    }]
+                }
+            }
+        },
+        401: {
+            "description": "Unauthorized - Invalid or missing authentication",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Could not validate credentials"
+                    }
+                }
+            }
+        }
     },
 )
 def list_online_machines(user: User = Depends(verify_user)):
@@ -190,12 +437,77 @@ def list_online_machines(user: User = Depends(verify_user)):
 @router.put(
     "/machines/{machine_uid}",
     summary="Update Machine Details",
-    description="Updates the details of an existing machine including network IP, name, and description.",
+    description="""Updates the details of an existing machine.
+
+### Authentication
+- Requires a valid authentication token
+- Token must be passed in the Authorization header
+
+### Path Parameters
+- `machine_uid`: UUID of the machine to update
+
+### Request Body
+```json
+{
+    "network_ip": string,
+    "name": string,
+    "description": string | null
+}
+```
+
+### Response Format
+Returns the complete updated machine object.
+
+### Error Responses
+- `401 Unauthorized`:
+    ```json
+    {
+        "detail": "Could not validate credentials"
+    }
+    ```
+- `404 Not Found`:
+    ```json
+    {
+        "detail": "Machine not found"
+    }
+    ```""",
     response_description="Returns the updated machine details",
     responses={
-        200: {"description": "Successfully updated machine"},
-        404: {"description": "Machine not found"},
-        401: {"description": "Unauthorized - Invalid or missing authentication"},
+        200: {
+            "description": "Successfully updated machine",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "network_machine_uid": "550e8400-e29b-41d4-a716-446655440000",
+                        "network_ip": "192.168.1.100",
+                        "name": "Updated Server Name",
+                        "description": "Updated description",
+                        "created_at": "2024-01-15T10:30:00Z",
+                        "disabled": False,
+                    }
+                }
+            }
+        },
+        404: {
+            "description": "Machine not found",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Machine not found"
+                    }
+                }
+            }
+        },
+        401: {
+            "description": "Unauthorized - Invalid or missing authentication",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Could not validate credentials"
+                    }
+                }
+            }
+        }
     },
 )
 def update_machine(

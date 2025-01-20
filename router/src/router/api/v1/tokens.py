@@ -14,17 +14,89 @@ router = APIRouter()
 @router.post(
     "/api-tokens",
     summary="Create API Token",
-    description="""
-    Creates a new API token for the authenticated user.
-    Generates a secure random token with 'sk-mira-' prefix.
-    Stores token details including description and creation timestamp.
-    """,
+    description="""Creates a new API token for the authenticated user.
+
+### Authentication
+- Requires a valid authentication token
+- Token must be passed in the Authorization header
+
+### Request Body
+```json
+{
+    "description": string | null  // Optional description for the token
+}
+```
+
+### Response Format
+```json
+{
+    "id": int,              // Unique identifier for the token
+    "token": string,        // The generated API token
+    "description": string | null,
+    "created_at": string    // ISO 8601 datetime
+}
+```
+
+### Token Format
+- Prefix: `sk-mira-`
+- Length: 56 characters (including prefix)
+- Example: `sk-mira-a1b2c3d4e5f6...`
+
+### Error Responses
+- `401 Unauthorized`:
+    ```json
+    {
+        "detail": "Could not validate credentials"
+    }
+    ```
+- `500 Internal Server Error`:
+    ```json
+    {
+        "detail": "Error message from the server"
+    }
+    ```
+
+### Notes
+- Tokens are generated using cryptographically secure random bytes
+- Tokens cannot be retrieved after creation - store them securely
+- Multiple tokens per user are allowed
+- Description field is optional but recommended for token management""",
     response_description="Returns the created API token details",
     responses={
-        200: {"description": "Successfully created API token"},
-        401: {"description": "Unauthorized - Invalid or missing authentication"},
-        500: {"description": "Internal server error while creating token"},
-    },
+        200: {
+            "description": "Successfully created API token",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "id": 1,
+                        "token": "sk-mira-a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6",
+                        "description": "Development environment token",
+                        "created_at": "2024-01-15T10:30:00Z"
+                    }
+                }
+            }
+        },
+        401: {
+            "description": "Unauthorized - Invalid or missing authentication",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Could not validate credentials"
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "Internal server error while creating token",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Database error occurred while creating token"
+                    }
+                }
+            }
+        }
+    }
 )
 def create_api_token(
     request: ApiTokenRequest,
@@ -56,12 +128,71 @@ def create_api_token(
 @router.get(
     "/api-tokens",
     summary="List API Tokens",
-    description="Retrieves all active API tokens for the authenticated user.",
-    response_description="Returns an array of API token details",
+    description="""Retrieves all active API tokens for the authenticated user.
+
+### Authentication
+- Requires a valid authentication token
+- Token must be passed in the Authorization header
+
+### Response Format
+```json
+[
+    {
+        "id": int,              // Unique identifier for the token
+        "token": string,        // The API token
+        "description": string | null,
+        "created_at": string    // ISO 8601 datetime
+    }
+]
+```
+
+### Error Responses
+- `401 Unauthorized`:
+    ```json
+    {
+        "detail": "Could not validate credentials"
+    }
+    ```
+
+### Notes
+- Only returns active (non-deleted) tokens
+- Tokens are ordered by creation date (newest first)
+- Deleted tokens are not included in the response
+- Empty array is returned if user has no active tokens""",
+    response_description="Returns an array of active API token details",
     responses={
-        200: {"description": "Successfully retrieved API tokens"},
-        401: {"description": "Unauthorized - Invalid or missing authentication"},
-    },
+        200: {
+            "description": "Successfully retrieved API tokens",
+            "content": {
+                "application/json": {
+                    "example": [
+                        {
+                            "id": 1,
+                            "token": "sk-mira-a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6",
+                            "description": "Production token",
+                            "created_at": "2024-01-15T10:30:00Z"
+                        },
+                        {
+                            "id": 2,
+                            "token": "sk-mira-b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7",
+                            "description": "Development token",
+                            "created_at": "2024-01-14T15:45:00Z"
+                        }
+                    ]
+                }
+            }
+        },
+        401: {
+            "description": "Unauthorized - Invalid or missing authentication",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Could not validate credentials"
+                    }
+                }
+            }
+        }
+    }
 )
 def list_api_tokens(
     db: Session = Depends(get_session), user: User = Depends(verify_user)
@@ -85,16 +216,74 @@ def list_api_tokens(
 @router.delete(
     "/api-tokens/{token}",
     summary="Delete API Token",
-    description="""
-    Soft deletes an API token by setting its deleted_at timestamp.
-    Only allows deletion of tokens owned by the authenticated user.
-    """,
-    response_description="Returns success message",
+    description="""Soft deletes an API token by setting its deleted_at timestamp.
+
+### Authentication
+- Requires a valid authentication token
+- Token must be passed in the Authorization header
+
+### Path Parameters
+- `token`: The API token to delete (including 'sk-mira-' prefix)
+
+### Response Format
+```json
+{
+    "message": "Token deleted successfully"
+}
+```
+
+### Error Responses
+- `401 Unauthorized`:
+    ```json
+    {
+        "detail": "Could not validate credentials"
+    }
+    ```
+- `404 Not Found`:
+    ```json
+    {
+        "detail": "Token not found"
+    }
+    ```
+
+### Notes
+- Performs a soft delete (sets deleted_at timestamp)
+- Only the token owner can delete their tokens
+- Token cannot be reactivated after deletion
+- Deleted tokens will not work for API authentication""",
+    response_description="Returns success message upon deletion",
     responses={
-        200: {"description": "Successfully deleted API token"},
-        401: {"description": "Unauthorized - Invalid or missing authentication"},
-        404: {"description": "Token not found"},
-    },
+        200: {
+            "description": "Successfully deleted API token",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "message": "Token deleted successfully"
+                    }
+                }
+            }
+        },
+        401: {
+            "description": "Unauthorized - Invalid or missing authentication",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Could not validate credentials"
+                    }
+                }
+            }
+        },
+        404: {
+            "description": "Token not found",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Token not found"
+                    }
+                }
+            }
+        }
+    }
 )
 def delete_api_token(
     token: str, db: Session = Depends(get_session), user: User = Depends(verify_user)
