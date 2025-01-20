@@ -1,6 +1,7 @@
 name: Create New Relic Deployment Marker
 
-on: workflow_call
+on:
+  workflow_call:
 
 jobs:
   create_deployment_marker:

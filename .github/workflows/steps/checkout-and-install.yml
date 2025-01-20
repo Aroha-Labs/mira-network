@@ -1,6 +1,11 @@
 name: Checkout and Install Dependencies
 
-on: workflow_call
+on:
+  workflow_call:
+    inputs:
+      working-directory:
+        required: true
+        type: string
 
 jobs:
   checkout_and_install:
@@ -9,3 +14,4 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install dependencies
         run: yarn
+        working-directory: ${{ inputs.working-directory }}
