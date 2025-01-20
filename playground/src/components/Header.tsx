@@ -121,7 +121,7 @@ export const Header = () => {
               className="text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 px-4 py-2 rounded-md transition-colors inline-flex items-center gap-2"
             >
               <ChatBubbleBottomCenterTextIcon className="h-5 w-5" />
-              Console
+              Chat
             </Link>
             <Link
               href="/terminal"
