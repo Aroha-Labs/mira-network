@@ -24,59 +24,396 @@ permissions:
 
 jobs:
   changes:
-    uses: ./.github/workflows/changes.yml
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      router: ${{ steps.filter.outputs.router }}
+      service: ${{ steps.filter.outputs.service }}
+      cli: ${{ steps.filter.outputs.cli }}
+      playground: ${{ steps.filter.outputs.playground }}
+      sdk: ${{ steps.filter.outputs.sdk }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            router:
+              - 'router/**'
+            service:
+              - 'service/**'
+            cli:
+              - 'cli/**'
+            playground:
+              - 'playground/**'
+            sdk:
+              - 'sdk/**'
 
   create-tag:
     needs: changes
-    uses: ./.github/workflows/create-tag.yml
     if: |
       needs.changes.outputs.router == 'true' ||
       needs.changes.outputs.service == 'true' ||
       needs.changes.outputs.cli == 'true' ||
       needs.changes.outputs.playground == 'true' ||
       needs.changes.outputs.sdk == 'true'
-
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    outputs:
+      new_tag: ${{ steps.tag_version.outputs.new_tag }}
+      notes: ${{ steps.release_notes.outputs.notes }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Get latest tag
+        id: get_latest_tag
+        run: |
+          latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "latest_tag=${latest_tag}" >> $GITHUB_OUTPUT
+      - name: Bump version and push tag
+        id: tag_version
+        run: |
+          latest_tag=${{ steps.get_latest_tag.outputs.latest_tag }}
+          latest_ver=${latest_tag#v}
+          IFS='.' read -r major minor patch <<< "$latest_ver"
+          new_patch=$((patch + 1))
+          # Function to check if tag exists
+          tag_exists() {
+            git rev-parse "$1" >/dev/null 2>&1
+          }
+          # Find next available tag
+          while true; do
+            if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+              new_tag="v$major.$minor.$new_patch"
+            else
+              new_tag="v$major.$minor.$new_patch-dev"
+            fi
+            if ! tag_exists "$new_tag"; then
+              break
+            fi
+            new_patch=$((new_patch + 1))
+          done
+          echo "new_tag=${new_tag}" >> $GITHUB_OUTPUT
+          echo "Creating new tag: $new_tag"
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          # Create and push tag with error handling
+          if git tag -a $new_tag -m "Release $new_tag" && git push origin $new_tag; then
+            echo "Successfully created and pushed tag $new_tag"
+          else
+            echo "Failed to create or push tag"
+            exit 1
+          fi
+      - name: Generate Release Notes
+        id: release_notes
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Install only OpenAI package
+          npm install openai
+          # Create and run the release notes generator script
+          cat > generate-notes.js << 'EOF'
+          const OpenAI = require('openai');
+          async function main() {
+            try {
+              const openai = new OpenAI({
+                apiKey: process.env.OPENAI_API_KEY
+              });
+              
+              // Get repository details from GitHub URL
+              const [owner, repo] = process.env.GITHUB_REPOSITORY.split('/');
+              
+              // Get the comparison between tags using GitHub API
+              const response = await fetch(
+                `https://api.github.com/repos/${owner}/${repo}/compare/${process.env.LAST_TAG}...${process.env.NEW_TAG}`,
+                {
+                  headers: {
+                    'Authorization': `Bearer ${process.env.GITHUB_TOKEN}`,
+                    'Accept': 'application/vnd.github.v3+json'
+                  }
+                }
+              );
+              
+              const comparison = await response.json();
+              
+              const diff = comparison.files
+                .map(file => `${file.filename} | ${file.additions} additions, ${file.deletions} deletions`)
+                .join('\n');
+              
+              if (!diff) {
+                throw new Error('No diff found between tags');
+              }
+              
+              // Generate release notes using OpenAI
+              const completion = await openai.chat.completions.create({
+                model: "gpt-4-1106-preview",
+                messages: [
+                  {
+                    role: "system",
+                    content: "You are a technical writer creating release notes. Only describe changes that are explicitly present in the provided diff - do not add, assume, or infer any additional changes. Use clear, professional language and organize changes into relevant sections: New Features, Improvements, Bug Fixes, or Technical Updates. If a section has no changes, omit it entirely. Each note should directly correspond to a specific change in the diff."
+                  },
+                  {
+                    role: "user",
+                    content: `Based on the following changes, generate release notes that strictly describe only the actual changes made:\n\n${diff}`
+                  }
+                ],
+                temperature: 0.3,
+                max_tokens: 1000
+              });
+              
+              const notes = completion.choices[0].message.content;
+              require('fs').writeFileSync('release_notes.txt', notes);
+            } catch (error) {
+              console.error('Error generating release notes:', error);
+              // Provide a default message if generation fails
+              const defaultNotes = `# Release ${process.env.NEW_TAG}\n\n` +
+                                 `## Overview\n` +
+                                 `This release includes updates to the system components.\n\n` +
+                                 `Please refer to the commit history for specific changes.\n`;
+              require('fs').writeFileSync('release_notes.txt', defaultNotes);
+              process.exit(0); // Don't fail the workflow
+            }
+          }
+          main().catch(error => {
+            console.error('Unhandled error:', error);
+            const defaultNotes = `# Release ${process.env.NEW_TAG}\n\n` +
+                               `## Overview\n` +
+                               `This release includes updates to the system components.\n\n` +
+                               `Please refer to the commit history for specific changes.\n`;
+            require('fs').writeFileSync('release_notes.txt', defaultNotes);
+            process.exit(0); // Don't fail the workflow
+          });
+          EOF
+          # Run the script
+          NEW_TAG=${{ steps.tag_version.outputs.new_tag }} \
+          LAST_TAG=$(git describe --tags --abbrev=0 ${{ steps.tag_version.outputs.new_tag }}^) \
+          node generate-notes.js
+          # Save the release notes path as output
+          mv release_notes.txt release_notes_${{ steps.tag_version.outputs.new_tag }}.md
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.tag_version.outputs.new_tag }}
+          name: Release ${{ steps.tag_version.outputs.new_tag }}
+          body_path: release_notes_${{ steps.tag_version.outputs.new_tag }}.md
+          draft: false
+          prerelease: ${{ github.ref != 'refs/heads/main' }}
   publish-router:
     needs: [changes, create-tag]
     if: needs.changes.outputs.router == 'true'
-    uses: ./.github/workflows/publish-router.yml
-    with:
-      version: ${{ needs.create-tag.outputs.new_tag }}
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.create-tag.outputs.new_tag }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Extract metadata (tags, labels) for Router
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.ROUTER_IMAGE }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=,format=short
+            type=raw,value=latest
+            type=raw,value=${{ needs.create-tag.outputs.new_tag }}
+      - name: Build and push Router image
+        uses: docker/build-push-action@v6
+        with:
+          context: router
+          build-args: |
+            IMAGE_VERSION=${{ env.VERSION }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+      - name: Clean up Docker images
+        run: docker image prune -f
 
   publish-service:
     needs: [changes, create-tag]
     if: needs.changes.outputs.service == 'true'
-    uses: ./.github/workflows/publish-service.yml
-    with:
-      version: ${{ needs.create-tag.outputs.new_tag }}
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.create-tag.outputs.new_tag }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Extract metadata (tags, labels) for Service
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.SERVICE_IMAGE }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=,format=short
+            type=raw,value=latest
+            type=raw,value=${{ needs.create-tag.outputs.new_tag }}
+      - name: Build and push Service image
+        uses: docker/build-push-action@v6
+        with:
+          context: service
+          build-args: |
+            IMAGE_VERSION=${{ env.VERSION }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+      - name: Clean up Docker images
+        run: docker image prune -f
 
   publish-cli:
     needs: [changes, create-tag]
-    uses: ./.github/workflows/publish-cli.yml
-    with:
-      version: ${{ needs.create-tag.outputs.new_tag }}
+    if: needs.changes.outputs.cli == 'true'
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.create-tag.outputs.new_tag }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23.4"
+      - name: Build project
+        working-directory: cli
+        run: make build VERSION=${{ env.VERSION }}
+      - name: Upload binaries to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: cli/bin/*
+          tag: ${{ env.VERSION }}
+          overwrite: true
+          file_glob: true
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
 
   deploy-console-testnet:
     needs: [changes, create-tag]
     if: needs.changes.outputs.playground == 'true'
-    uses: ./.github/workflows/deploy-console-testnet.yml
-    with:
-      version: ${{ needs.create-tag.outputs.new_tag }}
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.create-tag.outputs.new_tag }}
+    defaults:
+      run:
+        working-directory: ./playground
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install dependencies
+        run: yarn
+      - name: Build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://atmocsvasyapsvwsustd.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_API_BASE_URL: https://apis.mira.network
+          NEXT_PUBLIC_LLM_BASE_URL: https://apis.mira.network/v1
+          NEXT_PUBLIC_VERSION: ${{ env.VERSION }}
+        run: yarn build
+      - name: Publish to Cloudflare Pages
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: "b9d9855d1fdfcd9fb504dc752c05499f"
+          projectName: "mira-playground"
+          workingDirectory: playground
+          directory: out
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
 
   sdk-test:
     needs: [changes, create-tag]
     if: needs.changes.outputs.sdk == 'true'
-    uses: ./.github/workflows/sdk-test.yml
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11"]
+    defaults:
+      run:
+        working-directory: sdk
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pdm
+          pdm install --dev
+      - name: Run tests
+        run: |
+          pdm run pytest tests/
 
   sdk-lint:
     needs: [changes, create-tag]
     if: needs.changes.outputs.sdk == 'true'
-    uses: ./.github/workflows/sdk-lint.yml
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sdk
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pdm ruff black
+      - name: Format with Ruff
+        run: pdm format
+      - name: Lint with Ruff
+        run: pdm lint
 
   sonarqube:
-    needs: [changes, create-tag]
-    if: needs.changes.outputs.sdk == 'true'
-    uses: ./.github/workflows/sonarqube.yml
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Disabling shallow clones is recommended for improving the relevancy of reporting
+          fetch-depth: 0
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@master
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
   summary:
     needs:
@@ -91,12 +428,81 @@ jobs:
         sdk-lint,
       ]
     if: always()
-    uses: ./.github/workflows/summary.yml
-    with:
-      new_tag: ${{ needs.create-tag.outputs.new_tag }}
-      router_result: ${{ needs.publish-router.result }}
-      service_result: ${{ needs.publish-service.result }}
-      cli_result: ${{ needs.publish-cli.result }}
-      playground_result: ${{ needs.deploy-console-testnet.result }}
-      sdk_test_result: ${{ needs.sdk-test.result }}
-      sdk_lint_result: ${{ needs.sdk-lint.result }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate Job Summary
+        run: |
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "# 📋 Final Workflow Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 🏷️ Tag Information" >> $GITHUB_STEP_SUMMARY
+          echo "**New Release:** \`${{ needs.create-tag.outputs.new_tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 🚀 Job Status" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          # Header for the table
+          echo "| Component | Task | Status | Details |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|------|--------|----------|" >> $GITHUB_STEP_SUMMARY
+          # Router Status
+          if [ "${{ needs.changes.outputs.router }}" != "true" ]; then
+            echo "| 🌐 Router | Build & Publish | ⏭️ | **Skipped** (No Changes) |" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.publish-router.result }}" = "success" ]; then
+            echo "| 🌐 Router | Build & Publish | ✅ | **Successful** |" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.publish-router.result }}" = "failure" ]; then
+            echo "| 🌐 Router | Build & Publish | ❌ | **Failed** |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| 🌐 Router | Build & Publish | ⚠️ | **Cancelled** |" >> $GITHUB_STEP_SUMMARY
+          fi
+          # Service Status
+          if [ "${{ needs.changes.outputs.service }}" != "true" ]; then
+            echo "| ⚙️ Service | Build & Publish | ⏭️ | **Skipped** (No Changes) |" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.publish-service.result }}" = "success" ]; then
+            echo "| ⚙️ Service | Build & Publish | ✅ | **Successful** |" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.publish-service.result }}" = "failure" ]; then
+            echo "| ⚙️ Service | Build & Publish | ❌ | **Failed** |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| ⚙️ Service | Build & Publish | ⚠️ | **Cancelled** |" >> $GITHUB_STEP_SUMMARY
+          fi
+          # CLI Status
+          if [ "${{ needs.changes.outputs.cli }}" != "true" ]; then
+            echo "| 🔧 CLI | Build & Publish | ⏭️ | **Skipped** (No Changes) |" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.publish-cli.result }}" = "success" ]; then
+            echo "| 🔧 CLI | Build & Publish | ✅ | **Successful** |" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.publish-cli.result }}" = "failure" ]; then
+            echo "| 🔧 CLI | Build & Publish | ❌ | **Failed** |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| 🔧 CLI | Build & Publish | ⚠️ | **Cancelled** |" >> $GITHUB_STEP_SUMMARY
+          fi
+          # Playground Status
+          if [ "${{ needs.changes.outputs.playground }}" != "true" ]; then
+            echo "| 🎮 Playground | Deploy to Testnet | ⏭️ | **Skipped** (No Changes) |" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.deploy-console-testnet.result }}" = "success" ]; then
+            echo "| 🎮 Playground | Deploy to Testnet | ✅ | **Successful** |" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.deploy-console-testnet.result }}" = "failure" ]; then
+            echo "| 🎮 Playground | Deploy to Testnet | ❌ | **Failed** |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| 🎮 Playground | Deploy to Testnet | ⚠️ | **Cancelled** |" >> $GITHUB_STEP_SUMMARY
+          fi
+          # SDK Status
+          if [ "${{ needs.changes.outputs.sdk }}" != "true" ]; then
+            echo "| 📦 SDK | Tests | ⏭️ | **Skipped** (No Changes) |" >> $GITHUB_STEP_SUMMARY
+            echo "| 📦 SDK | Lint | ⏭️ | **Skipped** (No Changes) |" >> $GITHUB_STEP_SUMMARY
+          else
+            if [ "${{ needs.sdk-test.result }}" = "success" ]; then
+              echo "| 📦 SDK | Tests | ✅ | **Passed** |" >> $GITHUB_STEP_SUMMARY
+            elif [ "${{ needs.sdk-test.result }}" = "failure" ]; then
+              echo "| 📦 SDK | Tests | ❌ | **Failed** |" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "| 📦 SDK | Tests | ⚠️ | **Cancelled** |" >> $GITHUB_STEP_SUMMARY
+            fi
+            
+            if [ "${{ needs.sdk-lint.result }}" = "success" ]; then
+              echo "| 📦 SDK | Lint | ✅ | **Passed** |" >> $GITHUB_STEP_SUMMARY
+            elif [ "${{ needs.sdk-lint.result }}" = "failure" ]; then
+              echo "| 📦 SDK | Lint | ❌ | **Failed** |" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "| 📦 SDK | Lint | ⚠️ | **Cancelled** |" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
