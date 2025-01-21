@@ -442,14 +442,40 @@ jobs:
         run: pdm lint
 
   sonarqube:
+    needs: [changes, create-tag]
+    if: |
+      needs.changes.outputs.router == 'true' ||
+      needs.changes.outputs.service == 'true' ||
+      needs.changes.outputs.cli == 'true' ||
+      needs.changes.outputs.playground == 'true' ||
+      needs.changes.outputs.sdk == 'true'
     runs-on: ubuntu-latest
     steps:
+<<<<<<< Updated upstream
     - uses: actions/checkout@v4
       with:
         # Disabling shallow clones is recommended for improving the relevancy of reporting
         fetch-depth: 0
     - name: SonarQube Scan
       uses: SonarSource/sonarqube-scan-action@master
+=======
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Important for SCM history analysis
+    - name: Set up JDK 11
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'adopt'
+        java-version: '11'
+    - name: SonarQube Scan
+      uses: sonarsource/sonarqube-scan-action@master
+      with:
+        projectBaseDir: .
+        args: >
+          -Dsonar.organization=aroha-labs
+          -Dsonar.projectKey=mira-client
+>>>>>>> Stashed changes
       env:
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
@@ -465,6 +491,7 @@ jobs:
         deploy-console-testnet,
         sdk-test,
         sdk-lint,
+        sonarqube,
       ]
     if: always()
     runs-on: ubuntu-latest
