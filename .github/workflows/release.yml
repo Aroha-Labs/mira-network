@@ -52,7 +52,7 @@ jobs:
               - 'sdk/**'
 
   create-tag:
-    needs: changes
+    needs: [changes, sonarqube]
     if: |
       needs.changes.outputs.router == 'true' ||
       needs.changes.outputs.service == 'true' ||
