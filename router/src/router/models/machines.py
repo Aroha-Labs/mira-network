@@ -11,7 +11,8 @@ class Machine(SQLModel, table=True):
     name: str | None = Field(index=True)
     description: str | None = Field(index=True)
     auth_tokens: Dict[str, Any] = Field(
-        sa_column=Column(JSONB, server_default="{}", nullable=False)
+        sa_column=Column(JSONB, server_default="{}", nullable=False),
+        default_factory=dict,
     )
     disabled: bool = Field(
         sa_column=Column(BOOLEAN, server_default="False", nullable=False)

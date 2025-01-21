@@ -1,0 +1,53 @@
+name: Publish Service
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+
+jobs:
+  publish-service:
+    runs-on: ubuntu-latest
+    if: needs.changes.outputs.service == 'true'
+    env:
+      VERSION: ${{ inputs.version }}
+      REGISTRY: ghcr.io
+      SERVICE_IMAGE: Aroha-Labs/mira-client-service
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Service
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.SERVICE_IMAGE }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=,format=short
+            type=raw,value=latest
+            type=raw,value=${{ env.VERSION }}
+
+      - name: Build and push Service image
+        uses: docker/build-push-action@v6
+        with:
+          context: service
+          build-args: |
+            IMAGE_VERSION=${{ env.VERSION }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Clean up Docker images
+        run: docker image prune -f

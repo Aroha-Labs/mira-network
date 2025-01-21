@@ -1,0 +1,43 @@
+name: Deploy Console to Testnet
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+
+jobs:
+  deploy-console-testnet:
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ inputs.version }}
+      NEXT_PUBLIC_SUPABASE_URL: https://atmocsvasyapsvwsustd.supabase.co
+      NEXT_PUBLIC_API_BASE_URL: https://apis.mira.network
+      NEXT_PUBLIC_LLM_BASE_URL: https://apis.mira.network/v1
+    defaults:
+      run:
+        working-directory: ./playground
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Build
+        env:
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_VERSION: ${{ env.VERSION }}
+        run: yarn build
+
+      - name: Publish to Cloudflare Pages
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: "b9d9855d1fdfcd9fb504dc752c05499f"
+          projectName: "mira-playground"
+          workingDirectory: playground
+          directory: out
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
