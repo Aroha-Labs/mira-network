@@ -24,7 +24,7 @@ def extract_variables(system_prompt: str) -> List[str]:
 
 @router.post(
     "/flows",
-    summary="Create New Flow",
+    summary="Create a New Flow",
     description="""Creates a new flow with a system prompt and extracts any variables from it.
 
 ### Authentication

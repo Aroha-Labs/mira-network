@@ -403,7 +403,7 @@ jobs:
         run: pdm lint
 
   sonarqube:
-    needs: [changes, create-tag]
+    needs: changes
     if: |
       needs.changes.outputs.router == 'true' ||
       needs.changes.outputs.service == 'true' ||
