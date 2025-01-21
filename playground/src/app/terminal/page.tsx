@@ -300,7 +300,7 @@ export default function TerminalPage() {
                                 Copy
                               </button>
                             </div>
-                            <div className="p-4 overflow-x-auto">
+                            <div className="p-4 overflow-x-auto font-mono">
                               <CodeBlock
                                 text={getApiExample(selectedFlow)}
                                 language="bash"
@@ -316,7 +316,7 @@ export default function TerminalPage() {
                             Response
                           </h3>
                           <div className="overflow-hidden bg-[#282A36] rounded-lg">
-                            <div className="p-4 overflow-x-auto">
+                            <div className="p-4 overflow-x-auto font-mono">
                               <CodeBlock
                                 text={`{
   "id": "chat_xyz123",

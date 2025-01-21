@@ -47,7 +47,7 @@ const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({ userSession }) => {
             ) : error ? (
               "Error"
             ) : isLoggedIn ? (
-              inferenceCalls
+              inferenceCalls?.total || "----"
             ) : (
               "----"
             )}

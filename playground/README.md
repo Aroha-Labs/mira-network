@@ -12,12 +12,14 @@ _A powerful web interface for interacting with and testing Mira's AI capabilitie
 
 ## ✨ Features
 
-- 🤖 Interactive chat interface for testing AI models
-- 🔑 API key management and authentication
-- 📊 Comprehensive usage analytics and logs
-- 🌐 Real-time network monitoring
-- 👥 Advanced admin controls for user management
+- 🤖 Interactive chat interface with multiple AI models
+- 🔧 Advanced system prompt configuration
+- 🛠️ Built-in developer tools and debugging features
+- 📊 Real-time usage analytics and cost tracking
+- 🔑 Secure API key management
+- 🌐 Network performance monitoring
 - 💻 Integrated terminal interface
+- 👥 User and role management for administrators
 
 ## 🚀 Getting Started
 
@@ -25,22 +27,33 @@ _A powerful web interface for interacting with and testing Mira's AI capabilitie
 
 - Node.js 18.x or higher
 - Yarn package manager
+- Supabase account for authentication
+- Valid Mira API credentials
 
 ### Installation
 
-1. Install dependencies:
+1. Clone the repository and install dependencies:
 
 ```bash
+git clone https://github.com/miranetwork/playground.git
+cd playground
 yarn install
 ```
 
-2. Run the development server:
+2. Set up environment variables:
+
+```bash
+cp .env.example .env.local
+# Edit .env.local with your configuration
+```
+
+3. Run the development server:
 
 ```bash
 yarn dev
 ```
 
-3. Open [http://localhost:3000](http://localhost:3000) with your browser to see the application.
+4. Open [http://localhost:3000](http://localhost:3000) with your browser to see the application.
 
 ## 🏗️ Development
 
@@ -48,41 +61,44 @@ yarn dev
 
 ```
 src/
-├── app/          # Main application code
-├── components/   # Reusable components
+├── app/          # Next.js 13+ app directory
+│   ├── admin/    # Admin panel routes
+│   ├── chat/     # Chat interface
+│   └── api/      # API routes
+├── components/   # Reusable React components
+├── hooks/        # Custom React hooks
 ├── utils/        # Utility functions
-└── types/        # TypeScript type definitions
+├── types/        # TypeScript type definitions
+└── lib/          # Shared libraries
 ```
 
 ### Key Pages
 
-| Route       | Description                |
-| ----------- | -------------------------- |
-| `/`         | Home/Dashboard             |
-| `/login`    | Authentication             |
-| `/api-keys` | API key management         |
-| `/api-logs` | Request logs and analytics |
-| `/network`  | Network monitoring         |
-| `/terminal` | Terminal interface         |
-| `/admin/*`  | Admin controls             |
+| Route             | Description                     |
+| ----------------- | ------------------------------- |
+| `/`               | Dashboard & Overview            |
+| `/chat`           | AI Chat Interface               |
+| `/playground`     | Interactive Testing Environment |
+| `/terminal`       | Terminal Interface              |
+| `/api-keys`       | API Key Management              |
+| `/api-logs`       | Request Logs & Analytics        |
+| `/network`        | Network Status & Monitoring     |
+| `/analytics`      | Usage Analytics & Reports       |
+| `/admin/users`    | User Management                 |
+| `/admin/machines` | Machine Management              |
+| `/admin/settings` | System Settings                 |
 
 ## 📚 Documentation
 
-For more information about Mira and its capabilities, visit our [Documentation](https://docs.mira.ai).
+For detailed documentation about Mira and its capabilities, visit our [Documentation Portal](https://docs.mira.network).
 
 ## 🚢 Deployment
 
 The application is automatically deployed to Cloudflare Pages when changes are pushed to the main branch.
 
-### Deployment Process
-
-1. Builds the application with required environment variables
-2. Publishes the `out` directory to Cloudflare Pages
-3. Creates a new version tag and GitHub release
-
 ### Environment Variables
 
-The following environment variables are required for deployment:
+Required environment variables for deployment:
 
 | Variable                        | Description            |
 | ------------------------------- | ---------------------- |
@@ -92,10 +108,29 @@ The following environment variables are required for deployment:
 | `NEXT_PUBLIC_LLM_BASE_URL`      | LLM API base URL       |
 | `NEXT_PUBLIC_VERSION`           | Application version    |
 
+### Build Process
+
+1. Runs tests and linting checks
+2. Builds the Next.js application
+3. Generates static export
+4. Deploys to Cloudflare Pages
+5. Creates a new version tag and release
+
 ## 🤝 Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
+
+### Development Workflow
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Submit a pull request
 
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🔒 Security
+
+For security issues, please email security@mira.network instead of using the issue tracker.
