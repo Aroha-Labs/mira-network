@@ -4,9 +4,7 @@ import React from "react";
 import { supabase } from "src/utils/supabase/client";
 
 export default function Login() {
-  const handleLogin = async (
-    e: React.MouseEvent<HTMLButtonElement, MouseEvent>
-  ) => {
+  const handleLogin = async (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
     e.preventDefault();
     supabase.auth.signInWithOAuth({
       provider: "google",

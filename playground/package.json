@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "format": "prettier --write .",
+    "fix": "yarn format && yarn lint:fix"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.0",
@@ -24,6 +26,7 @@
     "jwt-decode": "^4.0.0",
     "lucide-react": "^0.473.0",
     "next": "15.1.5",
+    "prism-react-renderer": "^2.4.1",
     "react": "^19.0.0",
     "react-chartjs-2": "^5.3.0",
     "react-code-blocks": "^0.1.6",
@@ -41,6 +44,8 @@
     "eslint": "^9",
     "eslint-config-next": "15.1.5",
     "postcss": "8.5.1",
+    "prettier": "^3.4.2",
+    "prettier-plugin-tailwindcss": "^0.6.10",
     "tailwindcss": "^3.4.1",
     "typescript": "5.7.3"
   },
