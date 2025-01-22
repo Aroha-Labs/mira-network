@@ -10,9 +10,7 @@ interface SystemPromptInputProps {
   onChange: (formattedPrompt: string) => void;
 }
 
-export default function SystemPromptInput({
-  onChange,
-}: SystemPromptInputProps) {
+export default function SystemPromptInput({ onChange }: SystemPromptInputProps) {
   const [isFormVisible, setIsFormVisible] = useState(false);
   const [variables, setVariables] = useState<{ [key: string]: string }>({});
   const [systemPrompt, setSystemPrompt] = useState("");
@@ -23,11 +21,14 @@ export default function SystemPromptInput({
     const variableMatches = systemPrompt.match(/{{(.*?)}}/g);
     if (variableMatches) {
       const oldVars = { ...variables };
-      const vars = variableMatches.reduce((acc, match) => {
-        const varName = match.replace(/{{|}}/g, "").trim();
-        acc[varName] = oldVars[varName] || "";
-        return acc;
-      }, {} as { [key: string]: string });
+      const vars = variableMatches.reduce(
+        (acc, match) => {
+          const varName = match.replace(/{{|}}/g, "").trim();
+          acc[varName] = oldVars[varName] || "";
+          return acc;
+        },
+        {} as { [key: string]: string }
+      );
       setVariables(vars);
     } else {
       setVariables({});
@@ -86,9 +87,7 @@ export default function SystemPromptInput({
     onChange(formattedPrompt);
   };
 
-  const handleSystemPromptChange = (
-    e: React.ChangeEvent<HTMLTextAreaElement>
-  ) => {
+  const handleSystemPromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setSystemPrompt(e.target.value);
     const formattedPrompt = e.target.value.replace(/{{(.*?)}}/g, (_, v) => {
       return variables[v.trim()] || `{{${v.trim()}}}`;

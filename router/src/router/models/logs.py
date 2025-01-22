@@ -35,5 +35,6 @@ class ApiLogs(SQLModel, table=True):
     total_response_time: float
     model: str
     model_pricing: Optional[ModelPricing] = Field(sa_column=Column(ModelPricingType))
+    flow_id: Optional[str] = Field(index=True)
     machine_id: Optional[str] = Field(index=True)
     created_at: datetime = Field(default=func.now(), nullable=False)
