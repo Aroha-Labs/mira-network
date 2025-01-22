@@ -411,6 +411,35 @@ jobs:
       needs.changes.outputs.playground == 'true' ||
       needs.changes.outputs.sdk == 'true'
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        project: [
+          {
+            path: 'router',
+            key: 'mira-client-router',
+            enabled: '${{ needs.changes.outputs.router }}'
+          },
+          {
+            path: 'service',
+            key: 'mira-client-service',
+            enabled: '${{ needs.changes.outputs.service }}'
+          },
+          {
+            path: 'cli',
+            key: 'mira-client-cli',
+            enabled: '${{ needs.changes.outputs.cli }}'
+          },
+          {
+            path: 'playground',
+            key: 'mira-client-playground',
+            enabled: '${{ needs.changes.outputs.playground }}'
+          },
+          {
+            path: 'sdk',
+            key: 'mira-client-sdk',
+            enabled: '${{ needs.changes.outputs.sdk }}'
+          }
+        ]
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -424,10 +453,12 @@ jobs:
     - name: SonarQube Scan
       uses: sonarsource/sonarqube-scan-action@master
       with:
-        projectBaseDir: .
+        projectBaseDir: ${{ matrix.project.path }}
         args: >
           -Dsonar.organization=aroha-labs
-          -Dsonar.projectKey=mira-client
+          -Dsonar.projectKey=${{ matrix.project.key }}
+          -Dsonar.sources=${{ matrix.project.path }}
+          -Dsonar.exclusions=**/tests/**,**/test/**
       env:
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
