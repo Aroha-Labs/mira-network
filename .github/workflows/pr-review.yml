@@ -37,49 +37,64 @@ jobs:
             const https = require('https');
             const diff = fs.readFileSync('pr.diff', 'utf8');
 
-            // Function to make Mira API request
-            async function callMiraAI(messages) {
-              return new Promise((resolve, reject) => {
-                const data = JSON.stringify({
-                  model: "llama-3.3-70b-instruct",
-                  messages: messages,
-                  stream: false
-                });
+            // Function to make Mira API request with retries
+            async function callMiraAI(messages, maxRetries = 3) {
+              const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+              
+              for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                try {
+                  const response = await new Promise((resolve, reject) => {
+                    const data = JSON.stringify({
+                      model: "meta-llama/llama-3.3-70b-instruct",
+                      messages: messages,
+                      stream: false
+                    });
 
-                const options = {
-                  hostname: 'apis.mira.network',
-                  path: '/v1/chat/completions',
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${process.env.MIRA_API_KEY}`,
-                  }
-                };
-
-                const req = https.request(options, (res) => {
-                  let responseData = '';
-                  res.on('data', (chunk) => { responseData += chunk; });
-                  res.on('end', () => {
-                    try {
-                      const parsedData = JSON.parse(responseData);
-                      if (parsedData.error) {
-                        reject(new Error(parsedData.error.message));
-                      } else {
-                        resolve(parsedData.choices[0].message.content);
+                    const options = {
+                      hostname: 'apis.mira.network',
+                      path: '/v1/chat/completions',
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${process.env.MIRA_API_KEY}`,
                       }
-                    } catch (error) {
+                    };
+
+                    const req = https.request(options, (res) => {
+                      let responseData = '';
+                      res.on('data', (chunk) => { responseData += chunk; });
+                      res.on('end', () => {
+                        try {
+                          const parsedData = JSON.parse(responseData);
+                          if (parsedData.error) {
+                            reject(new Error(parsedData.error.message));
+                          } else {
+                            resolve(parsedData);
+                          }
+                        } catch (error) {
+                          reject(error);
+                        }
+                      });
+                    });
+
+                    req.on('error', (error) => {
                       reject(error);
-                    }
+                    });
+
+                    req.write(data);
+                    req.end();
                   });
-                });
 
-                req.on('error', (error) => {
-                  reject(error);
-                });
-
-                req.write(data);
-                req.end();
-              });
+                  // Extract content from the properly structured response
+                  return response.choices[0].message.content;
+                } catch (error) {
+                  if (attempt === maxRetries) {
+                    throw error;
+                  }
+                  console.log(`Attempt ${attempt} failed. Retrying after delay...`);
+                  await delay(2000 * attempt); // Exponential backoff
+                }
+              }
             }
 
             // Function to split diff into chunks
