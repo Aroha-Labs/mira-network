@@ -15,11 +15,13 @@ import {
   ArrowDownTrayIcon,
   UserCircleIcon,
   CheckIcon,
+  ChartBarIcon,
 } from "@heroicons/react/24/solid";
 import { PlayIcon, Bars3Icon } from "@heroicons/react/24/outline";
 import api from "src/lib/axios";
 import { Message, streamChatCompletion, Tool } from "src/utils/chat";
 import { useQueryClient } from "@tanstack/react-query";
+import MetricsModal from "src/components/MetricsModal";
 
 // Update the Flow interface
 interface Flow {
@@ -121,6 +123,7 @@ export default function Workbench() {
   // UI state
   const [isSliderOpen, setIsSliderOpen] = useState(true);
   const [selectedModel, setSelectedModel] = useState<string>("");
+  const [showMetrics, setShowMetrics] = useState(false);
 
   // Flow state
   const [selectedFlow, setSelectedFlow] = useState<Flow | null>(null);
@@ -494,6 +497,15 @@ export default function Workbench() {
         </div>
       )}
 
+      {/* Add Metrics Modal */}
+      {showMetrics && selectedFlow && (
+        <MetricsModal
+          onClose={() => setShowMetrics(false)}
+          flowId={selectedFlow.id}
+          title={`Metrics for Flow: ${selectedFlow.name}`}
+        />
+      )}
+
       {/* Flow Slider - Update classes for mobile */}
       <div
         className={`absolute inset-y-0 left-0 z-30 w-full md:w-96 transform transition-transform duration-300 ease-in-out ${
@@ -506,22 +518,28 @@ export default function Workbench() {
               <div>
                 <h2 className="text-xl font-semibold text-gray-900">Flows</h2>
                 <p className="mt-1 text-sm text-gray-500">
-                  {flows.length} flows available
+                  {flows.length} {flows.length === 1 ? "flow" : "flows"} available
                 </p>
               </div>
               <div className="flex items-center space-x-2">
                 <button
                   onClick={handleCreateFlow}
-                  className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 transition-colors"
+                  className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 transition-colors group relative"
                 >
                   <PlusIcon className="w-4 h-4 mr-1.5" />
                   New Flow
+                  <span className="absolute px-2 py-1 mb-2 text-xs font-medium text-white transition-opacity transform -translate-x-1/2 bg-gray-900 rounded opacity-0 bottom-full left-1/2 group-hover:opacity-100 whitespace-nowrap">
+                    Create a new flow
+                  </span>
                 </button>
                 <button
                   onClick={() => setIsSliderOpen(false)}
-                  className="p-2 text-gray-500 transition-colors rounded-full hover:text-gray-700 hover:bg-gray-100"
+                  className="relative p-2 text-gray-500 transition-colors rounded-full hover:text-gray-700 hover:bg-gray-100 group"
                 >
                   <ChevronRightIcon className="w-5 h-5" />
+                  <span className="absolute right-0 px-2 py-1 mb-2 text-xs font-medium text-white transition-opacity bg-gray-900 rounded opacity-0 bottom-full group-hover:opacity-100 whitespace-nowrap">
+                    Hide flows panel
+                  </span>
                 </button>
               </div>
             </div>
@@ -549,93 +567,114 @@ export default function Workbench() {
             )}
           </div>
           <div className="flex-1 p-6 space-y-4 overflow-y-auto">
-            {flows.map((flow) => (
-              <button
-                key={flow.id}
-                onClick={() => {
-                  if (editingFlowName !== flow.id) {
-                    setSelectedFlow(flow);
-                    setVariables({});
-                    setTools(flow.tools || []);
-                    setIsSliderOpen(false);
-                  }
-                }}
-                className={`w-full p-4 text-left transition-all rounded-xl border relative ${
-                  selectedFlow?.id === flow.id
-                    ? "bg-indigo-50 border-indigo-200 shadow-sm"
-                    : "border-gray-200 hover:border-indigo-200 hover:bg-gray-50"
-                }`}
-              >
-                {selectedFlow?.id === flow.id && (
-                  <div className="absolute inset-0 rounded-xl animate-pulse-border" />
-                )}
-                <div className="relative z-10">
-                  <div className="flex items-center justify-between">
-                    {editingFlowName === flow.id ? (
-                      <div className="flex-1 mr-2">
-                        <input
-                          type="text"
-                          value={newFlowName}
-                          onChange={(e) => setNewFlowName(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              handleUpdateFlowName(flow.id, newFlowName);
-                            } else if (e.key === "Escape") {
-                              setEditingFlowName(null);
-                            }
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                          placeholder="Enter flow name..."
-                          autoFocus
-                        />
-                      </div>
-                    ) : (
-                      <div className="font-medium text-gray-900">{flow.name}</div>
-                    )}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (editingFlowName === flow.id) {
-                          handleUpdateFlowName(flow.id, newFlowName);
-                        } else {
-                          setEditingFlowName(flow.id);
-                          setNewFlowName(flow.name);
-                        }
-                      }}
-                      className="p-1 text-gray-400 rounded hover:text-gray-600 hover:bg-gray-100"
-                    >
-                      {editingFlowName === flow.id ? (
-                        <CheckIcon className="w-4 h-4" />
-                      ) : (
-                        <PencilIcon className="w-4 h-4" />
-                      )}
-                    </button>
+            {/* Loading State */}
+            {!flows ? (
+              <div className="space-y-4">
+                {[...Array(3)].map((_, i) => (
+                  <div
+                    key={i}
+                    className="w-full p-4 border border-gray-200 rounded-xl animate-pulse"
+                  >
+                    <div className="w-1/3 h-5 mb-3 bg-gray-200 rounded"></div>
+                    <div className="w-2/3 h-4 bg-gray-200 rounded"></div>
                   </div>
-                  <div className="mt-2 text-sm text-gray-600 line-clamp-2">
-                    {flow.system_prompt}
-                  </div>
-                  {flow.variables.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-3">
-                      {flow.variables.map((variable) => (
-                        <span
-                          key={variable}
-                          className="px-2 py-1 text-xs font-medium text-indigo-600 rounded-full bg-indigo-50"
-                        >
-                          {variable}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </button>
-            ))}
-            {flows.length === 0 && (
+                ))}
+              </div>
+            ) : flows.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-gray-500">
                 <Bars3Icon className="w-12 h-12 mb-4" />
-                <p>No flows available</p>
+                <p className="text-lg font-medium">No flows available</p>
+                <p className="mt-1 text-sm text-gray-400">
+                  Create your first flow to get started
+                </p>
               </div>
+            ) : (
+              flows.map((flow) => (
+                <button
+                  key={flow.id}
+                  onClick={() => {
+                    if (editingFlowName !== flow.id) {
+                      setSelectedFlow(flow);
+                      setVariables({});
+                      setTools(flow.tools || []);
+                      setIsSliderOpen(false);
+                    }
+                  }}
+                  className={`w-full p-4 text-left transition-all rounded-xl border relative group ${
+                    selectedFlow?.id === flow.id
+                      ? "bg-gradient-to-br from-indigo-50 to-white border-indigo-200 shadow-sm"
+                      : "border-gray-200 hover:border-indigo-200 hover:bg-gradient-to-br hover:from-gray-50 hover:to-white"
+                  }`}
+                >
+                  {selectedFlow?.id === flow.id && (
+                    <div className="absolute border-2 border-indigo-500 pointer-events-none -inset-px rounded-xl"></div>
+                  )}
+                  <div className="relative z-10">
+                    <div className="flex items-center justify-between">
+                      {editingFlowName === flow.id ? (
+                        <div className="flex-1 mr-2">
+                          <input
+                            type="text"
+                            value={newFlowName}
+                            onChange={(e) => setNewFlowName(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                handleUpdateFlowName(flow.id, newFlowName);
+                              } else if (e.key === "Escape") {
+                                setEditingFlowName(null);
+                              }
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white shadow-sm"
+                            placeholder="Enter flow name..."
+                            autoFocus
+                          />
+                        </div>
+                      ) : (
+                        <div className="font-medium text-gray-900 transition-colors group-hover:text-indigo-600">
+                          {flow.name}
+                        </div>
+                      )}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (editingFlowName === flow.id) {
+                            handleUpdateFlowName(flow.id, newFlowName);
+                          } else {
+                            setEditingFlowName(flow.id);
+                            setNewFlowName(flow.name);
+                          }
+                        }}
+                        className="p-1.5 text-gray-400 rounded-md hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                      >
+                        {editingFlowName === flow.id ? (
+                          <CheckIcon className="w-4 h-4" />
+                        ) : (
+                          <PencilIcon className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
+                    <div className="mt-2 text-sm text-gray-600 line-clamp-2">
+                      {flow.system_prompt || (
+                        <span className="italic text-gray-400">No system prompt set</span>
+                      )}
+                    </div>
+                    {flow.variables.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        {flow.variables.map((variable) => (
+                          <span
+                            key={variable}
+                            className="px-2.5 py-1 text-xs font-medium text-indigo-700 border border-indigo-200 rounded-full bg-indigo-50 shadow-sm"
+                          >
+                            {variable}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </button>
+              ))
             )}
           </div>
         </div>
@@ -646,12 +685,14 @@ export default function Workbench() {
         {/* Toggle Slider Button - Update for mobile */}
         <button
           onClick={() => setIsSliderOpen(true)}
-          className={`fixed top-4 left-4 z-20 p-2 text-gray-500 bg-white rounded-full shadow-lg hover:text-gray-700 hover:bg-gray-50 transition-colors ${
+          className={`fixed top-20 left-4 z-20 p-2 bg-white/50 backdrop-blur-sm border border-gray-200/50 rounded-full shadow-sm hover:bg-white hover:border-gray-300 hover:shadow-md transition-all duration-200 ${
             isSliderOpen ? "hidden" : "flex items-center space-x-2"
           }`}
         >
-          <Bars3Icon className="w-5 h-5" />
-          <span className="hidden text-sm font-medium md:inline">Show Flows</span>
+          <Bars3Icon className="w-5 h-5 text-gray-400 group-hover:text-gray-600" />
+          <span className="hidden text-sm font-medium text-gray-500 group-hover:text-gray-700 md:inline">
+            Show Flows
+          </span>
         </button>
 
         {/* Mobile Panel Toggle */}
@@ -689,13 +730,13 @@ export default function Workbench() {
           {selectedFlow ? (
             <>
               {/* Tools Editor */}
-              <div className="mb-6 border border-gray-200 rounded-lg bg-gray-50">
+              <div className="mb-6 border border-gray-200 rounded-lg bg-gradient-to-b from-gray-50 to-white">
                 <div
-                  className="flex items-center justify-between px-4 py-2 bg-gray-100 border-b border-gray-200 cursor-pointer hover:bg-gray-200"
+                  className="flex items-center justify-between px-4 py-3 border-b border-gray-200 cursor-pointer bg-gradient-to-b from-gray-100 to-gray-50 hover:from-gray-200 hover:to-gray-100"
                   onClick={() => toggleSection("tools")}
                 >
                   <div className="flex items-center space-x-2">
-                    <span className="px-2 py-1 text-xs font-medium bg-gray-200 rounded-md">
+                    <span className="px-2 py-1 text-xs font-medium text-indigo-700 bg-indigo-100 rounded-md">
                       tools
                     </span>
                     <span className="text-sm font-medium text-gray-700">
@@ -835,13 +876,13 @@ export default function Workbench() {
               </div>
 
               {/* System Message */}
-              <div className="mb-6 border border-gray-200 rounded-lg bg-gray-50">
+              <div className="mb-6 border border-gray-200 rounded-lg bg-gradient-to-b from-gray-50 to-white">
                 <div
-                  className="flex items-center justify-between px-4 py-2 bg-gray-100 border-b border-gray-200 cursor-pointer hover:bg-gray-200"
+                  className="flex items-center justify-between px-4 py-3 border-b border-gray-200 cursor-pointer bg-gradient-to-b from-gray-100 to-gray-50 hover:from-gray-200 hover:to-gray-100"
                   onClick={() => toggleSection("system")}
                 >
                   <div className="flex items-center space-x-2">
-                    <span className="px-2 py-1 text-xs font-medium bg-gray-200 rounded-md">
+                    <span className="px-2 py-1 text-xs font-medium text-indigo-700 bg-indigo-100 rounded-md">
                       system
                     </span>
                     <span className="text-sm font-medium text-gray-700">
@@ -861,15 +902,15 @@ export default function Workbench() {
                         value={editableSystemPrompt}
                         onChange={(e) => setEditableSystemPrompt(e.target.value)}
                         rows={5}
-                        className="w-full p-2 font-mono text-sm text-gray-700 bg-white border border-gray-200 rounded-md focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                        className="w-full p-3 font-mono text-sm text-gray-700 transition-shadow bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                         placeholder="Enter system prompt... Use {{variable}} for variables"
                       />
                     </div>
 
                     {/* Variables */}
                     {Object.entries(variables).length > 0 && (
-                      <div className="px-4 py-3 bg-gray-100 border-t border-gray-200">
-                        <h4 className="mb-2 text-sm font-medium text-gray-700">
+                      <div className="px-4 py-3 border-t border-gray-200 bg-gradient-to-b from-gray-50 to-white">
+                        <h4 className="mb-3 text-sm font-medium text-gray-700">
                           Variables
                         </h4>
                         <div className="space-y-2">
@@ -888,10 +929,10 @@ export default function Workbench() {
                                     [key]: newValue,
                                   }));
                                 }}
-                                className={`flex-1 px-2 py-1 text-sm border rounded focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 ${
+                                className={`flex-1 px-3 py-1.5 text-sm border rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all ${
                                   !value || value.trim() === ""
                                     ? "border-red-300 bg-red-50"
-                                    : "border-gray-300"
+                                    : "border-gray-300 bg-white hover:border-gray-400"
                                 }`}
                                 placeholder="Required"
                               />
@@ -905,13 +946,13 @@ export default function Workbench() {
               </div>
 
               {/* Conversation Flow */}
-              <div className="flex-1 border border-gray-200 rounded-lg bg-gray-50">
+              <div className="flex-1 border border-gray-200 rounded-lg bg-gradient-to-b from-gray-50 to-white">
                 <div
-                  className="flex items-center justify-between px-4 py-2 bg-gray-100 border-b border-gray-200 cursor-pointer hover:bg-gray-200"
+                  className="flex items-center justify-between px-4 py-3 border-b border-gray-200 cursor-pointer bg-gradient-to-b from-gray-100 to-gray-50 hover:from-gray-200 hover:to-gray-100"
                   onClick={() => toggleSection("conversation")}
                 >
                   <div className="flex items-center space-x-2">
-                    <span className="px-2 py-1 text-xs font-medium bg-gray-200 rounded-md">
+                    <span className="px-2 py-1 text-xs font-medium text-indigo-700 bg-indigo-100 rounded-md">
                       conversation
                     </span>
                     <span className="text-sm font-medium text-gray-700">Messages</span>
@@ -982,8 +1023,12 @@ export default function Workbench() {
                               setConversation(newMessages);
                             }}
                             rows={3}
-                            className="w-full p-0 text-sm bg-transparent border-0 resize-none focus:ring-0"
-                            placeholder="Type your message..."
+                            className="w-full p-3 text-sm transition-colors border border-gray-200 rounded-lg resize-none bg-gray-50 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:bg-white"
+                            placeholder={
+                              message.role === "user"
+                                ? "Type your message..."
+                                : "Assistant's response..."
+                            }
                           />
                         </div>
                       </div>
@@ -992,7 +1037,7 @@ export default function Workbench() {
                     {/* Add Message Button */}
                     <button
                       onClick={handleAddMessage}
-                      className="flex items-center justify-center w-full px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+                      className="flex items-center justify-center w-full px-4 py-2.5 text-sm font-medium text-gray-700 bg-gradient-to-b from-white to-gray-50 border border-gray-300 rounded-lg hover:from-gray-50 hover:to-gray-100 hover:text-indigo-600 hover:border-indigo-200 transition-all duration-200"
                     >
                       <PlusIcon className="w-4 h-4 mr-2" />
                       Add Message
@@ -1022,7 +1067,7 @@ export default function Workbench() {
                 <div
                   className={`w-2 h-2 rounded-full ${
                     isLoading
-                      ? "bg-yellow-500"
+                      ? "bg-yellow-500 animate-pulse"
                       : conversation.length === 0
                         ? "bg-gray-400"
                         : "bg-green-500"
@@ -1032,67 +1077,96 @@ export default function Workbench() {
                   {isLoading
                     ? "Generating..."
                     : conversation.length === 0
-                      ? "Add messages"
-                      : "Ready"}
+                      ? "Add messages to start"
+                      : "Ready to generate"}
                 </span>
               </div>
               <div className="flex items-center space-x-2">
                 <label className="text-sm font-medium text-gray-700">Model:</label>
-                <select
-                  value={selectedModel}
-                  onChange={(e) => setSelectedModel(e.target.value)}
-                  className="pl-3 pr-8 py-1.5 text-sm border border-gray-300 rounded-md bg-white shadow-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                >
-                  {Array.isArray(models) &&
-                    models.map((modelId: string) => (
-                      <option key={modelId} value={modelId}>
-                        {modelId.split("/").pop()}
-                      </option>
-                    ))}
-                </select>
+                <div className="relative">
+                  <select
+                    value={selectedModel}
+                    onChange={(e) => setSelectedModel(e.target.value)}
+                    className="pl-3 pr-10 py-1.5 text-sm border border-gray-300 rounded-md bg-white shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 appearance-none"
+                  >
+                    {Array.isArray(models) &&
+                      models.map((modelId: string) => (
+                        <option key={modelId} value={modelId}>
+                          {modelId.split("/").pop()}
+                        </option>
+                      ))}
+                  </select>
+                  <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+                    <ChevronDownIcon className="w-4 h-4 text-gray-400" />
+                  </div>
+                </div>
               </div>
             </div>
             <div className="flex items-center space-x-3">
+              {selectedFlow && (
+                <button
+                  onClick={() => setShowMetrics(true)}
+                  className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors group relative"
+                >
+                  <ChartBarIcon className="w-4 h-4 md:mr-1.5" />
+
+                  <span className="absolute px-2 py-1 mb-2 text-xs font-medium text-white transition-opacity transform -translate-x-1/2 bg-gray-900 rounded opacity-0 bottom-full left-1/2 group-hover:opacity-100 whitespace-nowrap">
+                    View flow metrics and analytics
+                  </span>
+                </button>
+              )}
               <button
                 onClick={handleRedo}
                 disabled={!previewMessage || isLoading}
-                className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors group relative"
               >
                 <ArrowPathIcon className="w-4 h-4 md:mr-1.5" />
-                <span className="hidden md:inline">Regenerate</span>
+                {/* <span className="hidden md:inline">Regenerate</span> */}
+                <span className="absolute px-2 py-1 mb-2 text-xs font-medium text-white transition-opacity transform -translate-x-1/2 bg-gray-900 rounded opacity-0 bottom-full left-1/2 group-hover:opacity-100 whitespace-nowrap">
+                  Generate a new response
+                </span>
               </button>
               {isLoading ? (
                 <button
                   onClick={handleStop}
-                  className="inline-flex items-center px-4 py-2 text-sm font-medium text-white transition-colors bg-red-600 rounded-md hover:bg-red-700"
+                  className="relative inline-flex items-center px-4 py-2 text-sm font-medium text-white transition-colors bg-red-600 rounded-md hover:bg-red-700 group"
                 >
                   <StopIcon className="w-4 h-4 md:mr-1.5" />
                   <span className="hidden md:inline">Stop</span>
+                  <span className="absolute px-2 py-1 mb-2 text-xs font-medium text-white transition-opacity transform -translate-x-1/2 bg-gray-900 rounded opacity-0 bottom-full left-1/2 group-hover:opacity-100 whitespace-nowrap">
+                    Stop generation
+                  </span>
                 </button>
               ) : (
                 <button
                   onClick={handleRun}
                   disabled={!selectedFlow || conversation.length === 0}
-                  className="inline-flex items-center px-4 py-2 text-sm font-medium text-white transition-colors bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="relative inline-flex items-center px-4 py-2 text-sm font-medium text-white transition-colors bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed group"
                 >
                   <PlayIcon className="w-4 h-4 md:mr-1.5" />
-                  <span className="hidden md:inline">Generate</span>
+                  {/* <span className="hidden md:inline">Generate</span> */}
+                  <span className="absolute px-2 py-1 mb-2 text-xs font-medium text-white transition-opacity transform -translate-x-1/2 bg-gray-900 rounded opacity-0 bottom-full left-1/2 group-hover:opacity-100 whitespace-nowrap">
+                    Generate response
+                  </span>
                 </button>
               )}
             </div>
           </div>
 
           {/* Preview Content - Adjust height for mobile */}
-          <div className="flex-1 overflow-hidden bg-white border border-gray-200 shadow-sm rounded-xl">
+          <div className="flex-1 overflow-hidden border border-gray-200 shadow-sm bg-gradient-to-b from-white to-gray-50 rounded-xl">
             <div className="flex items-center justify-between p-4 border-b border-gray-200">
               <h3 className="text-sm font-medium text-gray-900">Response Preview</h3>
               {previewMessage && (
                 <button
                   onClick={handleAddToConversation}
-                  className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-indigo-700 bg-indigo-50 rounded-md hover:bg-indigo-100 transition-colors"
+                  className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-indigo-700 bg-indigo-50 rounded-md hover:bg-indigo-100 hover:text-indigo-800 transition-colors group relative"
                 >
                   <PlusIcon className="w-4 h-4 md:mr-1.5" />
                   <span className="hidden md:inline">Add to Conversation</span>
+                  <span className="absolute right-0 px-2 py-1 mb-2 text-xs font-medium text-white transition-opacity bg-gray-900 rounded opacity-0 bottom-full group-hover:opacity-100 whitespace-nowrap">
+                    Add response to conversation
+                  </span>
                 </button>
               )}
             </div>
@@ -1105,12 +1179,20 @@ export default function Workbench() {
                 </div>
               ) : (
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-500">
-                  <PlayIcon className="w-12 h-12 mb-4" />
+                  <PlayIcon className="w-12 h-12 mb-4 text-indigo-300" />
                   <p className="text-lg font-medium">Ready to Generate</p>
                   <p className="mt-1 text-sm text-gray-400">
-                    {conversation.length === 0
-                      ? "Add messages to get started"
-                      : "Click Generate to create a response"}
+                    {conversation.length === 0 ? (
+                      <span className="flex items-center">
+                        <PlusIcon className="w-4 h-4 mr-1" />
+                        Add messages to get started
+                      </span>
+                    ) : (
+                      <span className="flex items-center">
+                        <PlayIcon className="w-4 h-4 mr-1" />
+                        Click Generate to create a response
+                      </span>
+                    )}
                   </p>
                 </div>
               )}
