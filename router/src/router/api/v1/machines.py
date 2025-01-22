@@ -19,7 +19,7 @@ SessionDep = Annotated[Session, Depends(get_session)]
 
 @router.post(
     "/machines/register",
-    summary="Register New Machine",
+    summary="Register a New Machine",
     description="""Registers a new machine in the system.
 
 ### Request Body
