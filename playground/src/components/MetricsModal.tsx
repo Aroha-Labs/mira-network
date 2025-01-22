@@ -54,14 +54,15 @@ interface MetricsModalProps {
     startDate?: string;
     endDate?: string;
   };
+  flowId?: string;
 }
 
-const Shimmer = () => <div className="animate-pulse bg-gray-200 rounded h-full w-full" />;
+const Shimmer = () => <div className="w-full h-full bg-gray-200 rounded animate-pulse" />;
 
-const ValueShimmer = () => <div className="animate-pulse bg-gray-200 rounded h-6 w-16" />;
+const ValueShimmer = () => <div className="w-16 h-6 bg-gray-200 rounded animate-pulse" />;
 
 const ChartShimmer = () => (
-  <div className="animate-pulse bg-gray-200/60 rounded-lg h-full w-full" />
+  <div className="w-full h-full rounded-lg animate-pulse bg-gray-200/60" />
 );
 
 const MetricsModal = ({
@@ -72,6 +73,7 @@ const MetricsModal = ({
   userId,
   modelFilter,
   dateRange,
+  flowId,
 }: MetricsModalProps) => {
   const { data: userSession } = useSession();
   const [dateRangeState, setDateRangeState] = useState("7");
@@ -123,6 +125,7 @@ const MetricsModal = ({
     queryFn: async () => {
       const resp = await api.get("/api-logs", {
         params: {
+          ...(flowId && { flow_id: flowId }),
           ...(machineId && { machine_id: machineId }),
           ...(apiKeyId && { api_key_id: apiKeyId }),
           ...(userId && { user_id: userId }),
@@ -493,8 +496,8 @@ const MetricsModal = ({
       }`}
     >
       <div className="px-3 py-2 border-b border-gray-100">
-        <div className="flex justify-between items-baseline">
-          <h3 className="text-gray-700 font-medium text-sm">{title}</h3>
+        <div className="flex items-baseline justify-between">
+          <h3 className="text-sm font-medium text-gray-700">{title}</h3>
           {isLoading ? (
             <ValueShimmer />
           ) : (
@@ -520,19 +523,19 @@ const MetricsModal = ({
             ))}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {renderMetricBlock("Cost Distribution", null, null, false, true)}
             {renderMetricBlock("Token Usage", null, null, false, true)}
             {renderMetricBlock("Time to First Token", null, null, false, true)}
             {renderMetricBlock("Avg Response Time", null, null, false, true)}
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100">
+          <div className="bg-white border border-gray-100 rounded-lg shadow-sm">
             <div className="px-3 py-2 border-b border-gray-100">
-              <h3 className="text-gray-700 font-medium text-sm">Model Distribution</h3>
+              <h3 className="text-sm font-medium text-gray-700">Model Distribution</h3>
             </div>
             <div className="p-3">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div className="space-y-1.5">
                   {[...Array(4)].map((_, i) => (
                     <div key={i} className="h-7">
@@ -554,7 +557,7 @@ const MetricsModal = ({
 
     if (error) {
       return (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+        <div className="px-4 py-3 text-red-700 bg-red-100 border border-red-400 rounded">
           <p className="font-bold">Error loading metrics</p>
           <p>{(error as Error).message}</p>
         </div>
@@ -589,7 +592,7 @@ const MetricsModal = ({
           ))}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {renderMetricBlock(
             "Cost Distribution",
             `$${metrics.totalCost.toFixed(4)}`,
@@ -619,20 +622,20 @@ const MetricsModal = ({
         </div>
 
         {/* Model Distribution */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-100 transition-all duration-200 hover:shadow-md">
+        <div className="transition-all duration-200 bg-white border border-gray-100 rounded-lg shadow-sm hover:shadow-md">
           <div className="px-3 py-2 border-b border-gray-100">
-            <h3 className="text-gray-700 font-medium text-sm">Model Distribution</h3>
+            <h3 className="text-sm font-medium text-gray-700">Model Distribution</h3>
           </div>
           <div className="p-3">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div className="space-y-1.5 text-sm">
                 {Object.entries(metrics.modelUsage).map(([model, count]) => (
                   <div
                     key={model}
-                    className="flex justify-between items-center px-2 py-1 bg-gray-50 rounded"
+                    className="flex items-center justify-between px-2 py-1 rounded bg-gray-50"
                   >
-                    <span className="truncate text-gray-600 mr-2 text-xs">{model}</span>
-                    <span className="font-medium text-gray-900 text-xs">
+                    <span className="mr-2 text-xs text-gray-600 truncate">{model}</span>
+                    <span className="text-xs font-medium text-gray-900">
                       {count} calls
                     </span>
                   </div>

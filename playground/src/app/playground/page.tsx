@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import FlowChat from "src/components/FlowChat";
-import { Spinner } from "src/components/PageLoading";
+import Loading from "src/components/PageLoading";
 import api from "src/lib/axios";
 import { Flow } from "src/utils/chat";
 import { useEffect } from "react";
@@ -41,11 +41,7 @@ export default function Playground() {
   });
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Spinner />
-      </div>
-    );
+    return <Loading fullPage />;
   }
 
   if (error || !flow) {

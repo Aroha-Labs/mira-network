@@ -113,7 +113,12 @@ router = APIRouter()
                                 "payload": "What is the weather?",
                                 "request_payload": {
                                     "model": "gpt-4",
-                                    "messages": [{"role": "user", "content": "What is the weather?"}]
+                                    "messages": [
+                                        {
+                                            "role": "user",
+                                            "content": "What is the weather?",
+                                        }
+                                    ],
                                 },
                                 "ttft": 0.15,
                                 "response": "I cannot provide real-time weather information.",
@@ -124,50 +129,42 @@ router = APIRouter()
                                 "model": "gpt-4",
                                 "model_pricing": {
                                     "prompt_token": 0.00001,
-                                    "completion_token": 0.00002
+                                    "completion_token": 0.00002,
                                 },
                                 "machine_id": "machine_abc",
-                                "created_at": "2024-01-15T10:30:00Z"
+                                "created_at": "2024-01-15T10:30:00Z",
                             }
                         ],
                         "total": 150,
                         "page": 1,
-                        "page_size": 10
+                        "page_size": 10,
                     }
                 }
-            }
+            },
         },
         400: {
             "description": "Bad Request - Invalid parameters",
             "content": {
-                "application/json": {
-                    "example": {
-                        "detail": "Invalid order_by field"
-                    }
-                }
-            }
+                "application/json": {"example": {"detail": "Invalid order_by field"}}
+            },
         },
         401: {
             "description": "Unauthorized - Invalid or missing authentication",
             "content": {
                 "application/json": {
-                    "example": {
-                        "detail": "Could not validate credentials"
-                    }
+                    "example": {"detail": "Could not validate credentials"}
                 }
-            }
+            },
         },
         403: {
             "description": "Forbidden - Non-admin trying to access other user's logs",
             "content": {
                 "application/json": {
-                    "example": {
-                        "detail": "Only admins can query other users' logs"
-                    }
+                    "example": {"detail": "Only admins can query other users' logs"}
                 }
-            }
-        }
-    }
+            },
+        },
+    },
 )
 def list_all_logs(
     db: Session = Depends(get_session),
@@ -182,6 +179,7 @@ def list_all_logs(
     user_id: Optional[str] = None,
     order_by: Optional[str] = "created_at",
     order: Optional[str] = "desc",
+    flow_id: Optional[str] = None,
 ):
     offset = (page - 1) * page_size
 
@@ -205,6 +203,8 @@ def list_all_logs(
         query = query.filter(ApiLogs.model == model)
     if api_key_id:
         query = query.filter(ApiLogs.api_key_id == api_key_id)
+    if flow_id:
+        query = query.filter(ApiLogs.flow_id == flow_id)
 
     if order_by not in [
         "created_at",
@@ -281,25 +281,17 @@ def list_all_logs(
     responses={
         200: {
             "description": "Successfully retrieved total count",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "total": 1500
-                    }
-                }
-            }
+            "content": {"application/json": {"example": {"total": 1500}}},
         },
         401: {
             "description": "Unauthorized - Invalid or missing authentication",
             "content": {
                 "application/json": {
-                    "example": {
-                        "detail": "Could not validate credentials"
-                    }
+                    "example": {"detail": "Could not validate credentials"}
                 }
-            }
-        }
-    }
+            },
+        },
+    },
 )
 def total_inference_calls(
     db: Session = Depends(get_session),
