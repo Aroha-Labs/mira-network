@@ -24,7 +24,7 @@ jobs:
       - name: Get PR diff
         id: pr-diff
         run: |
-          git diff ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} > pr.diff
+          git diff --unified=3 ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} > pr.diff
 
       - name: Review PR
         env:
@@ -36,7 +36,6 @@ jobs:
             const fs = require('fs');
             const https = require('https');
             const diff = fs.readFileSync('pr.diff', 'utf8');
-            const changedFiles = '${{ steps.changed-files.outputs.all_changed_files }}'.split(' ');
 
             // Function to make OpenAI API request
             async function callOpenAI(messages) {
@@ -84,29 +83,24 @@ jobs:
               });
             }
 
-            const prompt = `Please review the following pull request changes and provide feedback:
-            Changed files: ${changedFiles.join(', ')}
+            const prompt = `Review the following pull request changes and provide concise feedback:
 
-            Diff:
             ${diff}
 
-            Please provide:
-            1. A brief summary of the changes
-            2. Potential issues or concerns
-            3. Suggestions for improvements
-            4. Code quality assessment
-
-            Be specific and constructive in your feedback.`;
+            Provide:
+            1. Brief summary of changes
+            2. Key concerns (if any)
+            3. Suggestions
+            4. Code quality rating (1-5)`;
 
             const messages = [
-              { role: "system", content: "You are a thorough and helpful code reviewer." },
+              { role: "system", content: "You are a concise code reviewer. Focus on the most important aspects." },
               { role: "user", content: prompt }
             ];
 
             try {
               const review = await callOpenAI(messages);
 
-              // Post review as a PR comment
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
