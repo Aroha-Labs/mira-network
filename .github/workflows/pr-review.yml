@@ -83,29 +83,65 @@ jobs:
               });
             }
 
-            const prompt = `Review the following pull request changes and provide concise feedback:
+            // Function to split diff into chunks
+            function splitDiffIntoChunks(diff, maxChunkSize = 4000) {
+              const diffLines = diff.split('\n');
+              const chunks = [];
+              let currentChunk = [];
+              let currentSize = 0;
 
-            ${diff}
+              for (const line of diffLines) {
+                const lineSize = line.length + 1; // +1 for newline
+                if (currentSize + lineSize > maxChunkSize && currentChunk.length > 0) {
+                  chunks.push(currentChunk.join('\n'));
+                  currentChunk = [];
+                  currentSize = 0;
+                }
+                currentChunk.push(line);
+                currentSize += lineSize;
+              }
 
-            Provide:
-            1. Brief summary of changes
-            2. Key concerns (if any)
-            3. Suggestions
-            4. Code quality rating (1-5)`;
+              if (currentChunk.length > 0) {
+                chunks.push(currentChunk.join('\n'));
+              }
 
-            const messages = [
-              { role: "system", content: "You are a concise code reviewer. Focus on the most important aspects." },
-              { role: "user", content: prompt }
-            ];
+              return chunks;
+            }
 
             try {
-              const review = await callOpenAI(messages);
+              const diffChunks = splitDiffIntoChunks(diff);
+              let fullReview = '';
+
+              for (let i = 0; i < diffChunks.length; i++) {
+                const prompt = `Review part ${i + 1}/${diffChunks.length} of the pull request changes:
+
+                ${diffChunks[i]}
+
+                ${i === diffChunks.length - 1 ? `
+                Provide a final summary with:
+                1. Brief summary of all changes
+                2. Key concerns (if any)
+                3. Suggestions
+                4. Code quality rating (1-5)
+                ` : 'Analyze these changes and note any important findings.'}`;
+
+                const messages = [
+                  { 
+                    role: "system", 
+                    content: "You are a concise code reviewer. Focus on the most important aspects." 
+                  },
+                  { role: "user", content: prompt }
+                ];
+
+                const review = await callOpenAI(messages);
+                fullReview += i === 0 ? review : `\n\n${review}`;
+              }
 
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: context.issue.number,
-                body: review
+                body: fullReview
               });
             } catch (error) {
               core.setFailed(`Error during PR review: ${error.message}`);
