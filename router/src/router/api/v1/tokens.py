@@ -14,7 +14,7 @@ router = APIRouter()
 @router.post(
     "/api-tokens",
     summary="Create API Token",
-    description="""Creates a new API token for the authenticated user.
+    description="""Creates a new API token for the authenticated user
 
 ### Authentication
 - Requires a valid authentication token
