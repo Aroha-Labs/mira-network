@@ -45,7 +45,7 @@ jobs:
                 try {
                   const response = await new Promise((resolve, reject) => {
                     const data = JSON.stringify({
-                      model: "meta-llama/llama-3.3-70b-instruct",
+                      model: "llama-3.3-70b-instruct",
                       messages: messages,
                       stream: false
                     });
@@ -85,13 +85,20 @@ jobs:
                     req.end();
                   });
 
-                  // Extract content from the properly structured response
+                  // Check if response has the expected structure
+                  if (!response?.choices?.[0]?.message?.content) {
+                    throw new Error('Invalid response structure from API');
+                  }
+
                   return response.choices[0].message.content;
                 } catch (error) {
+                  console.log(`Attempt ${attempt} error:`, error.message);
+                  
                   if (attempt === maxRetries) {
                     throw error;
                   }
-                  console.log(`Attempt ${attempt} failed. Retrying after delay...`);
+                  
+                  console.log(`Retrying after delay... (Attempt ${attempt}/${maxRetries})`);
                   await delay(2000 * attempt); // Exponential backoff
                 }
               }
