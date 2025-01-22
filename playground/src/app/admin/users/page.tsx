@@ -19,7 +19,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { SortField, SortOrder, User } from "src/types/user";
 import ErrorMessage from "src/components/ErrorMessage";
-import { Menu, Transition } from '@headlessui/react';
+import { Menu, Transition } from "@headlessui/react";
 
 interface UsersResponse {
   users: User[];
@@ -47,7 +47,7 @@ const fetchUsers = async (
       sort_by: sortBy,
       sort_order: sortOrder,
       min_credits: filters?.minCredits,
-      max_credits: filters?.maxCredits
+      max_credits: filters?.maxCredits,
     },
   });
   return response.data;
@@ -63,8 +63,8 @@ const AdminUsers = () => {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [submittedQuery, setSubmittedQuery] = useState<string>("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [sortBy, setSortBy] = useState<SortField>('created_at');
-  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+  const [sortBy, setSortBy] = useState<SortField>("created_at");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
   const [filters, setFilters] = useState<Filters>({});
 
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
@@ -105,7 +105,7 @@ const AdminUsers = () => {
         <Menu.Button className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-white border rounded-lg hover:bg-gray-50">
           <AdjustmentsHorizontalIcon className="w-4 h-4" />
           Sort by: {sortBy}
-          {sortOrder === 'asc' ? (
+          {sortOrder === "asc" ? (
             <ArrowUpIcon className="w-4 h-4" />
           ) : (
             <ArrowDownIcon className="w-4 h-4" />
@@ -122,25 +122,27 @@ const AdminUsers = () => {
         >
           <Menu.Items className="absolute left-0 z-10 mt-2 w-56 origin-top-left rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
             <div className="py-1">
-              {['created_at', 'last_login_at', 'credits', 'email', 'full_name'].map((field) => (
-                <Menu.Item key={field}>
-                  {({ active }) => (
-                    <button
-                      onClick={() => {
-                        setSortBy(field as SortField);
-                        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-                      }}
-                      className={`
-                        ${active ? 'bg-gray-100' : ''} 
-                        ${sortBy === field ? 'font-medium' : ''}
+              {["created_at", "last_login_at", "credits", "email", "full_name"].map(
+                (field) => (
+                  <Menu.Item key={field}>
+                    {({ active }) => (
+                      <button
+                        onClick={() => {
+                          setSortBy(field as SortField);
+                          setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                        }}
+                        className={`
+                        ${active ? "bg-gray-100" : ""} 
+                        ${sortBy === field ? "font-medium" : ""}
                         block px-4 py-2 text-sm text-gray-700 w-full text-left
                       `}
-                    >
-                      {field.replace('_', ' ')}
-                    </button>
-                  )}
-                </Menu.Item>
-              ))}
+                      >
+                        {field.replace("_", " ")}
+                      </button>
+                    )}
+                  </Menu.Item>
+                )
+              )}
             </div>
           </Menu.Items>
         </Transition>
@@ -176,15 +178,25 @@ const AdminUsers = () => {
                     type="number"
                     placeholder="Min"
                     className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                    value={filters.minCredits || ''}
-                    onChange={(e) => setFilters(f => ({ ...f, minCredits: Number(e.target.value) || undefined }))}
+                    value={filters.minCredits || ""}
+                    onChange={(e) =>
+                      setFilters((f) => ({
+                        ...f,
+                        minCredits: Number(e.target.value) || undefined,
+                      }))
+                    }
                   />
                   <input
                     type="number"
                     placeholder="Max"
                     className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                    value={filters.maxCredits || ''}
-                    onChange={(e) => setFilters(f => ({ ...f, maxCredits: Number(e.target.value) || undefined }))}
+                    value={filters.maxCredits || ""}
+                    onChange={(e) =>
+                      setFilters((f) => ({
+                        ...f,
+                        maxCredits: Number(e.target.value) || undefined,
+                      }))
+                    }
                   />
                 </div>
               </div>
