@@ -1,5 +1,10 @@
-export type SortField = 'created_at' | 'last_login_at' | 'credits' | 'email' | 'full_name';
-export type SortOrder = 'asc' | 'desc';
+export type SortField =
+  | "created_at"
+  | "last_login_at"
+  | "credits"
+  | "email"
+  | "full_name";
+export type SortOrder = "asc" | "desc";
 
 export interface UsersResponse {
   users: User[];

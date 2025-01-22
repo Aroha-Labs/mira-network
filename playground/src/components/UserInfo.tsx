@@ -24,19 +24,13 @@ const UserInfo: React.FC<UserInfoProps> = ({ user, children }) => {
         <div className="flex items-center justify-between">
           <div className="flex items-center">
             <ProfileImage
-              src={
-                isLoggedIn
-                  ? user.user_metadata.avatar_url
-                  : "/img/avatar-dummy.svg"
-              }
+              src={isLoggedIn ? user.user_metadata.avatar_url : "/img/avatar-dummy.svg"}
               alt="Avatar"
               className="w-12 h-12 rounded-full mr-4"
             />
             <div>
               <p className="font-bold">
-                {isLoggedIn
-                  ? user.user_metadata.full_name
-                  : "Welcome to Console"}
+                {isLoggedIn ? user.user_metadata.full_name : "Welcome to Console"}
               </p>
               <p className="text-sm text-gray-600">
                 {isLoggedIn ? user.email : "Sign in to access your console"}

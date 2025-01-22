@@ -157,10 +157,13 @@ const MetricsModal = ({
       );
     }, 0);
 
-    const modelUsage = logs.reduce((acc, log) => {
-      acc[log.model] = (acc[log.model] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    const modelUsage = logs.reduce(
+      (acc, log) => {
+        acc[log.model] = (acc[log.model] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
 
     return {
       totalCalls,
@@ -686,10 +689,10 @@ const MetricsModal = ({
           machineId
             ? `Machine ${machineId}`
             : apiKeyId
-            ? `API Key ${apiKeyId}`
-            : userId
-            ? `User ${userId}`
-            : "Unknown"
+              ? `API Key ${apiKeyId}`
+              : userId
+                ? `User ${userId}`
+                : "Unknown"
         }`
       }
       maxWidth="sm:max-w-6xl"

@@ -14,17 +14,13 @@ const MachineItem = ({ machine_uid, network_ip, status }: MachineProps) => {
   return (
     <div
       className={`bg-white rounded-lg shadow-sm border transition-shadow duration-200 
-      ${
-        status === "online" ? "border-gray-200" : "border-gray-200"
-      } hover:shadow-md`}
+      ${status === "online" ? "border-gray-200" : "border-gray-200"} hover:shadow-md`}
     >
       <div className="p-4">
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <div className="flex items-center space-x-2">
-              <h3 className="font-medium text-gray-900 truncate">
-                {machine_uid}
-              </h3>
+              <h3 className="font-medium text-gray-900 truncate">{machine_uid}</h3>
               <CopyToClipboardIcon text={machine_uid} />
               <span
                 className={`px-2 py-0.5 text-xs font-medium rounded-full ${
@@ -40,9 +36,7 @@ const MachineItem = ({ machine_uid, network_ip, status }: MachineProps) => {
             <div className="flex items-center mt-1 space-x-2">
               <div
                 className={`w-2 h-2 rounded-full ${
-                  status === "online"
-                    ? "bg-green-500 animate-pulse"
-                    : "bg-yellow-500"
+                  status === "online" ? "bg-green-500 animate-pulse" : "bg-yellow-500"
                 }`}
               />
               <p
@@ -71,10 +65,7 @@ const MachineItem = ({ machine_uid, network_ip, status }: MachineProps) => {
       </div>
 
       {showMetrics && (
-        <MetricsModal
-          machineId={machine_uid}
-          onClose={() => setShowMetrics(false)}
-        />
+        <MetricsModal machineId={machine_uid} onClose={() => setShowMetrics(false)} />
       )}
     </div>
   );
