@@ -195,6 +195,7 @@ interface ChatRequestBody {
     base_url: string;
     api_key: string;
   } | null;
+  flow_id?: number;
 }
 
 interface FlowRequestBody {
@@ -245,34 +246,46 @@ export async function streamChatCompletion(
         messages[0] = { ...systemMessage, content };
       }
 
+
       body = {
         ...chatOptions,
         messages,
         tools: serializedTools,
         stream: true,
       } as ChatRequestBody;
+
+
+
+
     } else {
       // Flow request - use existing format
       body = flowId
         ? ({
+          ...chatOptions,
+          tools: serializedTools,
+          stream: true,
+        } as ChatRequestBody)
+        : ({
+          req: {
+            system_prompt: systemPrompt,
+            name: "Test Flow",
+          },
+          chat: {
             ...chatOptions,
             tools: serializedTools,
             stream: true,
-          } as ChatRequestBody)
-        : ({
-            req: {
-              system_prompt: systemPrompt,
-              name: "Test Flow",
-            },
-            chat: {
-              ...chatOptions,
-              tools: serializedTools,
-              stream: true,
-            },
-          } as FlowRequestBody);
+          },
+        } as FlowRequestBody);
     }
 
-    const response = await fetch(`${api.defaults.baseURL}${endpoint}`, {
+    let url = `${api.defaults.baseURL}${endpoint}`;
+
+    if (flowId && endpoint === "/v1/chat/completions") {
+      url = `${url}?flow_id=${flowId}`;
+    }
+
+
+    const response = await fetch(url, {
       method: "POST",
       headers,
       body: JSON.stringify(body),
@@ -283,8 +296,8 @@ export async function streamChatCompletion(
       const errorData = await response.json().catch(() => ({}));
       throw new Error(
         errorData.detail ||
-          errorData.message ||
-          `Request failed with status ${response.status}`
+        errorData.message ||
+        `Request failed with status ${response.status}`
       );
     }
 
