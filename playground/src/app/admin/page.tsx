@@ -12,8 +12,8 @@ const AdminDashboard = () => {
             Dashboard Under Construction
           </h3>
           <p className="text-gray-500 max-w-md">
-            We&apos;re working on building an amazing admin dashboard. Check
-            back soon for new features and insights.
+            We&apos;re working on building an amazing admin dashboard. Check back soon for
+            new features and insights.
           </p>
         </div>
       </div>

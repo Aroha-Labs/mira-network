@@ -14,17 +14,11 @@ import ConfirmModal from "./ConfirmModal";
 import ChatBubble from "./ChatBubble";
 import { Spinner } from "./PageLoading";
 import api from "src/lib/axios";
-import { Message, streamChatCompletion, Tool } from "src/utils/chat";
+import { Flow, Message, streamChatCompletion, Tool } from "src/utils/chat";
 import ToolEditModal from "./ToolEditModal";
 
 interface FlowChatProps {
-  flow: {
-    id: number;
-    name: string;
-    system_prompt: string;
-    variables: string[];
-    tools?: Tool[];
-  };
+  flow: Flow;
   onClose: () => void;
 }
 

@@ -15,8 +15,7 @@ const CostCell = ({ log }: { log: ApiLog }) => {
     }
 
     const promptCost = log.prompt_tokens * log.model_pricing.prompt_token;
-    const completionCost =
-      log.completion_tokens * log.model_pricing.completion_token;
+    const completionCost = log.completion_tokens * log.model_pricing.completion_token;
     return {
       promptCost,
       completionCost,
