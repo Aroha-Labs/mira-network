@@ -25,6 +25,8 @@ jobs:
         id: pr-diff
         run: |
           git diff --unified=3 ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} > pr.diff
+          echo "PR Diff content:"
+          cat pr.diff
 
       - name: Review PR
         env:
@@ -32,6 +34,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         uses: actions/github-script@v7
         with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
             const https = require('https');
@@ -104,65 +107,34 @@ jobs:
               }
             }
 
-            // Function to split diff into chunks
-            function splitDiffIntoChunks(diff, maxChunkSize = 4000) {
-              const diffLines = diff.split('\n');
-              const chunks = [];
-              let currentChunk = [];
-              let currentSize = 0;
-
-              for (const line of diffLines) {
-                const lineSize = line.length + 1; // +1 for newline
-                if (currentSize + lineSize > maxChunkSize && currentChunk.length > 0) {
-                  chunks.push(currentChunk.join('\n'));
-                  currentChunk = [];
-                  currentSize = 0;
-                }
-                currentChunk.push(line);
-                currentSize += lineSize;
-              }
-
-              if (currentChunk.length > 0) {
-                chunks.push(currentChunk.join('\n'));
-              }
-
-              return chunks;
-            }
-
             try {
-              const diffChunks = splitDiffIntoChunks(diff);
-              let fullReview = '';
+              const prompt = `Review the following pull request changes:
 
-              for (let i = 0; i < diffChunks.length; i++) {
-                const prompt = `Review part ${i + 1}/${diffChunks.length} of the pull request changes:
+              ${diff}
 
-                ${diffChunks[i]}
+              Provide a concise review focusing on:
+              1. Potential bugs or issues
+              2. Security concerns
+              3. Performance implications
+              4. Specific improvement suggestions
+              
+              Be direct and focus only on significant findings.`;
 
-                ${i === diffChunks.length - 1 ? `
-                Provide a final summary with:
-                1. Brief summary of all changes
-                2. Key concerns (if any)
-                3. Suggestions
-                4. Code quality rating (1-5)
-                ` : 'Analyze these changes and note any important findings.'}`;
+              const messages = [
+                { 
+                  role: "system", 
+                  content: "You are a precise and thorough code reviewer. Focus on concrete issues and actionable feedback." 
+                },
+                { role: "user", content: prompt }
+              ];
 
-                const messages = [
-                  { 
-                    role: "system", 
-                    content: "You are a concise code reviewer. Focus on the most important aspects." 
-                  },
-                  { role: "user", content: prompt }
-                ];
-
-                const review = await callMiraAI(messages);
-                fullReview += i === 0 ? review : `\n\n${review}`;
-              }
+              const review = await callMiraAI(messages);
 
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: context.issue.number,
-                body: fullReview
+                body: review
               });
             } catch (error) {
               core.setFailed(`Error during PR review: ${error.message}`);
