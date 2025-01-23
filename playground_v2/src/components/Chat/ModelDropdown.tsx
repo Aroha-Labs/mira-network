@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import {
   Select,
   SelectContent,
@@ -8,15 +8,19 @@ import {
 } from "src/components/Select";
 import useAllSupportedModels from "src/hooks/useAllSupportedModels";
 import { cn } from "src/lib/utils";
+
 const ModelDropdown = ({
   isModalOpen,
   setIsModalOpen,
+  selectedModel,
+  setSelectedModel,
 }: {
   isModalOpen: boolean;
   setIsModalOpen: (isModalOpen: boolean) => void;
+  selectedModel: string;
+  setSelectedModel: (selectedModel: string) => void;
 }) => {
   const { supportedModelsData, isModelsLoading } = useAllSupportedModels();
-  const [selectedModel, setSelectedModel] = useState("");
 
   const supportedModelsOptions = useMemo(() => {
     if (!supportedModelsData) return [];
