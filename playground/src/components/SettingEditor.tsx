@@ -132,11 +132,7 @@ const JsonValueEditor = ({
       );
     case "array":
       return (
-        <ArrayEditor
-          value={value as JsonArray}
-          onChange={onChange}
-          disabled={disabled}
-        />
+        <ArrayEditor value={value as JsonArray} onChange={onChange} disabled={disabled} />
       );
     case "object":
       return (
@@ -245,11 +241,7 @@ const ValueRow = ({
             disabled={disabled}
           />
         )}
-        <DeleteButton
-          onDelete={onDelete}
-          disabled={disabled}
-          parentRef={rowRef}
-        />
+        <DeleteButton onDelete={onDelete} disabled={disabled} parentRef={rowRef} />
       </div>
       {isExpanded && isExpandable && (
         <div className="ml-4">
@@ -286,9 +278,7 @@ const NestedObjectEditor = ({
   disabled?: boolean;
 }) => {
   const [newKey, setNewKey] = useState("");
-  const [expandedObjects, setExpandedObjects] = useState<
-    Record<string, boolean>
-  >({});
+  const [expandedObjects, setExpandedObjects] = useState<Record<string, boolean>>({});
 
   const handleAddKey = () => {
     if (newKey && !(newKey in value)) {
@@ -355,9 +345,7 @@ const ArrayEditor = ({
   disabled?: boolean;
 }) => {
   const handleAddItem = () => onChange([...value, ""]);
-  const [expandedItems, setExpandedItems] = useState<Record<number, boolean>>(
-    {}
-  );
+  const [expandedItems, setExpandedItems] = useState<Record<number, boolean>>({});
 
   const toggleExpand = (index: number) => {
     setExpandedItems((prev) => ({
@@ -408,9 +396,7 @@ const RawJsonEditor = ({
   onCancel: () => void;
   disabled?: boolean;
 }) => {
-  const [jsonString, setJsonString] = useState(() =>
-    JSON.stringify(value, null, 2)
-  );
+  const [jsonString, setJsonString] = useState(() => JSON.stringify(value, null, 2));
   const [error, setError] = useState<string | null>(null);
 
   const handleSave = () => {
@@ -484,11 +470,7 @@ const SettingEditor = ({ value, onChange, disabled }: SettingEditorProps) => {
           Edit as JSON
         </button>
       </div>
-      <NestedObjectEditor
-        value={value}
-        onChange={onChange}
-        disabled={disabled}
-      />
+      <NestedObjectEditor value={value} onChange={onChange} disabled={disabled} />
     </div>
   );
 };

@@ -101,29 +101,23 @@ router = APIRouter()
                             {
                                 "machine": {
                                     "machine_uid": "machine_123",
-                                    "network_ip": "10.0.0.1"
+                                    "network_ip": "10.0.0.1",
                                 },
                                 "result": "yes",
-                                "response": {
-                                    "result": "yes",
-                                    "confidence": 0.95
-                                }
+                                "response": {"result": "yes", "confidence": 0.95},
                             },
                             {
                                 "machine": {
                                     "machine_uid": "machine_456",
-                                    "network_ip": "10.0.0.2"
+                                    "network_ip": "10.0.0.2",
                                 },
                                 "result": "no",
-                                "response": {
-                                    "result": "no",
-                                    "confidence": 0.75
-                                }
-                            }
-                        ]
+                                "response": {"result": "no", "confidence": 0.75},
+                            },
+                        ],
                     }
                 }
-            }
+            },
         },
         400: {
             "description": "Invalid request parameters",
@@ -131,25 +125,21 @@ router = APIRouter()
                 "application/json": {
                     "examples": {
                         "no_models": {
-                            "value": {
-                                "detail": "At least one model is required"
-                            }
+                            "value": {"detail": "At least one model is required"}
                         },
                         "invalid_min_yes": {
-                            "value": {
-                                "detail": "Minimum yes must be at least 1"
-                            }
+                            "value": {"detail": "Minimum yes must be at least 1"}
                         },
                         "min_yes_too_high": {
                             "value": {
                                 "detail": "Minimum yes must be less than or equal to the number of models"
                             }
-                        }
+                        },
                     }
                 }
-            }
-        }
-    }
+            },
+        },
+    },
 )
 async def verify(req: VerifyRequest):
     if len(req.models) < 1:
@@ -249,22 +239,19 @@ class ModelListRes(BaseModel):
                         "data": [
                             {
                                 "id": "openrouter/meta-llama/llama-3.3-70b-instruct",
-                                "object": "model"
+                                "object": "model",
                             },
-                            {
-                                "id": "openai/gpt-4",
-                                "object": "model"
-                            },
+                            {"id": "openai/gpt-4", "object": "model"},
                             {
                                 "id": "openrouter/anthropic/claude-3.5-sonnet",
-                                "object": "model"
-                            }
-                        ]
+                                "object": "model",
+                            },
+                        ],
                     }
                 }
-            }
+            },
         }
-    }
+    },
 )
 async def list_models(db: Session = Depends(get_session)) -> ModelListRes:
     supported_models = get_supported_models(db)
@@ -288,6 +275,7 @@ def save_log(
     ttfs: Optional[float],
     timeStart: float,
     machine_uid: str,
+    flow_id: Optional[str] = None,
 ) -> None:
     sm = get_setting_value(
         db,
@@ -325,6 +313,7 @@ def save_log(
         model=req.model,
         model_pricing=model_pricing,
         machine_id=machine_uid,
+        flow_id=flow_id,
     )
 
     db.add(api_log)
@@ -503,66 +492,51 @@ Server-sent events with the following data structure:
                                 "message": {
                                     "role": "assistant",
                                     "content": "Hello! How can I help you today?",
-                                    "tool_calls": None
+                                    "tool_calls": None,
                                 },
-                                "finish_reason": "stop"
+                                "finish_reason": "stop",
                             }
                         ],
                         "usage": {
                             "prompt_tokens": 10,
                             "completion_tokens": 8,
-                            "total_tokens": 18
-                        }
+                            "total_tokens": 18,
+                        },
                     }
                 }
-            }
+            },
         },
         400: {
             "description": "Invalid request or unsupported model",
             "content": {
-                "application/json": {
-                    "example": {
-                        "detail": "Unsupported model"
-                    }
-                }
-            }
+                "application/json": {"example": {"detail": "Unsupported model"}}
+            },
         },
         401: {
             "description": "Unauthorized - Invalid or missing authentication",
             "content": {
                 "application/json": {
-                    "example": {
-                        "detail": "Could not validate credentials"
-                    }
+                    "example": {"detail": "Could not validate credentials"}
                 }
-            }
+            },
         },
         402: {
             "description": "Insufficient credits",
             "content": {
-                "application/json": {
-                    "example": {
-                        "detail": "Insufficient credits"
-                    }
-                }
-            }
+                "application/json": {"example": {"detail": "Insufficient credits"}}
+            },
         },
         404: {
             "description": "User not found",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "detail": "User not found"
-                    }
-                }
-            }
-        }
-    }
+            "content": {"application/json": {"example": {"detail": "User not found"}}},
+        },
+    },
 )
 async def generate(
     req: AiRequest,
     user: User = Depends(verify_user),
     db: Session = Depends(get_session),
+    flow_id: Optional[str] = None,
 ) -> Response:
     timeStart = time.time()
 
@@ -674,6 +648,7 @@ async def generate(
             ttfs=ttfs,
             timeStart=timeStart,
             machine_uid=machine.machine_uid,
+            flow_id=flow_id,
         )
 
     if req.stream:
@@ -695,6 +670,7 @@ async def generate(
             ttfs=ttfs,
             timeStart=timeStart,
             machine_uid=machine.machine_uid,
+            flow_id=flow_id,
         )
 
         return Response(
