@@ -96,4 +96,5 @@ async def test_error_handling(client):
             model="invalid-model",
             messages=[Message(role="user", content="Hello")]
         )
-    assert exc_info.value.response.status_code in (401, 404)
+    # The API returns 400 for invalid model names, not 401/404
+    assert exc_info.value.response.status_code == 400
