@@ -18,13 +18,18 @@ const MessageContent = ({ msg, errorMessage }: MessageContentProps) => {
         return "--------/-_-/------";
       }
     }
-    return msg.content;
+    if (msg.content?.length === 0) {
+      return "--------/-_-/------";
+    }
+    return msg.content ?? "";
   };
 
   return (
     <ReactMarkdown
       className={cn(jetBrainsMono.className, "prose space-y-1", {
         "text-white": msg.role === "user",
+        "text-black": msg.role === "assistant",
+        "opacity-20": errorMessage || msg.content?.length === 0,
       })}
     >
       {getMessageContent(msg, errorMessage)}

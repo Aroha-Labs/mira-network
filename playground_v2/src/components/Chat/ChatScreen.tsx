@@ -15,8 +15,13 @@ interface ChatScreenProps {
 const getMessageStatus = (
   msg: Message,
   isSending: boolean,
-  errorMessage: string
+  errorMessage: string,
+  currentIndex: number,
+  messageIndex: number
 ): string => {
+  if (currentIndex !== messageIndex) {
+    return msg.role === "user" ? "You" : "Mira";
+  }
   switch (msg.role) {
     case "user":
       return "You";
@@ -48,7 +53,7 @@ const ChatScreen = ({
   }, [messages]);
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto p-[22px]">
+    <div className="flex flex-col h-full overflow-y-auto p-[22px] pb-[52px]">
       {messages.map((msg, index) => (
         <div
           key={`${msg.role}-${index}`}
@@ -64,7 +69,13 @@ const ChatScreen = ({
             })}
           >
             <div className="text-black mb-[6px] opacity-30 text-[12px] font-normal leading-[18px] tracking-[-0.013em]">
-              {getMessageStatus(msg, isSending, errorMessage)}
+              {getMessageStatus(
+                msg,
+                isSending,
+                errorMessage,
+                index,
+                messages.length - 1
+              )}
             </div>
             <pre
               className={cn("text-sm p-[10px] text-left overflow-auto", {
@@ -76,10 +87,12 @@ const ChatScreen = ({
             >
               <ChatBubble msg={msg} errorMessage={errorMessage} />
             </pre>
-            <div className="flex justify-end w-full mt-[6px] gap-[6px]">
-              <CopyToClipboardIcon text={msg.content} />
-              <RefreshChat onClick={() => refreshMessage(index)} />
-            </div>
+            {msg.role === "assistant" && (
+              <div className="flex justify-end w-full mt-[6px] gap-[6px]">
+                <CopyToClipboardIcon text={msg.content} />
+                <RefreshChat onClick={() => refreshMessage(index)} />
+              </div>
+            )}
           </div>
         </div>
       ))}

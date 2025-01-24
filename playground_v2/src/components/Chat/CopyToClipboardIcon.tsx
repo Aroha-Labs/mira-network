@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Button } from "src/components/button";
 
 interface CopyToClipboardIconProps {
-  text: string;
+  text: string | null;
   className?: string;
 }
 
@@ -16,7 +16,7 @@ export default function CopyToClipboardIcon({
   const [copied, setCopied] = useState(false);
 
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(text);
+    navigator.clipboard.writeText(text ?? "");
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };

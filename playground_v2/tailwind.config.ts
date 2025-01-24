@@ -79,6 +79,7 @@ export default {
               fontSize: "12px",
               lineHeight: "18px",
               letterSpacing: "-0.013em",
+              textWrap: "auto",
               p: {
                 marginTop: "0px",
                 marginBottom: "6px",
