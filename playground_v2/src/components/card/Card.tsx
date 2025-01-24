@@ -1,5 +1,6 @@
 import { forwardRef, ReactNode } from "react";
 import { cn } from "src/lib/utils";
+import "./card.css";
 
 interface CardProps {
   children: ReactNode;
@@ -23,7 +24,12 @@ const Card = forwardRef<HTMLDivElement, CardProps>(
         <div className="absolute bottom-3 left-3 w-[6px] h-[6px] bg-[#D7E2DE] rounded-full"></div>
         <div className="absolute bottom-3 right-3 w-[6px] h-[6px] bg-[#D7E2DE] rounded-full"></div>
 
-        <div className={cn("max-h-96 overflow-y-auto", contentClassName)}>
+        <div
+          className={cn(
+            "max-h-96 overflow-y-auto custom-scrollbar",
+            contentClassName
+          )}
+        >
           {children}
         </div>
       </div>
