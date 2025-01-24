@@ -17,7 +17,7 @@ export interface ToolResponse {
 
 export interface Message {
   role: "user" | "assistant" | "system";
-  content: string;
+  content: string | null;
   tool_calls?: ToolCall[];
   tool_responses?: ToolResponse[];
 }
@@ -130,7 +130,7 @@ export const useChatMessages = ({
       setErrorMessage("");
 
       const userMessage: Message = { role: "user", content: input };
-      const assistantMessage: Message = { role: "assistant", content: "" };
+      const assistantMessage: Message = { role: "assistant", content: null };
       const updatedMessages = [...messages, userMessage];
 
       setMessages([...updatedMessages, assistantMessage]);
@@ -146,6 +146,9 @@ export const useChatMessages = ({
         await fetchChatCompletion(
           updatedMessages,
           (chunk) => {
+            if (assistantMessage.content === null) {
+              assistantMessage.content = "";
+            }
             assistantMessage.content += chunk;
             setMessages((prevMessages) => [
               ...prevMessages.slice(0, -1),
