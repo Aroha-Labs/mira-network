@@ -22,6 +22,8 @@ import api from "src/lib/axios";
 import { Message, streamChatCompletion, Tool } from "src/utils/chat";
 import { useQueryClient } from "@tanstack/react-query";
 import MetricsModal from "src/components/MetricsModal";
+import Link from "next/link";
+import { useSession } from "src/hooks/useSession";
 
 // Update the Flow interface
 interface Flow {
@@ -120,6 +122,8 @@ const createFlow = async (data: { system_prompt: string; name: string }) => {
 };
 
 export default function Workbench() {
+  const { data: userSession, isLoading: isUserSessionLoading } = useSession();
+
   // UI state
   const [isSliderOpen, setIsSliderOpen] = useState(true);
   const [selectedModel, setSelectedModel] = useState<string>("");
@@ -137,6 +141,19 @@ export default function Workbench() {
   const [conversation, setConversation] = useState<Message[]>([]);
 
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  if (!userSession?.user) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <Link
+          href="/login"
+          className="p-4 text-white bg-blue-500 rounded-lg hover:bg-blue-600"
+        >
+          Login
+        </Link>
+      </div>
+    );
+  }
 
   // Fetch flows with better error handling
   const { data: flows = [] } = useQuery<Flow[]>({
