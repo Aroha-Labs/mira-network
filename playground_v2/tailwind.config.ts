@@ -61,6 +61,37 @@ export default {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      typography: {
+        DEFAULT: {
+          css: {
+            fontSize: "12px",
+            fontWeight: 400,
+            h3: {
+              marginTop: "0px",
+              marginBottom: "0px",
+            },
+            p: {
+              marginTop: "0px",
+              marginBottom: "6px",
+            },
+            li: {},
+            "*": {
+              fontSize: "12px",
+              lineHeight: "18px",
+              letterSpacing: "-0.013em",
+              p: {
+                marginTop: "0px",
+                marginBottom: "6px",
+              },
+            },
+          },
+        },
+        sm: {
+          css: {
+            fontSize: "12px",
+          },
+        },
+      },
     },
   },
   plugins: [require("@tailwindcss/typography"), require("tailwindcss-animate")],

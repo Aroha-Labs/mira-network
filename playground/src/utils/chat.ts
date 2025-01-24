@@ -60,6 +60,15 @@ export interface ToolResponse {
   content: string;
 }
 
+export interface Flow {
+  id: number;
+  name: string;
+  system_prompt: string;
+  updated_at: string;
+  variables: string[];
+  tools?: Tool[];
+}
+
 async function getAuthHeaders() {
   const {
     data: { session },
@@ -182,6 +191,11 @@ interface ChatRequestBody {
   variables?: Record<string, string>;
   tools?: Tool[];
   stream: boolean;
+  model_provider?: {
+    base_url: string;
+    api_key: string;
+  } | null;
+  flow_id?: number;
 }
 
 interface FlowRequestBody {
@@ -215,13 +229,43 @@ export async function streamChatCompletion(
       return JSON.parse(JSON.stringify(toolDict));
     });
 
-    const body = flowId
-      ? ({
+    let body;
+    if (endpoint === "/v1/chat/completions") {
+      // Direct chat completion - include system prompt in messages
+      const messages = systemPrompt
+        ? [{ role: "system" as const, content: systemPrompt }, ...chatOptions.messages]
+        : chatOptions.messages;
+
+      // Replace variables in system prompt if both are present
+      if (systemPrompt && options.variables) {
+        const systemMessage = messages[0];
+        let content = systemMessage.content;
+        Object.entries(options.variables).forEach(([key, value]) => {
+          content = content.replace(new RegExp(`{{${key}}}`, "g"), value);
+        });
+        messages[0] = { ...systemMessage, content };
+      }
+
+
+      body = {
+        ...chatOptions,
+        messages,
+        tools: serializedTools,
+        stream: true,
+      } as ChatRequestBody;
+
+
+
+
+    } else {
+      // Flow request - use existing format
+      body = flowId
+        ? ({
           ...chatOptions,
           tools: serializedTools,
           stream: true,
         } as ChatRequestBody)
-      : ({
+        : ({
           req: {
             system_prompt: systemPrompt,
             name: "Test Flow",
@@ -232,8 +276,16 @@ export async function streamChatCompletion(
             stream: true,
           },
         } as FlowRequestBody);
+    }
 
-    const response = await fetch(`${api.defaults.baseURL}${endpoint}`, {
+    let url = `${api.defaults.baseURL}${endpoint}`;
+
+    if (flowId && endpoint === "/v1/chat/completions") {
+      url = `${url}?flow_id=${flowId}`;
+    }
+
+
+    const response = await fetch(url, {
       method: "POST",
       headers,
       body: JSON.stringify(body),
@@ -244,8 +296,8 @@ export async function streamChatCompletion(
       const errorData = await response.json().catch(() => ({}));
       throw new Error(
         errorData.detail ||
-          errorData.message ||
-          `Request failed with status ${response.status}`
+        errorData.message ||
+        `Request failed with status ${response.status}`
       );
     }
 

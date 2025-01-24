@@ -13,7 +13,7 @@ const AnalyticsCard = ({ className }: { className?: string }) => {
       <div className="flex justify-between items-center pl-[20px] pr-[20px] pt-[14px] pb-[32px]">
         <div className="flex flex-col gap-[6px]">
           <p className="text-[18px] font-[700] leading-[18px] text-[#303030] capitalize">
-            {isLoading || error ? "_ _ _" : inferenceCalls}
+            {isLoading || error ? "_ _ _" : inferenceCalls?.total || "_ _ _"}
           </p>
           <p className="text-[#303030] text-[13px] font-[500] leading-[13px] tracking-[-0.26px] capitalize opacity-40">
             Inference calls

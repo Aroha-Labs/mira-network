@@ -75,10 +75,10 @@ export default function ChatBubble({
           msg.role === "assistant"
             ? "bg-gray-50"
             : msg.role === "system"
-            ? "bg-blue-50"
-            : msg.role === "user"
-            ? "bg-sky-50 text-black self-end rounded-tr-lg"
-            : "bg-indigo-50 text-black self-start rounded-tl-lg border border-gray-300"
+              ? "bg-blue-50"
+              : msg.role === "user"
+                ? "bg-sky-50 text-black self-end rounded-tr-lg"
+                : "bg-indigo-50 text-black self-start rounded-tl-lg border border-gray-300"
         }`}
       >
         <div className="flex-1 space-y-2 overflow-x-auto">
