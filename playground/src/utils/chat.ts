@@ -246,36 +246,31 @@ export async function streamChatCompletion(
         messages[0] = { ...systemMessage, content };
       }
 
-
       body = {
         ...chatOptions,
         messages,
         tools: serializedTools,
         stream: true,
       } as ChatRequestBody;
-
-
-
-
     } else {
       // Flow request - use existing format
       body = flowId
         ? ({
-          ...chatOptions,
-          tools: serializedTools,
-          stream: true,
-        } as ChatRequestBody)
-        : ({
-          req: {
-            system_prompt: systemPrompt,
-            name: "Test Flow",
-          },
-          chat: {
             ...chatOptions,
             tools: serializedTools,
             stream: true,
-          },
-        } as FlowRequestBody);
+          } as ChatRequestBody)
+        : ({
+            req: {
+              system_prompt: systemPrompt,
+              name: "Test Flow",
+            },
+            chat: {
+              ...chatOptions,
+              tools: serializedTools,
+              stream: true,
+            },
+          } as FlowRequestBody);
     }
 
     let url = `${api.defaults.baseURL}${endpoint}`;
@@ -283,7 +278,6 @@ export async function streamChatCompletion(
     if (flowId && endpoint === "/v1/chat/completions") {
       url = `${url}?flow_id=${flowId}`;
     }
-
 
     const response = await fetch(url, {
       method: "POST",
@@ -296,8 +290,8 @@ export async function streamChatCompletion(
       const errorData = await response.json().catch(() => ({}));
       throw new Error(
         errorData.detail ||
-        errorData.message ||
-        `Request failed with status ${response.status}`
+          errorData.message ||
+          `Request failed with status ${response.status}`
       );
     }
 
