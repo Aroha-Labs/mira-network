@@ -1,0 +1,94 @@
+version: 2
+updates:
+  # CLI project - Go modules
+  - package-ecosystem: "gomod"
+    directory: "/cli"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 5
+    groups:
+      go-dependencies:
+        patterns:
+          - "*"
+
+  # Playground project - Next.js using Yarn
+  - package-ecosystem: "npm"
+    directory: "/playground"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 5
+    groups:
+      dependencies:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "next"
+          - "react"
+          - "react-dom"
+      framework:
+        patterns:
+          - "next"
+          - "react"
+          - "react-dom"
+
+  # Playground_v2 project - Next.js using Yarn
+  - package-ecosystem: "npm"
+    directory: "/playground_v2"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 5
+    groups:
+      dependencies:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "next"
+          - "react"
+          - "react-dom"
+      framework:
+        patterns:
+          - "next"
+          - "react"
+          - "react-dom"
+
+  # Router project - Python using PDM
+  - package-ecosystem: "pip"
+    directory: "/router"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "pdm"
+        versions: ["*"]
+    groups:
+      python-dependencies:
+        patterns:
+          - "*"
+
+  # SDK project - Python using PDM
+  - package-ecosystem: "pip"
+    directory: "/sdk"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "pdm"
+        versions: ["*"]
+    groups:
+      python-dependencies:
+        patterns:
+          - "*"
+
+  # Service project - Python using PDM
+  - package-ecosystem: "pip"
+    directory: "/service"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "pdm"
+        versions: ["*"]
+    groups:
+      python-dependencies:
+        patterns:
+          - "*"

@@ -3,23 +3,22 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import AutoGrowTextarea from "./AutoGrowTextarea";
-import { StopIcon } from "@heroicons/react/24/solid";
-import { ChatBubbleBottomCenterIcon } from "@heroicons/react/24/outline";
+import { StopIcon, ArrowLeftIcon } from "@heroicons/react/24/solid";
+import {
+  ChatBubbleBottomCenterIcon,
+  BeakerIcon,
+  WrenchIcon,
+  DocumentTextIcon,
+} from "@heroicons/react/24/outline";
 import ConfirmModal from "./ConfirmModal";
 import ChatBubble from "./ChatBubble";
 import { Spinner } from "./PageLoading";
 import api from "src/lib/axios";
-import { Message, streamChatCompletion, Tool } from "src/utils/chat";
+import { Flow, Message, streamChatCompletion, Tool } from "src/utils/chat";
 import ToolEditModal from "./ToolEditModal";
 
 interface FlowChatProps {
-  flow: {
-    id: number;
-    name: string;
-    system_prompt: string;
-    variables: string[];
-    tools?: Tool[];
-  };
+  flow: Flow;
   onClose: () => void;
 }
 
@@ -64,12 +63,17 @@ interface ToolItemProps {
 }
 
 const ToolItem: React.FC<ToolItemProps> = ({ tool, onDelete }) => (
-  <div className="flex items-center justify-between p-2 bg-gray-50 rounded-md mb-2">
-    <div>
-      <div className="font-medium">{tool.function.name}</div>
-      <div className="text-sm text-gray-600">{tool.function.description}</div>
+  <div className="flex items-center justify-between p-3 mb-2 transition-colors duration-200 bg-white border border-gray-200 rounded-lg hover:bg-gray-50">
+    <div className="flex-1 min-w-0">
+      <div className="font-medium text-gray-900">{tool.function.name}</div>
+      <div className="mt-1 text-sm text-gray-500 truncate">
+        {tool.function.description}
+      </div>
     </div>
-    <button onClick={onDelete} className="text-red-600 hover:text-red-800">
+    <button
+      onClick={onDelete}
+      className="flex items-center px-3 py-1 ml-4 text-sm font-medium text-red-600 transition-colors duration-200 rounded-md bg-red-50 hover:bg-red-100"
+    >
       Remove
     </button>
   </div>
@@ -315,87 +319,112 @@ export default function FlowChat({ flow, onClose }: FlowChatProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-white">
+    <div className="fixed inset-0 z-50 bg-gray-50">
       <div className="flex flex-col h-full">
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <div className="flex items-center gap-4">
-            <h2 className="text-xl font-semibold">{flow.name}</h2>
-            <select
-              value={selectedModel}
-              onChange={(e) => setSelectedModel(e.target.value)}
-              className="p-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-gray-200">
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={onClose}
+              className="p-2 text-gray-500 transition-colors duration-200 rounded-lg hover:bg-gray-100"
             >
-              {supportedModelsOptions.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+              <ArrowLeftIcon className="w-5 h-5" />
+            </button>
+            <h2 className="text-xl font-semibold text-gray-900">{flow.name}</h2>
           </div>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
-            Close
-          </button>
+          <select
+            value={selectedModel}
+            onChange={(e) => setSelectedModel(e.target.value)}
+            className="px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            {supportedModelsOptions.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="flex flex-1 overflow-hidden">
           {/* Left Panel */}
-          <div className="w-1/3 p-4 overflow-y-auto border-r border-gray-200">
-            <div className="mb-6">
-              <h3 className="mb-2 text-sm font-medium text-gray-700">System Prompt</h3>
-              <div className="p-3 rounded-md bg-gray-50">
-                <p className="text-sm text-gray-600">{flow.system_prompt}</p>
+          <div className="flex-shrink-0 p-6 overflow-y-auto bg-white border-r border-gray-200 w-80">
+            {/* System Prompt Section */}
+            <div className="mb-8">
+              <div className="flex items-center mb-4 text-gray-900">
+                <DocumentTextIcon className="w-5 h-5 mr-2" />
+                <h3 className="font-medium">System Prompt</h3>
+              </div>
+              <div className="p-4 text-sm text-gray-600 border border-gray-200 rounded-lg bg-gray-50">
+                <p className="whitespace-pre-wrap">{flow.system_prompt}</p>
               </div>
             </div>
 
-            <div className="mb-6">
-              <h3 className="mb-2 text-sm font-medium text-gray-700">Variables</h3>
+            {/* Variables Section */}
+            {flow.variables.length > 0 && (
+              <div className="mb-8">
+                <div className="flex items-center mb-4 text-gray-900">
+                  <BeakerIcon className="w-5 h-5 mr-2" />
+                  <h3 className="font-medium">Variables</h3>
+                </div>
+                <div className="space-y-4">
+                  {flow.variables.map((variable) => (
+                    <div key={variable}>
+                      <label className="block mb-1.5 text-sm font-medium text-gray-700">
+                        {variable}
+                      </label>
+                      <input
+                        type="text"
+                        value={variables[variable] || ""}
+                        onChange={(e) => handleVariableChange(variable, e.target.value)}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder={`Enter ${variable}`}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Tools Section */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center text-gray-900">
+                  <WrenchIcon className="w-5 h-5 mr-2" />
+                  <h3 className="font-medium">Tools</h3>
+                </div>
+                <button
+                  onClick={handleAddTool}
+                  className="px-3 py-1.5 text-sm font-medium text-blue-600 transition-colors duration-200 bg-blue-50 rounded-md hover:bg-blue-100"
+                >
+                  Add Tool
+                </button>
+              </div>
               <div className="space-y-3">
-                {flow.variables.map((variable) => (
-                  <div key={variable}>
-                    <label className="block mb-1 text-sm text-gray-600">{variable}</label>
-                    <input
-                      type="text"
-                      value={variables[variable] || ""}
-                      onChange={(e) => handleVariableChange(variable, e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder={`Enter ${variable}`}
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="mb-6">
-              <h3 className="mb-2 text-sm font-medium text-gray-700">Tools</h3>
-              <div className="space-y-2">
                 {tools.map((tool, index) => (
-                  <div key={index}>
+                  <div key={index} className="space-y-2">
                     <ToolItem tool={tool} onDelete={() => handleRemoveTool(index)} />
                     <button
                       onClick={() => handleEditTool(tool)}
-                      className="w-full py-2 px-4 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
+                      className="w-full px-3 py-1.5 text-sm font-medium text-gray-600 transition-colors duration-200 bg-white border border-gray-200 rounded-md hover:bg-gray-50"
                     >
                       Edit Tool
                     </button>
                   </div>
                 ))}
-                <button
-                  onClick={handleAddTool}
-                  className="w-full py-2 px-4 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
-                >
-                  Add Tool
-                </button>
               </div>
             </div>
           </div>
 
           {/* Right Panel - Chat Area */}
-          <div className="flex flex-col flex-1">
-            <div className="flex-1 w-full p-4 space-y-6 overflow-y-auto">
+          <div className="flex flex-col flex-1 min-w-0">
+            <div className="flex-1 p-6 space-y-6 overflow-y-auto">
               {messages.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full text-gray-500">
-                  <ChatBubbleBottomCenterIcon className="w-12 h-12 mb-4" />
-                  <div>Start chatting...</div>
+                <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                  <ChatBubbleBottomCenterIcon className="w-16 h-16 mb-4" />
+                  <div className="text-lg">Start a conversation...</div>
+                  <p className="mt-2 text-sm text-gray-500">
+                    Use the variables and tools in the sidebar to customize your chat
+                  </p>
                 </div>
               ) : (
                 messages.map((msg, index) => (
@@ -411,81 +440,92 @@ export default function FlowChat({ flow, onClose }: FlowChatProps) {
                 ))
               )}
 
-              {!isLoading && messages.length ? (
-                <div className="relative flex justify-start max-w-2xl px-4 mx-auto -top-4">
+              {!isLoading && messages.length > 0 && (
+                <div className="flex justify-center">
                   <button
-                    className="text-sm text-gray-400 underline hover:text-gray-600 focus:outline-none"
                     onClick={() => handleSubmit("continue")}
+                    className="px-4 py-2 text-sm text-gray-600 transition-colors duration-200 bg-white border border-gray-200 rounded-md hover:bg-gray-50"
                   >
-                    Continue
+                    Continue generating
                   </button>
                 </div>
-              ) : null}
+              )}
 
               {messages.length > 0 && (
                 <div className="flex flex-col items-center text-center text-gray-500">
-                  {isLoading ? <Spinner /> : <div>End of messages</div>}
+                  {isLoading ? (
+                    <Spinner />
+                  ) : (
+                    <div className="text-sm">End of conversation</div>
+                  )}
                   {!isLoading && (
                     <button
-                      className="text-sm text-blue-400 underline hover:text-gray-600 focus:outline-none"
                       onClick={handleClearHistory}
+                      className="mt-2 text-sm text-blue-600 hover:text-blue-700"
                     >
-                      Clean History
+                      Clear History
                     </button>
                   )}
                 </div>
               )}
             </div>
 
-            <div className="sticky bottom-0 w-full p-4 bg-white border-t border-gray-300">
-              <div className="flex justify-center max-w-2xl mx-auto space-x-2">
-                <AutoGrowTextarea
-                  value={userInput}
-                  onChange={(e) => setUserInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSubmit();
-                    }
-                  }}
-                  placeholder="Type your message... (Shift+Enter for new line)"
-                  className="flex-1 p-2 border border-gray-300 resize-none rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  disabled={isLoading}
-                />
-                <button
-                  onClick={() => handleSubmit()}
-                  disabled={isLoading}
-                  className="p-2 text-white bg-blue-500 rounded-r-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  {isLoading ? "Sending..." : "Send"}
-                </button>
-                {isLoading && (
-                  <button
-                    onClick={handleStop}
-                    className="p-2 text-white bg-red-500 rounded-md hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
-                  >
-                    <StopIcon className="w-5 h-5" />
-                  </button>
+            {/* Input Area */}
+            <div className="p-4 bg-white border-t border-gray-200">
+              <div className="max-w-4xl mx-auto">
+                <div className="flex space-x-3">
+                  <AutoGrowTextarea
+                    value={userInput}
+                    onChange={(e) => setUserInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSubmit();
+                      }
+                    }}
+                    placeholder="Type your message... (Shift+Enter for new line)"
+                    className="flex-1 p-3 text-sm border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={isLoading}
+                  />
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => handleSubmit()}
+                      disabled={isLoading}
+                      className="px-4 py-2 text-sm font-medium text-white transition-colors duration-200 bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      {isLoading ? "Sending..." : "Send"}
+                    </button>
+                    {isLoading && (
+                      <button
+                        onClick={handleStop}
+                        className="p-2 text-white transition-colors duration-200 bg-red-500 rounded-lg hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
+                      >
+                        <StopIcon className="w-5 h-5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {errorMessage && (
+                  <div className="mt-2 text-sm text-center text-red-500">
+                    {errorMessage}
+                  </div>
                 )}
               </div>
-              {errorMessage && (
-                <div className="mt-2 text-sm text-center text-red-500">
-                  {errorMessage}
-                </div>
-              )}
             </div>
           </div>
         </div>
       </div>
+
       {showConfirmModal && (
         <ConfirmModal
-          title="Confirm Clear History"
+          title="Clear Chat History"
           onConfirm={confirmClearHistory}
           onCancel={() => setShowConfirmModal(false)}
         >
           Are you sure you want to clear the chat history?
         </ConfirmModal>
       )}
+
       {showToolModal && (
         <ToolEditModal
           tool={editingTool}

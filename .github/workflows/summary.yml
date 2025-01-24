@@ -1,0 +1,102 @@
+# .github/workflows/summary.yml
+name: Generate Summary
+
+on:
+  workflow_call:
+    inputs:
+      new_tag:
+        required: true
+        type: string
+      router_result:
+        required: true
+        type: string
+      service_result:
+        required: true
+        type: string
+      cli_result:
+        required: true
+        type: string
+      playground_result:
+        required: true
+        type: string
+      sdk_test_result:
+        required: true
+        type: string
+      sdk_lint_result:
+        required: true
+        type: string
+
+jobs:
+  generate-summary:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate Job Summary
+        run: |
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "# 📋 Final Workflow Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 🏷️ Tag Information" >> $GITHUB_STEP_SUMMARY
+          echo "**New Release:** \`${{ inputs.new_tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 🚀 Job Status" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Header for the table
+          echo "| Component | Task | Status | Details |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|------|--------|----------|" >> $GITHUB_STEP_SUMMARY
+
+          # Router Status
+          if [ "${{ inputs.router_result }}" = "success" ]; then
+            echo "| 🌐 Router | Build & Publish | ✅ | **Successful** |" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ inputs.router_result }}" = "failure" ]; then
+            echo "| 🌐 Router | Build & Publish | ❌ | **Failed** |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| 🌐 Router | Build & Publish | ⚠️ | **Cancelled** |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Service Status
+          if [ "${{ inputs.service_result }}" = "success" ]; then
+            echo "| ⚙️ Service | Build & Publish | ✅ | **Successful** |" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ inputs.service_result }}" = "failure" ]; then
+            echo "| ⚙️ Service | Build & Publish | ❌ | **Failed** |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| ⚙️ Service | Build & Publish | ⚠️ | **Cancelled** |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # CLI Status
+          if [ "${{ inputs.cli_result }}" = "success" ]; then
+            echo "| 🔧 CLI | Build & Publish | ✅ | **Successful** |" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ inputs.cli_result }}" = "failure" ]; then
+            echo "| 🔧 CLI | Build & Publish | ❌ | **Failed** |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| 🔧 CLI | Build & Publish | ⚠️ | **Cancelled** |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Playground Status
+          if [ "${{ inputs.playground_result }}" = "success" ]; then
+            echo "| 🎮 Playground | Deploy to Testnet | ✅ | **Successful** |" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ inputs.playground_result }}" = "failure" ]; then
+            echo "| 🎮 Playground | Deploy to Testnet | ❌ | **Failed** |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| 🎮 Playground | Deploy to Testnet | ⚠️ | **Cancelled** |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # SDK Status
+          if [ "${{ inputs.sdk_test_result }}" = "success" ]; then
+            echo "| 📦 SDK | Tests | ✅ | **Passed** |" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ inputs.sdk_test_result }}" = "failure" ]; then
+            echo "| 📦 SDK | Tests | ❌ | **Failed** |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| 📦 SDK | Tests | ⚠️ | **Cancelled** |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ inputs.sdk_lint_result }}" = "success" ]; then
+            echo "| 📦 SDK | Lint | ✅ | **Passed** |" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ inputs.sdk_lint_result }}" = "failure" ]; then
+            echo "| 📦 SDK | Lint | ❌ | **Failed** |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| 📦 SDK | Lint | ⚠️ | **Cancelled** |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY

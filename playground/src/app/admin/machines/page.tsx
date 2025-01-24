@@ -9,6 +9,7 @@ import {
   PlusIcon,
   MagnifyingGlassIcon,
   FunnelIcon,
+  KeyIcon,
 } from "@heroicons/react/24/outline";
 import Loading from "src/components/PageLoading";
 import ErrorMessage from "src/components/ErrorMessage";
@@ -17,6 +18,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog } from "@headlessui/react";
 import { Menu, Transition } from "@headlessui/react";
 import { Fragment } from "react";
+import CopyToClipboardIcon from "src/components/CopyToClipboardIcon";
+import ConfirmModal from "src/components/ConfirmModal";
 
 interface Machine {
   machine_uid: string;
@@ -27,6 +30,11 @@ interface Machine {
   created_at: string;
   last_seen?: string;
   disabled: boolean;
+  auth_tokens: Record<string, AuthToken>;
+}
+
+interface AuthToken {
+  description: string | null;
 }
 
 interface RegisterMachineRequest {
@@ -67,8 +75,14 @@ const updateMachine = async (machine_uid: string, data: UpdateMachineRequest) =>
   return response.data;
 };
 
+const truncateString = (str: string, showLength: number = 4) => {
+  if (str.length <= showLength * 2) return str;
+  return `${str.slice(0, showLength)}...${str.slice(-showLength)}`;
+};
+
 const MachineCard = ({ machine }: { machine: Machine }) => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isAuthTokenModalOpen, setIsAuthTokenModalOpen] = useState(false);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString();
@@ -119,26 +133,35 @@ const MachineCard = ({ machine }: { machine: Machine }) => {
               )}
             </div>
           </div>
-          <button
-            onClick={() => setIsEditModalOpen(true)}
-            className="p-1.5 text-gray-400 hover:text-gray-600 rounded-md hover:bg-gray-50"
-            title="Edit machine"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={1.5}
-              stroke="currentColor"
-              className="w-5 h-5"
+          <div className="flex gap-2">
+            <button
+              onClick={() => setIsAuthTokenModalOpen(true)}
+              className="p-1.5 text-gray-400 hover:text-gray-600 rounded-md hover:bg-gray-50"
+              title="Manage auth tokens"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"
-              />
-            </svg>
-          </button>
+              <KeyIcon className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => setIsEditModalOpen(true)}
+              className="p-1.5 text-gray-400 hover:text-gray-600 rounded-md hover:bg-gray-50"
+              title="Edit machine"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={1.5}
+                stroke="currentColor"
+                className="w-5 h-5"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"
+                />
+              </svg>
+            </button>
+          </div>
         </div>
 
         <div className="pt-4 border-t border-gray-100">
@@ -183,6 +206,11 @@ const MachineCard = ({ machine }: { machine: Machine }) => {
         machine={machine}
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
+      />
+      <AuthTokenModal
+        machine={machine}
+        isOpen={isAuthTokenModalOpen}
+        onClose={() => setIsAuthTokenModalOpen(false)}
       />
     </div>
   );
@@ -351,74 +379,116 @@ const EditMachineModal = ({
       <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
       <div className="fixed inset-0 flex items-center justify-center p-4">
         <Dialog.Panel className="mx-auto max-w-sm rounded-lg bg-white p-6 shadow-xl w-full">
-          <Dialog.Title className="text-lg font-medium text-gray-900 mb-4">
-            Edit Machine
-          </Dialog.Title>
+          <div className="flex items-center justify-between mb-6">
+            <Dialog.Title className="text-lg font-medium text-gray-900">
+              Edit Machine
+            </Dialog.Title>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-500 p-1 rounded-full hover:bg-gray-50"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </button>
+          </div>
 
           <form onSubmit={handleSubmit}>
-            <div className="space-y-4">
+            <div className="space-y-5">
               <div>
                 <label
-                  htmlFor="name"
+                  htmlFor="edit-name"
                   className="block text-sm font-medium text-gray-700 mb-1"
                 >
                   Name
                 </label>
                 <input
                   type="text"
-                  id="name"
+                  id="edit-name"
                   value={formData.name}
                   onChange={(e) =>
                     setFormData((prev) => ({ ...prev, name: e.target.value }))
                   }
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  placeholder="Machine name"
+                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-colors"
+                  placeholder="Enter machine name"
                 />
               </div>
 
               <div>
                 <label
-                  htmlFor="description"
+                  htmlFor="edit-network-ip"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Network IP
+                  <span className="text-red-500 ml-1">*</span>
+                </label>
+                <input
+                  type="text"
+                  id="edit-network-ip"
+                  value={formData.network_ip}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, network_ip: e.target.value }))
+                  }
+                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-colors font-mono"
+                  placeholder="192.168.1.100"
+                  required
+                  pattern="^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$"
+                  title="Please enter a valid IP address (e.g., 192.168.1.100)"
+                />
+                <p className="mt-1 text-sm text-gray-500">
+                  Enter the IPv4 address of the machine
+                </p>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="edit-description"
                   className="block text-sm font-medium text-gray-700 mb-1"
                 >
                   Description
                 </label>
                 <textarea
-                  id="description"
+                  id="edit-description"
                   value={formData.description}
                   onChange={(e) =>
                     setFormData((prev) => ({ ...prev, description: e.target.value }))
                   }
                   rows={3}
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  placeholder="Machine description"
+                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-colors resize-none"
+                  placeholder="Add a description for this machine..."
                 />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="network_ip"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
-                  Network IP
-                </label>
-                <input
-                  type="text"
-                  id="network_ip"
-                  value={formData.network_ip}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, network_ip: e.target.value }))
-                  }
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  placeholder="192.168.1.100"
-                  required
-                />
+                <p className="mt-1 text-sm text-gray-500">
+                  Optional: Add details about this machine&apos;s purpose or location
+                </p>
               </div>
             </div>
 
             {error && (
-              <div className="mt-4 text-sm text-red-600">
-                {error instanceof Error ? error.message : "Failed to update machine"}
+              <div className="mt-6 p-3 bg-red-50 rounded-md">
+                <div className="flex items-center gap-2 text-sm text-red-700">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  {error instanceof Error ? error.message : "Failed to update machine"}
+                </div>
               </div>
             )}
 
@@ -426,22 +496,220 @@ const EditMachineModal = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isPending}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                {isPending ? "Saving..." : "Save Changes"}
+                {isPending ? (
+                  <>
+                    <svg
+                      className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                    Saving...
+                  </>
+                ) : (
+                  "Save Changes"
+                )}
               </button>
             </div>
           </form>
         </Dialog.Panel>
       </div>
     </Dialog>
+  );
+};
+
+const AuthTokenModal = ({
+  machine,
+  isOpen,
+  onClose,
+}: {
+  machine: Machine;
+  isOpen: boolean;
+  onClose: () => void;
+}) => {
+  const [newTokenDescription, setNewTokenDescription] = useState("");
+  const [tokenToDelete, setTokenToDelete] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
+  const { mutate: createToken, isPending: isCreating } = useMutation({
+    mutationFn: async () => {
+      const response = await api.post(`/machines/${machine.machine_uid}/auth-tokens`, {
+        description: newTokenDescription || null,
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["machines"] });
+      setNewTokenDescription("");
+    },
+  });
+
+  const { mutate: deleteToken, isPending: isDeleting } = useMutation({
+    mutationFn: async (tokenId: string) => {
+      await api.delete(`/machines/${machine.machine_uid}/auth-tokens/${tokenId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["machines"] });
+      setTokenToDelete(null);
+    },
+  });
+
+  const handleDeleteClick = (tokenId: string) => {
+    setTokenToDelete(tokenId);
+  };
+
+  return (
+    <>
+      <Dialog open={isOpen} onClose={onClose} className="relative z-50">
+        <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+        <div className="fixed inset-0 flex items-center justify-center p-4">
+          <Dialog.Panel className="mx-auto max-w-md rounded-lg bg-white p-6 shadow-xl w-full">
+            <div className="flex items-center justify-between mb-6">
+              <Dialog.Title className="text-lg font-medium text-gray-900">
+                Manage Auth Tokens
+              </Dialog.Title>
+              <button onClick={onClose} className="text-gray-400 hover:text-gray-500">
+                <span className="sr-only">Close</span>
+                <svg
+                  className="h-6 w-6"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth="1.5"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-sm font-medium text-gray-900">Create New Token</h3>
+                <div className="mt-2">
+                  <input
+                    type="text"
+                    value={newTokenDescription}
+                    onChange={(e) => setNewTokenDescription(e.target.value)}
+                    placeholder="Token description (optional)"
+                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  />
+                  <button
+                    onClick={() => createToken()}
+                    disabled={isCreating}
+                    className="mt-2 w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                  >
+                    {isCreating ? "Creating..." : "Create Token"}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-medium text-gray-900 mb-3">
+                  Existing Tokens
+                </h3>
+                <div className="space-y-2">
+                  {machine.auth_tokens && Object.keys(machine.auth_tokens).length > 0 ? (
+                    Object.entries(machine.auth_tokens).map(([tokenId, token]) => (
+                      <div
+                        key={tokenId}
+                        className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900">
+                            {token.description || "Unnamed Token"}
+                          </p>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <p className="text-xs text-gray-500 font-mono truncate">
+                              {truncateString(tokenId)}
+                            </p>
+                            <CopyToClipboardIcon
+                              text={tokenId}
+                              className="text-gray-400"
+                              tooltipText="Copy token ID"
+                            />
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleDeleteClick(tokenId)}
+                          disabled={isDeleting}
+                          className="ml-2 text-red-600 hover:text-red-700 flex-shrink-0"
+                        >
+                          <span className="sr-only">Delete token</span>
+                          <svg
+                            className="h-5 w-5"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            strokeWidth="1.5"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-gray-500">No tokens created yet</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </Dialog.Panel>
+        </div>
+      </Dialog>
+
+      {/* Confirmation Modal */}
+      {tokenToDelete && (
+        <ConfirmModal
+          title="Delete Auth Token"
+          onConfirm={() => deleteToken(tokenToDelete)}
+          onCancel={() => setTokenToDelete(null)}
+          isLoading={isDeleting}
+        >
+          <p className="text-sm text-gray-500">
+            Are you sure you want to delete this auth token? This action cannot be undone.
+          </p>
+          <div className="mt-2 p-3 bg-gray-50 rounded-md">
+            <p className="text-sm font-medium text-gray-900">
+              {machine.auth_tokens[tokenToDelete]?.description || "Unnamed Token"}
+            </p>
+            <p className="text-xs text-gray-500 font-mono mt-1">
+              {truncateString(tokenToDelete)}
+            </p>
+          </div>
+        </ConfirmModal>
+      )}
+    </>
   );
 };
 
