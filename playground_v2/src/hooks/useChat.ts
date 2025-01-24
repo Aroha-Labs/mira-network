@@ -121,6 +121,7 @@ export const useChatMessages = ({
   const [errorMessage, setErrorMessage] = useState("");
   const abortControllerRef = useRef<AbortController | null>(null);
 
+  console.log("coming in messages", messages, errorMessage, userSession);
 
   const sendMessage = useCallback(
     async (userInput: string = "") => {
