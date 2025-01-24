@@ -48,7 +48,7 @@ const ChatScreen = ({
   }, [messages]);
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto p-[32px]">
+    <div className="flex flex-col h-full overflow-y-auto p-[22px]">
       {messages.map((msg, index) => (
         <div
           key={`${msg.role}-${index}`}
