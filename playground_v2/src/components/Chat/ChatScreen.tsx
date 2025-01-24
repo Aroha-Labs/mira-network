@@ -2,11 +2,14 @@ import { useEffect, useRef } from "react";
 import { Message } from "src/hooks/useChat";
 import { cn } from "src/lib/utils";
 import ChatBubble from "./ChatBubble";
+import CopyToClipboardIcon from "./CopyToClipboardIcon";
+import RefreshChat from "./RefreshChat";
 
 interface ChatScreenProps {
   messages: Message[];
   isSending: boolean;
   errorMessage: string;
+  refreshMessage: (index: number) => Promise<void>;
 }
 
 const getMessageStatus = (
@@ -30,7 +33,12 @@ const getMessageStatus = (
   }
 };
 
-const ChatScreen = ({ messages, isSending, errorMessage }: ChatScreenProps) => {
+const ChatScreen = ({
+  messages,
+  isSending,
+  errorMessage,
+  refreshMessage,
+}: ChatScreenProps) => {
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -68,6 +76,10 @@ const ChatScreen = ({ messages, isSending, errorMessage }: ChatScreenProps) => {
             >
               <ChatBubble msg={msg} errorMessage={errorMessage} />
             </pre>
+            <div className="flex justify-end w-full mt-[6px] gap-[6px]">
+              <CopyToClipboardIcon text={msg.content} />
+              <RefreshChat onClick={() => refreshMessage(index)} />
+            </div>
           </div>
         </div>
       ))}
