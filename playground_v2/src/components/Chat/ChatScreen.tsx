@@ -52,7 +52,7 @@ const ChatScreen = ({
       {messages.map((msg, index) => (
         <div
           key={`${msg.role}-${index}`}
-          className={cn("flex mb-4", {
+          className={cn("flex mb-[10px]", {
             "justify-end": msg.role === "user",
             "justify-start": msg.role !== "user",
           })}

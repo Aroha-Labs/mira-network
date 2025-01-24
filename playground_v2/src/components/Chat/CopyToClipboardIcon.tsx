@@ -7,13 +7,11 @@ import { Button } from "src/components/button";
 interface CopyToClipboardIconProps {
   text: string;
   className?: string;
-  tooltipText?: string;
 }
 
 export default function CopyToClipboardIcon({
   text,
   className,
-  tooltipText = "Copy to clipboard",
 }: Readonly<CopyToClipboardIconProps>) {
   const [copied, setCopied] = useState(false);
 
