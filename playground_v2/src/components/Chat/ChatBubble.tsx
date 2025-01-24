@@ -1,58 +1,35 @@
-import { useEffect, useRef } from "react";
-import { useChatMessages } from "src/hooks/useChat";
+import ReactMarkdown from "react-markdown";
+import jetBrainsMono from "src/app/fonts/jetBrainsMono";
+import { Message } from "src/hooks/useChat";
+import { cn } from "src/lib/utils";
 
-interface ChatScreenProps {
-  selectedModel: string;
+interface MessageContentProps {
+  msg: Message;
+  errorMessage: string;
 }
 
-const ChatScreen = ({ selectedModel }: ChatScreenProps) => {
-  const { messages, isSending, errorMessage } = useChatMessages({
-    selectedModel,
-  });
-  const chatEndRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: "smooth" });
+const MessageContent = ({ msg, errorMessage }: MessageContentProps) => {
+  const getMessageContent = (msg: Message, errorMessage: string): string => {
+    if (msg.role === "assistant") {
+      if (errorMessage) {
+        if (errorMessage === "Please login to continue.") {
+          return "Please login to continue.";
+        }
+        return "--------/-_-/------";
+      }
     }
-  }, [messages]);
+    return msg.content;
+  };
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto p-4">
-      {messages.map((msg, index) => (
-        <div
-          key={index}
-          className={`flex ${
-            msg.role === "user" ? "justify-end" : "justify-start"
-          } mb-4`}
-        >
-          <div
-            className={`${
-              msg.role === "user"
-                ? "border border-[#306E564F] bg-[#121212] max-w-[373px] text-right"
-                : "border border-[#306E564F] bg-[#FFFFFF] max-w-[480px] text-left"
-            } p-2 rounded-lg shadow-md`}
-          >
-            <div
-              className={`${
-                msg.role === "user" ? "text-white" : "text-black"
-              } text-sm font-normal leading-[18px] tracking-[-0.013em] mb-1`}
-            >
-              {msg.role === "user" ? "You" : "System"}
-            </div>
-            <div className="text-sm">
-              {msg.role === "system" && isSending
-                ? "Processing..."
-                : msg.role === "system" && errorMessage
-                ? "Something went wrong..."
-                : msg.content}
-            </div>
-          </div>
-        </div>
-      ))}
-      <div ref={chatEndRef} />
-    </div>
+    <ReactMarkdown
+      className={cn(jetBrainsMono.className, "prose space-y-1", {
+        "text-white": msg.role === "user",
+      })}
+    >
+      {getMessageContent(msg, errorMessage)}
+    </ReactMarkdown>
   );
 };
 
-export default ChatScreen;
+export default MessageContent;

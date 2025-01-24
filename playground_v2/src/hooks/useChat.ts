@@ -120,14 +120,12 @@ export const useChatMessages = ({
   const [errorMessage, setErrorMessage] = useState("");
   const abortControllerRef = useRef<AbortController | null>(null);
 
+  console.log("coming in messages", messages, errorMessage, userSession);
+
   const sendMessage = useCallback(
     async (userInput: string = "") => {
       const input = userInput.trim();
       if (!input) return;
-      if (!userSession?.access_token) {
-        setErrorMessage("Please login to continue.");
-        return;
-      }
 
       setIsSending(true);
       setErrorMessage("");
@@ -139,6 +137,11 @@ export const useChatMessages = ({
       setMessages([...updatedMessages, assistantMessage]);
 
       abortControllerRef.current = new AbortController();
+
+      if (!userSession?.access_token) {
+        setErrorMessage("Please login to continue.");
+        return;
+      }
 
       try {
         await fetchChatCompletion(
