@@ -5,9 +5,10 @@ import TypeMessage from "./TypeMessage";
 import ChatScreen from "./ChatScreen";
 
 const ChatSection = ({ selectedModel }: { selectedModel: string }) => {
-  const { messages, isSending, errorMessage, sendMessage } = useChatMessages({
-    selectedModel,
-  });
+  const { messages, isSending, errorMessage, sendMessage, refreshMessage } =
+    useChatMessages({
+      selectedModel,
+    });
 
   const handleSubmit = (message: string) => {
     sendMessage(message);
@@ -20,6 +21,7 @@ const ChatSection = ({ selectedModel }: { selectedModel: string }) => {
           messages={messages}
           isSending={isSending}
           errorMessage={errorMessage}
+          refreshMessage={refreshMessage}
         />
       </Card>
       <TypeMessage onSubmit={handleSubmit} />

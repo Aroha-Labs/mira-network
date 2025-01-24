@@ -27,6 +27,7 @@ interface UseChatMessagesReturn {
   isSending: boolean;
   errorMessage: string;
   sendMessage: (userInput: string) => Promise<void>;
+  refreshMessage: (index: number) => Promise<void>;
 }
 
 const handleErrorResponse = async (response: Response) => {
@@ -173,5 +174,58 @@ export const useChatMessages = ({
     [messages, userSession, selectedModel]
   );
 
-  return { messages, isSending, errorMessage, sendMessage };
+  const refreshMessage = async (index: number) => {
+    if (!userSession?.access_token) {
+      setErrorMessage("Please login to continue.");
+      return;
+    }
+
+    const messagesToKeep = messages.slice(0, index + 1);
+    setMessages(messagesToKeep);
+
+    setIsSending(true);
+    setErrorMessage("");
+
+    const assistantMessage: Message = { role: "assistant", content: "" };
+    const updatedMessages = [...messagesToKeep, assistantMessage];
+
+    setMessages(updatedMessages);
+
+    setTimeout(() => {
+      window.scrollTo({
+        top: document.body.scrollHeight,
+        behavior: "smooth",
+      });
+    }, 200);
+
+    const newMessages = messagesToKeep;
+
+    abortControllerRef.current = new AbortController();
+
+    try {
+      await fetchChatCompletion(
+        newMessages,
+        (chunk) => {
+          assistantMessage.content += chunk;
+          setMessages((prevMessages) => [
+            ...prevMessages.slice(0, -1),
+            assistantMessage,
+          ]);
+        },
+        abortControllerRef.current,
+        selectedModel,
+        userSession.access_token
+      );
+    } catch (error) {
+      if ((error as Error).name !== "AbortError") {
+        console.error("Failed to send message:", error);
+        setMessages((prevMessages) => prevMessages.slice(0, -1));
+        setErrorMessage("Failed to send message. Please try again.");
+      }
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  return { messages, isSending, errorMessage, sendMessage, refreshMessage };
 };
