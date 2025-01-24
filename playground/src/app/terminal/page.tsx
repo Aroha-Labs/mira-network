@@ -276,6 +276,7 @@ export default function Workbench() {
           endpoint: "/v1/chat/completions",
           variables,
           tools,
+          flowId: Number(selectedFlow.id),
         },
         abortControllerRef.current,
         {
