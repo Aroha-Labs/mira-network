@@ -24,6 +24,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import MetricsModal from "src/components/MetricsModal";
 import Link from "next/link";
 import { useSession } from "src/hooks/useSession";
+import { MessageVerification } from "src/components/MessageVerification";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { ClipboardIcon } from "@heroicons/react/24/outline";
 
 // Update the Flow interface
 interface Flow {
@@ -137,6 +141,7 @@ export default function Workbench() {
   // Preview state
   const [previewMessage, setPreviewMessage] = useState<Message | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [conversation, setConversation] = useState<Message[]>([]);
 
@@ -238,6 +243,19 @@ export default function Workbench() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  // Clear states when flow changes
+  useEffect(() => {
+    setPreviewMessage(null);
+    setIsLoading(false);
+    setIsGenerating(false);
+    setErrorMessage("");
+    setConversation([]);
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+  }, [selectedFlow?.id]);
+
   const handleRun = async () => {
     if (!selectedFlow) return;
 
@@ -253,6 +271,7 @@ export default function Workbench() {
 
     try {
       setIsLoading(true);
+      setIsGenerating(true);
       setErrorMessage("");
 
       const messages = [
@@ -313,6 +332,7 @@ export default function Workbench() {
       setErrorMessage("Failed to generate response. Please try again.");
     } finally {
       setIsLoading(false);
+      setIsGenerating(false);
     }
   };
 
@@ -320,6 +340,7 @@ export default function Workbench() {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       setIsLoading(false);
+      setIsGenerating(false);
     }
   };
 
@@ -471,6 +492,8 @@ export default function Workbench() {
       });
     }
   };
+
+  const [showVerification, setShowVerification] = useState(false);
 
   if (!userSession?.user) {
     return (
@@ -683,7 +706,7 @@ export default function Workbench() {
                         {flow.variables.map((variable) => (
                           <span
                             key={variable}
-                            className="px-2.5 py-1 text-xs font-medium text-indigo-700 border border-indigo-200 rounded-full bg-indigo-50 shadow-sm"
+                            className="px-2.5 py-1 text-xs font-medium text-indigo-700 bg-indigo-100 rounded-md"
                           >
                             {variable}
                           </span>
@@ -1055,9 +1078,9 @@ export default function Workbench() {
                     {/* Add Message Button */}
                     <button
                       onClick={handleAddMessage}
-                      className="flex items-center justify-center w-full px-4 py-2.5 text-sm font-medium text-gray-700 bg-gradient-to-b from-white to-gray-50 border border-gray-300 rounded-lg hover:from-gray-50 hover:to-gray-100 hover:text-indigo-600 hover:border-indigo-200 transition-all duration-200"
+                      className="flex items-center justify-center w-full px-4 py-2.5 text-sm font-medium text-gray-700 bg-gradient-to-b from-white to-gray-50 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors group relative"
                     >
-                      <PlusIcon className="w-4 h-4 mr-2" />
+                      <PlusIcon className="w-4 h-4 md:mr-1.5" />
                       Add Message
                     </button>
                   </div>
@@ -1128,7 +1151,7 @@ export default function Workbench() {
                 >
                   <ChartBarIcon className="w-4 h-4 md:mr-1.5" />
 
-                  <span className="absolute px-2 py-1 mb-2 text-xs font-medium text-white transition-opacity transform -translate-x-1/2 bg-gray-900 rounded opacity-0 bottom-full left-1/2 group-hover:opacity-100 whitespace-nowrap">
+                  <span className="absolute px-2 py-1 mb-2 text-xs font-medium text-white transition-opacity bg-gray-900 rounded opacity-0 bottom-full left-1/2 group-hover:opacity-100 whitespace-nowrap">
                     View flow metrics and analytics
                   </span>
                 </button>
@@ -1172,48 +1195,89 @@ export default function Workbench() {
           </div>
 
           {/* Preview Content - Adjust height for mobile */}
-          <div className="flex-1 overflow-hidden border border-gray-200 shadow-sm bg-gradient-to-b from-white to-gray-50 rounded-xl">
+          <div className="flex flex-col flex-1 overflow-hidden">
             <div className="flex items-center justify-between p-4 border-b border-gray-200">
-              <h3 className="text-sm font-medium text-gray-900">Response Preview</h3>
-              {previewMessage && (
+              <div className="text-sm font-medium text-gray-900">Response Preview</div>
+              <div className="flex space-x-2">
                 <button
                   onClick={handleAddToConversation}
-                  className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-indigo-700 bg-indigo-50 rounded-md hover:bg-indigo-100 hover:text-indigo-800 transition-colors group relative"
+                  disabled={!previewMessage || isGenerating}
+                  className={`px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center space-x-1 disabled:opacity-50 disabled:cursor-not-allowed ${
+                    (!previewMessage || isGenerating) && "opacity-50 cursor-not-allowed"
+                  }`}
                 >
-                  <PlusIcon className="w-4 h-4 md:mr-1.5" />
-                  <span className="hidden md:inline">Add to Conversation</span>
-                  <span className="absolute right-0 px-2 py-1 mb-2 text-xs font-medium text-white transition-opacity bg-gray-900 rounded opacity-0 bottom-full group-hover:opacity-100 whitespace-nowrap">
-                    Add response to conversation
-                  </span>
+                  <CheckIcon className="w-4 h-4" />
+                  <span>Add to Conversation</span>
                 </button>
-              )}
+                <button
+                  onClick={() => setShowVerification(!showVerification)}
+                  disabled={!previewMessage || isGenerating}
+                  className={`px-3 py-1 ${
+                    showVerification
+                      ? "bg-gray-600 hover:bg-gray-700"
+                      : "bg-green-600 hover:bg-green-700"
+                  } text-white rounded flex items-center space-x-1 disabled:opacity-50 disabled:cursor-not-allowed ${
+                    (!previewMessage || isGenerating) && "opacity-50 cursor-not-allowed"
+                  }`}
+                >
+                  <ChartBarIcon className="w-4 h-4" />
+                  <span>{showVerification ? "Hide Verification" : "Verify"}</span>
+                </button>
+              </div>
             </div>
-            <div className="relative flex-1 h-[calc(100vh-13rem)] md:h-[calc(100vh-13rem)]">
-              {previewMessage ? (
-                <div className="absolute inset-0 p-6 overflow-y-auto">
-                  <div className="prose prose-indigo max-w-none">
-                    {previewMessage.content}
-                  </div>
+            <div className="relative flex-1 overflow-hidden">
+              <div className="w-full h-[calc(100vh-13rem)] overflow-y-auto">
+                <div className="p-4">
+                  {previewMessage ? (
+                    <div className="prose max-w-none">
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          pre: ({ node, ...props }) => (
+                            <div className="relative group">
+                              <pre {...props} />
+                              <button
+                                onClick={() => {
+                                  const code = node.children[0]?.children[0]?.value;
+                                  if (code) {
+                                    navigator.clipboard.writeText(code);
+                                    toast.success("Code copied to clipboard");
+                                  }
+                                }}
+                                className="absolute p-1 text-gray-200 transition-opacity bg-gray-700 rounded opacity-0 top-2 right-2 group-hover:opacity-100"
+                              >
+                                <ClipboardIcon className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ),
+                          code: ({ node, inline, ...props }) =>
+                            inline ? <code {...props} /> : <code {...props} />,
+                        }}
+                      >
+                        {previewMessage.content}
+                      </ReactMarkdown>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-[calc(100vh-17rem)] text-gray-500">
+                      <PlayIcon className="w-12 h-12 mb-4 text-indigo-300" />
+                      <div className="text-lg font-medium">Ready to Generate</div>
+                      <div className="mt-1 text-sm text-gray-400">
+                        {conversation.length === 0 ? (
+                          <div className="flex items-center">
+                            <PlusIcon className="w-4 h-4 mr-1" />
+                            <span>Add messages to get started</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center">
+                            <PlayIcon className="w-4 h-4 mr-1" />
+                            <span>Click Generate to create a response</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-500">
-                  <PlayIcon className="w-12 h-12 mb-4 text-indigo-300" />
-                  <p className="text-lg font-medium">Ready to Generate</p>
-                  <p className="mt-1 text-sm text-gray-400">
-                    {conversation.length === 0 ? (
-                      <span className="flex items-center">
-                        <PlusIcon className="w-4 h-4 mr-1" />
-                        Add messages to get started
-                      </span>
-                    ) : (
-                      <span className="flex items-center">
-                        <PlayIcon className="w-4 h-4 mr-1" />
-                        Click Generate to create a response
-                      </span>
-                    )}
-                  </p>
-                </div>
-              )}
+              </div>
             </div>
           </div>
 
@@ -1229,6 +1293,39 @@ export default function Workbench() {
               </div>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Full-screen verification panel */}
+      <div
+        className={`fixed inset-0 bg-black/50 backdrop-blur-sm z-50 transition-all duration-300 ${
+          showVerification ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
+        onClick={() => setShowVerification(false)}
+      >
+        <div
+          className={`absolute inset-y-0 right-0 w-full md:w-2/3 lg:w-1/2 bg-white shadow-2xl transform transition-transform duration-300 ease-out ${
+            showVerification ? "translate-x-0" : "translate-x-full"
+          } flex flex-col`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+            <h2 className="text-xl font-semibold text-gray-900">Response Verification</h2>
+            <button
+              onClick={() => setShowVerification(false)}
+              className="p-2 text-gray-500 transition-colors rounded-full hover:bg-gray-100 hover:text-gray-700"
+            >
+              <XMarkIcon className="w-6 h-6" />
+            </button>
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 overflow-hidden">
+            {previewMessage && (
+              <MessageVerification messages={[previewMessage]} models={models} />
+            )}
+          </div>
         </div>
       </div>
     </div>
