@@ -141,7 +141,7 @@ router = APIRouter()
         },
     },
 )
-async def verify(req: VerifyRequest):
+async def verify(req: VerifyRequest, db: Session = Depends(get_session)):
     if len(req.models) < 1:
         raise HTTPException(status_code=400, detail="At least one model is required")
 
@@ -154,12 +154,24 @@ async def verify(req: VerifyRequest):
             detail="Minimum yes must be less than or equal to the number of models",
         )
 
-    machines = get_random_machines(len(req.models))
+    supported_models = get_supported_models(db)
+
+    # Validate and transform all models
+    transformed_models = []
+    for model in req.models:
+        if model not in supported_models:
+            raise HTTPException(status_code=400, detail=f"Unsupported model: {model}")
+        model_config = supported_models[model]
+        transformed_models.append({"original": model, "id": model_config.id})
 
     results = []
-    async with httpx.AsyncClient() as client:
-        for idx, machine in enumerate(machines):
-            proxy_url = f"http://{machine.network_ip}:{PROXY_PORT}/v1/verify"
+    async with httpx.AsyncClient(
+        timeout=httpx.Timeout(60.0),
+    ) as client:
+        for idx, model in enumerate(transformed_models):
+            machine = get_random_machines(1)
+
+            proxy_url = f"http://{machine[0].network_ip}:{PROXY_PORT}/v1/verify"
             response = await client.post(
                 proxy_url,
                 json={
@@ -167,15 +179,16 @@ async def verify(req: VerifyRequest):
                         {"role": msg.role, "content": msg.content}
                         for msg in req.messages
                     ],
-                    "model": req.models[idx],
+                    "model": model["id"],
                 },
             )
             response_data = response.json()
             results.append(
                 {
-                    "machine": machine.model_dump(),
+                    "machine": machine,
                     "result": response_data["result"],
                     "response": response_data,
+                    "model": transformed_models[idx]["original"],
                 }
             )
 

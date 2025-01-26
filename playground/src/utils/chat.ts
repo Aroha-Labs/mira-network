@@ -306,3 +306,45 @@ export async function streamChatCompletion(
     throw error;
   }
 }
+
+export interface VerificationRequest {
+  messages: Message[];
+  models: string[];
+  min_yes: number;
+}
+
+export interface VerificationResponse {
+  result: "yes" | "no";
+  results: {
+    machine: {
+      machine_uid: string;
+      network_ip: string;
+    }[];
+    result: "yes" | "no";
+    response: {
+      result: "yes" | "no";
+      content: string;
+    };
+    model: string;
+  }[];
+}
+
+export const verifyMessages = async (
+  request: VerificationRequest
+): Promise<VerificationResponse> => {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${api.defaults.baseURL}/v1/verify`, {
+    method: "POST",
+    headers: {
+      ...headers,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Verification failed: ${response.statusText}`);
+  }
+
+  return response.json();
+};
