@@ -5,6 +5,7 @@ import ApiLogs from "./ApiLogs";
 import Credit from "./Credit";
 import ManageApiKey from "./ManageApiKey";
 import Network from "./Network";
+import TestApiKeyWithChat from "./TestApiKeyWithChat";
 import UserInfo from "./UserInfo";
 
 interface LoggedinStateProps {
@@ -20,6 +21,7 @@ const LoggedinState = ({ userSession }: LoggedinStateProps) => (
         <Footer className="hidden md:block col-span-2" />
       </div>
       <div className="space-y-1">
+        <TestApiKeyWithChat />
         <Credit />
         <ManageApiKey />
         <ApiLogs />
