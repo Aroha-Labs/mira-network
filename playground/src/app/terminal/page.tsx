@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, ComponentPropsWithoutRef } from "react";
 import { useQuery, UseQueryOptions } from "@tanstack/react-query";
 import {
   StopIcon,
@@ -124,6 +124,8 @@ const createFlow = async (data: { system_prompt: string; name: string }) => {
     throw error;
   }
 };
+
+type CodeProps = ComponentPropsWithoutRef<"code"> & { inline?: boolean };
 
 export default function Workbench() {
   const { data: userSession } = useSession();
@@ -1233,16 +1235,13 @@ export default function Workbench() {
                       <ReactMarkdown
                         remarkPlugins={[remarkGfm]}
                         components={{
-                          pre: ({ node, ...props }) => (
+                          pre: ({ node, children, ...props }) => (
                             <div className="relative group">
-                              <pre {...props} />
+                              <pre {...props}>{children}</pre>
                               <button
                                 onClick={() => {
-                                  const code = node.children[0]?.children[0]?.value;
-                                  if (code) {
-                                    navigator.clipboard.writeText(code);
-                                    toast.success("Code copied to clipboard");
-                                  }
+                                  const preElement = children?.toString() || "";
+                                  navigator.clipboard.writeText(preElement);
                                 }}
                                 className="absolute p-1 text-gray-200 transition-opacity bg-gray-700 rounded opacity-0 top-2 right-2 group-hover:opacity-100"
                               >
@@ -1250,8 +1249,16 @@ export default function Workbench() {
                               </button>
                             </div>
                           ),
-                          code: ({ node, inline, ...props }) =>
-                            inline ? <code {...props} /> : <code {...props} />,
+                          code: ({
+                            inline,
+                            className,
+                            children,
+                            ...props
+                          }: CodeProps) => (
+                            <code className={className} {...props}>
+                              {children}
+                            </code>
+                          ),
                         }}
                       >
                         {previewMessage.content}
