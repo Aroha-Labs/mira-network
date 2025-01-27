@@ -14,7 +14,7 @@ const links = [
   },
   {
     text: "DISCORD",
-    href: "https://discord.gg/4Xq6nMYu",
+    href: "https://discord.com/invite/mira-network",
     target: "_blank",
   },
   {
