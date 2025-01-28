@@ -378,7 +378,6 @@ async def verify(req: VerifyRequest):
         }
 
     data = json.loads(res.body)
-    print(data)
     tool_call = data["choices"][0]["message"].get("tool_calls", [])[0]
 
     if tool_call:
