@@ -18,8 +18,7 @@ interface MessageVerificationProps {
 export const MessageVerification = ({
   messages,
   models,
-  minYes: defaultMinYes = 1,
-  systemMessage,
+  minYes: defaultMinYes = 1
 }: MessageVerificationProps) => {
   const [isVerifying, setIsVerifying] = useState(false);
   const [verificationResult, setVerificationResult] =
@@ -46,7 +45,6 @@ export const MessageVerification = ({
         messages,
         models: selectedModels,
         min_yes: minYes,
-        system_message: systemMessage,
       };
       const result = await verifyMessages(request);
       setVerificationResult(result);
