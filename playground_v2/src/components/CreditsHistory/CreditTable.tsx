@@ -63,7 +63,7 @@ const CreditTable = ({
         </TableHeader>
         <TableBody>
           {data?.history?.map((log) => (
-            <TableRow key={log?.id} className={cn("cursor-pointer")}>
+            <TableRow key={log?.id}>
               <TableCell>
                 {log?.created_at &&
                   format(new Date(log?.created_at), "MMM d, yyyy HH:mm")}
