@@ -496,6 +496,7 @@ export default function Workbench() {
   };
 
   const [showVerification, setShowVerification] = useState(false);
+  const [verificationSystemMessage, setVerificationSystemMessage] = useState("");
 
   if (!userSession?.user) {
     return (
@@ -1313,11 +1314,11 @@ export default function Workbench() {
         <div
           className={`absolute inset-y-0 right-0 w-full md:w-2/3 lg:w-1/2 bg-white shadow-2xl transform transition-transform duration-300 ease-out ${
             showVerification ? "translate-x-0" : "translate-x-full"
-          } flex flex-col`}
+          } flex flex-col h-full`}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <div className="flex-none flex items-center justify-between px-6 py-4 border-b border-gray-200">
             <h2 className="text-xl font-semibold text-gray-900">Response Verification</h2>
             <button
               onClick={() => setShowVerification(false)}
@@ -1328,9 +1329,40 @@ export default function Workbench() {
           </div>
 
           {/* Content */}
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 min-h-0 overflow-auto">
             {previewMessage && (
-              <MessageVerification messages={[previewMessage]} models={models} />
+              <>
+                <div className="flex-none p-4 border-b border-gray-200 bg-white">
+                  <label
+                    htmlFor="verification-system-message"
+                    className="block mb-2 text-sm font-medium text-gray-700"
+                  >
+                    System Message for Verification
+                  </label>
+                  <textarea
+                    id="verification-system-message"
+                    value={verificationSystemMessage}
+                    onChange={(e) => setVerificationSystemMessage(e.target.value)}
+                    placeholder="Enter a system message for verification (optional)"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    rows={3}
+                  />
+                </div>
+                <div className="flex-1">
+                  <MessageVerification
+                    messages={
+                      verificationSystemMessage
+                        ? [
+                            { role: "system", content: verificationSystemMessage },
+                            ...conversation,
+                            previewMessage,
+                          ]
+                        : [previewMessage]
+                    }
+                    models={models}
+                  />
+                </div>
+              </>
             )}
           </div>
         </div>

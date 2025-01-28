@@ -12,12 +12,14 @@ interface MessageVerificationProps {
   messages: Message[];
   models: string[];
   minYes?: number;
+  systemMessage?: string;
 }
 
 export const MessageVerification = ({
   messages,
   models,
   minYes: defaultMinYes = 1,
+  systemMessage,
 }: MessageVerificationProps) => {
   const [isVerifying, setIsVerifying] = useState(false);
   const [verificationResult, setVerificationResult] =
@@ -32,7 +34,9 @@ export const MessageVerification = ({
       return;
     }
     if (minYes > selectedModels.length) {
-      setError(`Min-yes cannot be greater than selected models (${selectedModels.length})`);
+      setError(
+        `Min-yes cannot be greater than selected models (${selectedModels.length})`
+      );
       return;
     }
     setIsVerifying(true);
@@ -42,6 +46,7 @@ export const MessageVerification = ({
         messages,
         models: selectedModels,
         min_yes: minYes,
+        system_message: systemMessage,
       };
       const result = await verifyMessages(request);
       setVerificationResult(result);
@@ -63,7 +68,9 @@ export const MessageVerification = ({
       <div className="flex-none p-6 bg-white border-b border-gray-200">
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <div className="text-sm font-medium text-gray-600">Select Models for Verification</div>
+            <div className="text-sm font-medium text-gray-600">
+              Select Models for Verification
+            </div>
             <button
               onClick={handleVerify}
               disabled={isVerifying}
@@ -79,7 +86,7 @@ export const MessageVerification = ({
               )}
             </button>
           </div>
-          
+
           <div className="flex flex-wrap gap-2">
             {models.map((model) => (
               <button
@@ -105,11 +112,13 @@ export const MessageVerification = ({
               onChange={(e) => setMinYes(Number(e.target.value))}
               className="px-3 py-1.5 rounded-lg text-sm font-medium border border-gray-200 bg-white text-gray-700 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
-              {Array.from({ length: selectedModels.length || 1 }, (_, i) => i + 1).map((num) => (
-                <option key={num} value={num}>
-                  {num} {num === 1 ? "verification" : "verifications"}
-                </option>
-              ))}
+              {Array.from({ length: selectedModels.length || 1 }, (_, i) => i + 1).map(
+                (num) => (
+                  <option key={num} value={num}>
+                    {num} {num === 1 ? "verification" : "verifications"}
+                  </option>
+                )
+              )}
             </select>
           </div>
         </div>
@@ -152,9 +161,7 @@ export const MessageVerification = ({
                 <div
                   key={index}
                   className={`p-4 rounded-xl bg-white border ${
-                    result.result === "yes" 
-                      ? "border-green-200" 
-                      : "border-red-200"
+                    result.result === "yes" ? "border-green-200" : "border-red-200"
                   } shadow-sm`}
                 >
                   <div className="space-y-3">
@@ -179,9 +186,7 @@ export const MessageVerification = ({
                         ) : (
                           <XCircleIcon className="w-4 h-4 mr-1.5" />
                         )}
-                        <span className="font-medium">
-                          {result.result.toUpperCase()}
-                        </span>
+                        <span className="font-medium">{result.result.toUpperCase()}</span>
                       </div>
                     </div>
 
@@ -189,15 +194,15 @@ export const MessageVerification = ({
                       Machine: {result.machine[0].network_ip}
                     </div>
 
-                    <div className={`p-3 rounded-lg text-sm ${
-                      result.result === "yes"
-                        ? "bg-green-50 text-green-700"
-                        : "bg-red-50 text-red-700"
-                    }`}>
+                    <div
+                      className={`p-3 rounded-lg text-sm ${
+                        result.result === "yes"
+                          ? "bg-green-50 text-green-700"
+                          : "bg-red-50 text-red-700"
+                      }`}
+                    >
                       <div className="font-medium mb-1">Response:</div>
-                      <div className="whitespace-pre-wrap">
-                        {result.response.content}
-                      </div>
+                      <div className="whitespace-pre-wrap">{result.response.content}</div>
                     </div>
                   </div>
                 </div>

@@ -18,6 +18,7 @@ import httpx
 import json
 from src.router.utils.settings import get_setting_value
 from src.router.utils.settings import get_supported_models
+import asyncio
 
 router = APIRouter()
 
@@ -164,14 +165,10 @@ async def verify(req: VerifyRequest, db: Session = Depends(get_session)):
         model_config = supported_models[model]
         transformed_models.append({"original": model, "id": model_config.id})
 
-    results = []
-    async with httpx.AsyncClient(
-        timeout=httpx.Timeout(60.0),
-    ) as client:
-        for idx, model in enumerate(transformed_models):
-            machine = get_random_machines(1)
-
-            proxy_url = f"http://{machine[0].network_ip}:{PROXY_PORT}/v1/verify"
+    async def process_model(model, idx):
+        machine = get_random_machines(1)
+        proxy_url = f"http://{machine[0].network_ip}:{PROXY_PORT}/v1/verify"
+        async with httpx.AsyncClient(timeout=httpx.Timeout(60.0)) as client:
             response = await client.post(
                 proxy_url,
                 json={
@@ -183,14 +180,17 @@ async def verify(req: VerifyRequest, db: Session = Depends(get_session)):
                 },
             )
             response_data = response.json()
-            results.append(
-                {
-                    "machine": machine,
-                    "result": response_data["result"],
-                    "response": response_data,
-                    "model": transformed_models[idx]["original"],
-                }
-            )
+            return {
+                "machine": machine,
+                "result": response_data["result"],
+                "response": response_data,
+                "model": transformed_models[idx]["original"],
+            }
+
+    # Make parallel requests
+    results = await asyncio.gather(
+        *[process_model(model, idx) for idx, model in enumerate(transformed_models)]
+    )
 
     yes_count = sum(1 for result in results if result["result"] == "yes")
     if yes_count >= req.min_yes:
