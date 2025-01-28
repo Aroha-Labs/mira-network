@@ -55,7 +55,7 @@ const ApiLogsPage = () => {
           <Footer />
           <Pagination
             currentPage={params.page ?? 1}
-            totalPages={Number((data?.total ?? 0) / (data?.page_size ?? 1))}
+            totalPages={Math.ceil((data?.total ?? 0) / (data?.page_size ?? 1))}
             handlePageChange={(pageNumber) =>
               apiLogsParamsState.setState(() => ({
                 ...params,
