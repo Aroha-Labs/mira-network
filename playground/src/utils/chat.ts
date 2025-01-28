@@ -256,21 +256,21 @@ export async function streamChatCompletion(
       // Flow request - use existing format
       body = flowId
         ? ({
+          ...chatOptions,
+          tools: serializedTools,
+          stream: true,
+        } as ChatRequestBody)
+        : ({
+          req: {
+            system_prompt: systemPrompt,
+            name: "Test Flow",
+          },
+          chat: {
             ...chatOptions,
             tools: serializedTools,
             stream: true,
-          } as ChatRequestBody)
-        : ({
-            req: {
-              system_prompt: systemPrompt,
-              name: "Test Flow",
-            },
-            chat: {
-              ...chatOptions,
-              tools: serializedTools,
-              stream: true,
-            },
-          } as FlowRequestBody);
+          },
+        } as FlowRequestBody);
     }
 
     let url = `${api.defaults.baseURL}${endpoint}`;
@@ -290,8 +290,8 @@ export async function streamChatCompletion(
       const errorData = await response.json().catch(() => ({}));
       throw new Error(
         errorData.detail ||
-          errorData.message ||
-          `Request failed with status ${response.status}`
+        errorData.message ||
+        `Request failed with status ${response.status}`
       );
     }
 
