@@ -327,20 +327,18 @@ async def verify(req: VerifyRequest):
     if not req.messages:
         raise HTTPException(status_code=400, detail="At least one message is required")
 
-    if any(msg.role == "system" for msg in req.messages):
-        raise HTTPException(status_code=400, detail="System message is not allowed")
-
-    system_message = Message(
-        role="system",
-        content="""You are a verification assistant. Your task is to verify if the user message is correct or not.
-                Use the provided verify_statement function to respond.
-                Be concise with your reasoning.
-                Always use the function to respond.""",
-    )
+    if not any(msg.role == "system" for msg in req.messages):
+        system_message = Message(
+            role="system",
+            content="""You are a verification assistant. Your task is to verify if the user message is correct or not.
+                    Use the provided verify_statement function to respond.
+                    Be concise with your reasoning.
+                    Always use the function to respond.""",
+        )
+        req.messages.insert(0, system_message)
 
     model_provider, model = get_model_provider(req.model, req.model_provider)
     messages = [{"role": msg.role, "content": msg.content} for msg in req.messages]
-    messages.insert(0, {"role": system_message.role, "content": system_message.content})
 
     res = get_llm_completion(
         model=model,
