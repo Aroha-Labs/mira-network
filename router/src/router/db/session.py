@@ -4,5 +4,8 @@ from .base import engine
 
 
 def get_session() -> Generator[Session, None, None]:
-    with Session(engine) as session:
-        yield session
+    session = Session(engine)
+    try:
+        yield session  # Provide session to FastAPI endpoint
+    finally:
+        session.close()  # ✅ Ensures session is closed after request
