@@ -181,18 +181,27 @@ def list_all_logs(
     order: Optional[str] = "desc",
     flow_id: Optional[str] = None,
 ):
-    offset = (page - 1) * page_size
-
-    # Handle user_id filtering with admin check
     if user_id:
         if "admin" not in user.roles:
             raise HTTPException(
                 status_code=403, detail="Only admins can query other users' logs"
             )
-        query = db.query(ApiLogs).filter(ApiLogs.user_id == user_id)
-    else:
-        query = db.query(ApiLogs).filter(ApiLogs.user_id == user.id)
 
+    offset = (page - 1) * page_size
+
+    query = db.query(ApiLogs)
+
+    # Handle user_id filtering and admin access
+    if "admin" in user.roles:
+        # Start with all logs for admin
+        if user_id:
+            # Admin filtering for specific user
+            query = query.filter(ApiLogs.user_id == user_id)
+    else:
+        # Non-admin only sees their own logs
+        query = query.filter(ApiLogs.user_id == user.id)
+
+    # Apply other filters
     if start_date:
         query = query.filter(ApiLogs.created_at >= start_date)
     if end_date:
@@ -204,6 +213,7 @@ def list_all_logs(
     if api_key_id:
         query = query.filter(ApiLogs.api_key_id == api_key_id)
     if flow_id:
+        # For flow_id, we don't need to check user ownership if admin
         query = query.filter(ApiLogs.flow_id == flow_id)
 
     if order_by not in [
