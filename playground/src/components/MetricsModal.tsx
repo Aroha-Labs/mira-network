@@ -688,7 +688,7 @@ const MetricsModal = ({
     );
   };
 
-  // Add pagination controls
+  // Add pagination control
   const renderPagination = () => {
     if (!data?.total) return null;
 
