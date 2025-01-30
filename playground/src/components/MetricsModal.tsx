@@ -77,6 +77,8 @@ const MetricsModal = ({
 }: MetricsModalProps) => {
   const { data: userSession } = useSession();
   const [dateRangeState, setDateRangeState] = useState("7");
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 10000; // Adjust based on your needs
 
   const chartOptions = useMemo(
     () => ({
@@ -120,8 +122,8 @@ const MetricsModal = ({
     return date;
   }, [dateRangeState]);
 
-  const { data, isLoading, error } = useQuery<{ logs: ApiLog[] }>({
-    queryKey: ["metrics-logs", machineId, apiKeyId, userId, modelFilter, dateRange],
+  const { data, isLoading, error } = useQuery<{ logs: ApiLog[]; total: number }>({
+    queryKey: ["metrics-logs", machineId, apiKeyId, userId, modelFilter, dateRange, page],
     queryFn: async () => {
       const resp = await api.get("/api-logs", {
         params: {
@@ -132,7 +134,8 @@ const MetricsModal = ({
           ...(modelFilter && { model: modelFilter }),
           ...(dateRange?.startDate && { start_date: dateRange.startDate }),
           ...(dateRange?.endDate && { end_date: dateRange.endDate }),
-          page_size: 10000,
+          page_size: PAGE_SIZE,
+          page,
         },
       });
       return resp.data;
@@ -574,25 +577,30 @@ const MetricsModal = ({
     return (
       <div className="space-y-4">
         {/* Date range buttons */}
-        <div className="bg-white px-2 py-1.5 rounded-lg shadow-sm border border-gray-100 flex justify-end gap-1.5 overflow-x-auto">
-          {[
-            { value: "1", label: "24h" },
-            { value: "7", label: "7d" },
-            { value: "30", label: "30d" },
-            { value: "90", label: "3m" },
-          ].map(({ value, label }) => (
-            <button
-              key={value}
-              onClick={() => setDateRangeState(value)}
-              className={`px-3 py-1 rounded-md text-sm font-medium transition-colors duration-200 ${
-                dateRangeState === value
-                  ? "bg-blue-500 text-white shadow-sm"
-                  : "bg-gray-50 text-gray-600 hover:bg-gray-100"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+        <div className="bg-white px-2 py-1.5 rounded-lg shadow-sm border border-gray-100 flex justify-between items-center">
+          <div className="text-sm text-gray-500">
+            {data?.total ? `${data.total} total logs` : ""}
+          </div>
+          <div className="flex gap-1.5 overflow-x-auto">
+            {[
+              { value: "1", label: "24h" },
+              { value: "7", label: "7d" },
+              { value: "30", label: "30d" },
+              { value: "90", label: "3m" },
+            ].map(({ value, label }) => (
+              <button
+                key={value}
+                onClick={() => setDateRangeState(value)}
+                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors duration-200 ${
+                  dateRangeState === value
+                    ? "bg-blue-500 text-white shadow-sm"
+                    : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -680,6 +688,44 @@ const MetricsModal = ({
     );
   };
 
+  // Add pagination controls
+  const renderPagination = () => {
+    if (!data?.total) return null;
+
+    const totalPages = Math.ceil(data.total / PAGE_SIZE);
+    if (totalPages <= 1) return null;
+
+    return (
+      <div className="flex items-center justify-end gap-2 mt-4">
+        <button
+          onClick={() => setPage((p) => Math.max(1, p - 1))}
+          disabled={page === 1}
+          className={`px-3 py-1 text-sm rounded-md ${
+            page === 1
+              ? "bg-gray-100 text-gray-400"
+              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+          }`}
+        >
+          Previous
+        </button>
+        <span className="text-sm text-gray-600">
+          Page {page} of {totalPages}
+        </span>
+        <button
+          onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+          disabled={page === totalPages}
+          className={`px-3 py-1 text-sm rounded-md ${
+            page === totalPages
+              ? "bg-gray-100 text-gray-400"
+              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+          }`}
+        >
+          Next
+        </button>
+      </div>
+    );
+  };
+
   return (
     <Modal
       onClose={onClose}
@@ -692,12 +738,44 @@ const MetricsModal = ({
               ? `API Key ${apiKeyId}`
               : userId
                 ? `User ${userId}`
-                : "Unknown"
+                : userSession?.user.role === "admin"
+                  ? "All Users"
+                  : "Your Usage"
         }`
       }
       maxWidth="sm:max-w-6xl"
     >
-      {renderContent()}
+      <div className="space-y-4">
+        {/* Date range buttons */}
+        {/* <div className="bg-white px-2 py-1.5 rounded-lg shadow-sm border border-gray-100 flex justify-between items-center">
+          <div className="text-sm text-gray-500">
+            {data?.total ? `${data.total} total logs` : ""}
+          </div>
+          <div className="flex gap-1.5 overflow-x-auto">
+            {[
+              { value: "1", label: "24h" },
+              { value: "7", label: "7d" },
+              { value: "30", label: "30d" },
+              { value: "90", label: "3m" },
+            ].map(({ value, label }) => (
+              <button
+                key={value}
+                onClick={() => setDateRangeState(value)}
+                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors duration-200 ${
+                  dateRangeState === value
+                    ? "bg-blue-500 text-white shadow-sm"
+                    : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div> */}
+
+        {renderContent()}
+        {renderPagination()}
+      </div>
     </Modal>
   );
 };
