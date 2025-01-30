@@ -181,7 +181,6 @@ def list_all_logs(
     order: Optional[str] = "desc",
     flow_id: Optional[str] = None,
 ):
-    # Check if user is admin
     if user_id:
         if "admin" not in user.roles:
             raise HTTPException(
