@@ -414,44 +414,52 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
+        project:
           - path: router
             key: mira-client-router
-            run: ${{ needs.changes.outputs.router == 'true' }}
+            changed: ${{ needs.changes.outputs.router }}
           - path: service
             key: mira-client-service
-            run: ${{ needs.changes.outputs.service == 'true' }}
+            changed: ${{ needs.changes.outputs.service }}
           - path: cli
             key: mira-client-cli
-            run: ${{ needs.changes.outputs.cli == 'true' }}
+            changed: ${{ needs.changes.outputs.cli }}
           - path: playground
             key: mira-client-playground
-            run: ${{ needs.changes.outputs.playground == 'true' }}
+            changed: ${{ needs.changes.outputs.playground }}
           - path: sdk
             key: mira-client-sdk
-            run: ${{ needs.changes.outputs.sdk == 'true' }}
+            changed: ${{ needs.changes.outputs.sdk }}
     steps:
+      - name: Check Changes
+        id: check
+        run: |
+          if [[ "${{ matrix.project.changed }}" != "true" ]]; then
+            echo "Skip job for ${{ matrix.project.path }} - no changes detected"
+            exit 78  # Neutral exit code to skip without failing
+          fi
+
       - name: Checkout code
-        if: matrix.run
+        if: success()
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Set up JDK 11
-        if: matrix.run
+        if: success()
         uses: actions/setup-java@v4
         with:
           distribution: "adopt"
           java-version: "11"
 
       - name: SonarQube Scan
-        if: matrix.run
+        if: success()
         uses: sonarsource/sonarqube-scan-action@master
         with:
-          projectBaseDir: ${{ matrix.path }}
+          projectBaseDir: ${{ matrix.project.path }}
           args: >
             -Dsonar.organization=aroha-labs
-            -Dsonar.projectKey=${{ matrix.key }}
+            -Dsonar.projectKey=${{ matrix.project.key }}
             -Dsonar.sources=.
             -Dsonar.exclusions=**/tests/**,**/test/**
         env:
