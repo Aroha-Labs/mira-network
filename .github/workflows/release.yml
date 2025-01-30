@@ -414,7 +414,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        project:
+        include:
           - path: router
             key: mira-client-router
             changed: ${{ needs.changes.outputs.router }}
@@ -435,25 +435,28 @@ jobs:
         id: check
         run: |
           if [[ "${{ matrix.project.changed }}" != "true" ]]; then
-            echo "Skip job for ${{ matrix.project.path }} - no changes detected"
-            exit 78  # Neutral exit code to skip without failing
+            echo "run_scan=false" >> $GITHUB_OUTPUT
+            echo "Skipping scan for ${{ matrix.project.path }} - no changes detected"
+          else
+            echo "run_scan=true" >> $GITHUB_OUTPUT
+            echo "Running scan for ${{ matrix.project.path }}"
           fi
 
       - name: Checkout code
-        if: success()
+        if: steps.check.outputs.run_scan == 'true'
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Set up JDK 11
-        if: success()
+        if: steps.check.outputs.run_scan == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: "adopt"
           java-version: "11"
 
       - name: SonarQube Scan
-        if: success()
+        if: steps.check.outputs.run_scan == 'true'
         uses: sonarsource/sonarqube-scan-action@master
         with:
           projectBaseDir: ${{ matrix.project.path }}
