@@ -405,54 +405,47 @@ jobs:
   sonarqube:
     needs: changes
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - path: "router"
-            key: "mira-client-router"
-            enabled: ${{ needs.changes.outputs.router == 'true' }}
-          - path: "service"
-            key: "mira-client-service"
-            enabled: ${{ needs.changes.outputs.service == 'true' }}
-          - path: "cli"
-            key: "mira-client-cli"
-            enabled: ${{ needs.changes.outputs.cli == 'true' }}
-          - path: "playground"
-            key: "mira-client-playground"
-            enabled: ${{ needs.changes.outputs.playground == 'true' }}
-          - path: "sdk"
-            key: "mira-client-sdk"
-            enabled: ${{ needs.changes.outputs.sdk == 'true' }}
     if: |
       needs.changes.outputs.router == 'true' ||
       needs.changes.outputs.service == 'true' ||
       needs.changes.outputs.cli == 'true' ||
       needs.changes.outputs.playground == 'true' ||
       needs.changes.outputs.sdk == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - path: router
+            key: mira-client-router
+            run: ${{ needs.changes.outputs.router == 'true' }}
+          - path: service
+            key: mira-client-service
+            run: ${{ needs.changes.outputs.service == 'true' }}
+          - path: cli
+            key: mira-client-cli
+            run: ${{ needs.changes.outputs.cli == 'true' }}
+          - path: playground
+            key: mira-client-playground
+            run: ${{ needs.changes.outputs.playground == 'true' }}
+          - path: sdk
+            key: mira-client-sdk
+            run: ${{ needs.changes.outputs.sdk == 'true' }}
     steps:
-      - name: Check if scan should run
-        id: check
-        run: |
-          enabled="${{ matrix.enabled }}"
-          if [[ "$enabled" != "true" ]]; then
-            echo "Skipping SonarQube scan for ${{ matrix.path }} - no changes detected"
-            exit 0
-          fi
-          echo "Running SonarQube scan for ${{ matrix.path }}"
       - name: Checkout code
-        if: steps.check.conclusion == 'success' && matrix.enabled == 'true'
+        if: matrix.run
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - name: Set up JDK 11
-        if: steps.check.conclusion == 'success' && matrix.enabled == 'true'
+        if: matrix.run
         uses: actions/setup-java@v4
         with:
           distribution: "adopt"
           java-version: "11"
+
       - name: SonarQube Scan
-        if: steps.check.conclusion == 'success' && matrix.enabled == 'true'
+        if: matrix.run
         uses: sonarsource/sonarqube-scan-action@master
         with:
           projectBaseDir: ${{ matrix.path }}
