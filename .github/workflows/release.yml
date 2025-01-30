@@ -434,10 +434,12 @@ jobs:
       - name: Check if scan should run
         id: check
         run: |
-          if [[ "${{ matrix.enabled }}" != "true" ]]; then
+          enabled="${{ matrix.enabled }}"
+          if [[ "$enabled" != "true" ]]; then
             echo "Skipping SonarQube scan for ${{ matrix.path }} - no changes detected"
             exit 0
           fi
+          echo "Running SonarQube scan for ${{ matrix.path }}"
       - name: Checkout code
         if: steps.check.conclusion == 'success' && matrix.enabled == 'true'
         uses: actions/checkout@v4
