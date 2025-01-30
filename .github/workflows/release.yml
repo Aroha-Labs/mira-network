@@ -411,37 +411,46 @@ jobs:
         include:
           - path: "router"
             key: "mira-client-router"
-            enabled: ${{ needs.changes.outputs.router == true }}
+            enabled: ${{ needs.changes.outputs.router == 'true' }}
           - path: "service"
             key: "mira-client-service"
-            enabled: ${{ needs.changes.outputs.service == true }}
+            enabled: ${{ needs.changes.outputs.service == 'true' }}
           - path: "cli"
             key: "mira-client-cli"
-            enabled: ${{ needs.changes.outputs.cli == true }}
+            enabled: ${{ needs.changes.outputs.cli == 'true' }}
           - path: "playground"
             key: "mira-client-playground"
-            enabled: ${{ needs.changes.outputs.playground == true }}
+            enabled: ${{ needs.changes.outputs.playground == 'true' }}
           - path: "sdk"
             key: "mira-client-sdk"
-            enabled: ${{ needs.changes.outputs.sdk == true }}
+            enabled: ${{ needs.changes.outputs.sdk == 'true' }}
     if: |
-      needs.changes.outputs.router == true ||
-      needs.changes.outputs.service == true ||
-      needs.changes.outputs.cli == true ||
-      needs.changes.outputs.playground == true ||
-      needs.changes.outputs.sdk == true
+      needs.changes.outputs.router == 'true' ||
+      needs.changes.outputs.service == 'true' ||
+      needs.changes.outputs.cli == 'true' ||
+      needs.changes.outputs.playground == 'true' ||
+      needs.changes.outputs.sdk == 'true'
     steps:
+      - name: Check if scan should run
+        id: check
+        run: |
+          if [[ "${{ matrix.enabled }}" != "true" ]]; then
+            echo "Skipping SonarQube scan for ${{ matrix.path }} - no changes detected"
+            exit 0
+          fi
       - name: Checkout code
+        if: steps.check.conclusion == 'success' && matrix.enabled == 'true'
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Set up JDK 11
+        if: steps.check.conclusion == 'success' && matrix.enabled == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: "adopt"
           java-version: "11"
       - name: SonarQube Scan
-        if: ${{ matrix.enabled }}
+        if: steps.check.conclusion == 'success' && matrix.enabled == 'true'
         uses: sonarsource/sonarqube-scan-action@master
         with:
           projectBaseDir: ${{ matrix.path }}
