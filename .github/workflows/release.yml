@@ -411,25 +411,25 @@ jobs:
         include:
           - path: "router"
             key: "mira-client-router"
-            enabled: ${{ needs.changes.outputs.router == 'true' }}
+            enabled: ${{ needs.changes.outputs.router == true }}
           - path: "service"
             key: "mira-client-service"
-            enabled: ${{ needs.changes.outputs.service == 'true' }}
+            enabled: ${{ needs.changes.outputs.service == true }}
           - path: "cli"
             key: "mira-client-cli"
-            enabled: ${{ needs.changes.outputs.cli == 'true' }}
+            enabled: ${{ needs.changes.outputs.cli == true }}
           - path: "playground"
             key: "mira-client-playground"
-            enabled: ${{ needs.changes.outputs.playground == 'true' }}
+            enabled: ${{ needs.changes.outputs.playground == true }}
           - path: "sdk"
             key: "mira-client-sdk"
-            enabled: ${{ needs.changes.outputs.sdk == 'true' }}
+            enabled: ${{ needs.changes.outputs.sdk == true }}
     if: |
-      needs.changes.outputs.router == 'true' ||
-      needs.changes.outputs.service == 'true' ||
-      needs.changes.outputs.cli == 'true' ||
-      needs.changes.outputs.playground == 'true' ||
-      needs.changes.outputs.sdk == 'true'
+      needs.changes.outputs.router == true ||
+      needs.changes.outputs.service == true ||
+      needs.changes.outputs.cli == true ||
+      needs.changes.outputs.playground == true ||
+      needs.changes.outputs.sdk == true
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
