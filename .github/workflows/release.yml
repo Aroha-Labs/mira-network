@@ -405,12 +405,6 @@ jobs:
   sonarqube:
     needs: changes
     runs-on: ubuntu-latest
-    if: |
-      needs.changes.outputs.router == 'true' ||
-      needs.changes.outputs.service == 'true' ||
-      needs.changes.outputs.cli == 'true' ||
-      needs.changes.outputs.playground == 'true' ||
-      needs.changes.outputs.sdk == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -434,35 +428,30 @@ jobs:
       - name: Check Changes
         id: check
         run: |
-          if [[ "${{ matrix.project.changed }}" != "true" ]]; then
-            echo "run_scan=false" >> $GITHUB_OUTPUT
-            echo "Skipping scan for ${{ matrix.project.path }} - no changes detected"
-          else
-            echo "run_scan=true" >> $GITHUB_OUTPUT
-            echo "Running scan for ${{ matrix.project.path }}"
+          if [[ "${{ matrix.changed }}" != "true" ]]; then
+            echo "Skipping scan for ${{ matrix.path }} - no changes detected"
+            exit 0
           fi
+          echo "Running scan for ${{ matrix.path }}"
 
       - name: Checkout code
-        if: steps.check.outputs.run_scan == 'true'
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Set up JDK 11
-        if: steps.check.outputs.run_scan == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: "adopt"
           java-version: "11"
 
       - name: SonarQube Scan
-        if: steps.check.outputs.run_scan == 'true'
         uses: sonarsource/sonarqube-scan-action@master
         with:
-          projectBaseDir: ${{ matrix.project.path }}
+          projectBaseDir: ${{ matrix.path }}
           args: >
             -Dsonar.organization=aroha-labs
-            -Dsonar.projectKey=${{ matrix.project.key }}
+            -Dsonar.projectKey=${{ matrix.key }}
             -Dsonar.sources=.
             -Dsonar.exclusions=**/tests/**,**/test/**
         env:
