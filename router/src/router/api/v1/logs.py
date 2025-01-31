@@ -331,46 +331,7 @@ def get_logs_metrics(
 ):
     """Get aggregated metrics without raw logs"""
 
-    # Base query
-    query = db.query(ApiLogs)
-
-    # Access control
-    if user_id:
-        if "admin" not in user.roles:
-            raise HTTPException(
-                status_code=403, detail="Only admins can query other users' logs"
-            )
-        query = query.filter(ApiLogs.user_id == user_id)
-    else:
-        if "admin" not in user.roles:
-            query = query.filter(ApiLogs.user_id == user.id)
-
-    # Set default date range based on time_bucket if not provided
-    now = datetime.utcnow()
-    if not start_date:
-        if time_bucket == "hour":
-            start_date = (now - timedelta(days=1)).isoformat()
-        elif time_bucket == "day":
-            start_date = (now - timedelta(days=7)).isoformat()
-        elif time_bucket == "week":
-            start_date = (now - timedelta(days=30)).isoformat()
-        else:  # month
-            start_date = (now - timedelta(days=90)).isoformat()
-
-    if not end_date:
-        end_date = now.isoformat()
-
-    # Apply filters
-    if machine_id:
-        query = query.filter(ApiLogs.machine_id == machine_id)
-    if model:
-        query = query.filter(ApiLogs.model == model)
-    if api_key_id:
-        query = query.filter(ApiLogs.api_key_id == api_key_id)
-    if flow_id:
-        query = query.filter(ApiLogs.flow_id == flow_id)
-
-    # Get time bucket function based on parameter
+    # Get time bucket function
     time_bucket_fn = {
         "hour": lambda x: func.date_trunc("hour", x),
         "day": lambda x: func.date_trunc("day", x),
@@ -378,88 +339,134 @@ def get_logs_metrics(
         "month": lambda x: func.date_trunc("month", x),
     }[time_bucket]
 
-    # Get time series data
-    time_series = db.execute(
-        select(
-            time_bucket_fn(ApiLogs.created_at).label("timestamp"),
-            func.count().label("calls"),
-            func.coalesce(func.sum(ApiLogs.prompt_tokens), 0).label("prompt_tokens"),
-            func.coalesce(func.sum(ApiLogs.completion_tokens), 0).label(
-                "completion_tokens"
+    # Build the aggregated query directly
+    query = select(
+        time_bucket_fn(ApiLogs.created_at).label("timestamp"),
+        ApiLogs.model,
+        func.count().label("calls"),
+        func.coalesce(func.sum(ApiLogs.prompt_tokens), 0).label("prompt_tokens"),
+        func.coalesce(func.sum(ApiLogs.completion_tokens), 0).label(
+            "completion_tokens"
+        ),
+        func.coalesce(func.avg(ApiLogs.total_response_time), 0.0).label(
+            "avg_response_time"
+        ),
+        func.coalesce(func.avg(ApiLogs.ttft), 0.0).label("avg_ttft"),
+        func.coalesce(
+            func.sum(
+                ApiLogs.prompt_tokens
+                * func.cast(ApiLogs.model_pricing["prompt_token"].astext, Float)
             ),
-            func.coalesce(func.avg(ApiLogs.total_response_time), 0).label(
-                "avg_response_time"
+            0.0,
+        ).label("prompt_cost"),
+        func.coalesce(
+            func.sum(
+                ApiLogs.completion_tokens
+                * func.cast(ApiLogs.model_pricing["completion_token"].astext, Float)
             ),
-            func.coalesce(func.avg(ApiLogs.ttft), 0).label("avg_ttft"),
-            func.coalesce(
-                func.sum(
-                    ApiLogs.prompt_tokens
-                    * func.cast(ApiLogs.model_pricing["prompt_token"].astext, Float)
-                ),
-                0,
-            ).label("prompt_cost"),
-            func.coalesce(
-                func.sum(
-                    ApiLogs.completion_tokens
-                    * func.cast(ApiLogs.model_pricing["completion_token"].astext, Float)
-                ),
-                0,
-            ).label("completion_cost"),
-        )
-        .select_from(query.subquery())
-        .group_by(time_bucket_fn(ApiLogs.created_at))
-        .order_by(time_bucket_fn(ApiLogs.created_at))
-        .where(time_bucket_fn(ApiLogs.created_at) >= start_date)
-        .where(time_bucket_fn(ApiLogs.created_at) <= end_date)
-    ).all()
+            0.0,
+        ).label("completion_cost"),
+    )
 
-    # Get model distribution
-    model_distribution = db.execute(
-        select(ApiLogs.model, func.count().label("count"))
-        .select_from(query.subquery())
-        .group_by(ApiLogs.model)
-    ).all()
+    # Access control
+    if user_id:
+        if "admin" not in user.roles:
+            raise HTTPException(
+                status_code=403, detail="Only admins can query other users' logs"
+            )
+        query = query.where(ApiLogs.user_id == user_id)
+    else:
+        if "admin" not in user.roles:
+            query = query.where(ApiLogs.user_id == user.id)
 
-    # Calculate weighted averages and totals safely
-    total_calls = sum(row.calls for row in time_series)
+    # Apply filters
+    if start_date:
+        query = query.where(ApiLogs.created_at >= start_date)
+    if end_date:
+        query = query.where(ApiLogs.created_at <= end_date)
+    if machine_id:
+        query = query.where(ApiLogs.machine_id == machine_id)
+    if model:
+        query = query.where(ApiLogs.model == model)
+    if api_key_id:
+        query = query.where(ApiLogs.api_key_id == api_key_id)
+    if flow_id:
+        query = query.where(ApiLogs.flow_id == flow_id)
 
-    def safe_weighted_avg(values, weights):
-        if not values or total_calls == 0:
-            return 0
-        return sum(v * w for v, w in zip(values, weights)) / total_calls
+    # Add grouping and ordering
+    query = query.group_by(time_bucket_fn(ApiLogs.created_at), ApiLogs.model).order_by(
+        time_bucket_fn(ApiLogs.created_at)
+    )
+
+    print(query)
+
+    # Execute the query once
+    results = db.execute(query).all()
+
+    # Process results safely
+    time_series = {}
+    model_distribution = {}
+
+    for row in results:
+        timestamp = row.timestamp.isoformat()
+        if timestamp not in time_series:
+            time_series[timestamp] = {
+                "timestamp": timestamp,
+                "calls": 0,
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "avg_response_time": 0.0,
+                "avg_ttft": 0.0,
+                "prompt_cost": 0.0,
+                "completion_cost": 0.0,
+            }
+
+        time_series[timestamp]["calls"] += row.calls or 0
+        time_series[timestamp]["prompt_tokens"] += row.prompt_tokens or 0
+        time_series[timestamp]["completion_tokens"] += row.completion_tokens or 0
+        time_series[timestamp]["avg_response_time"] = row.avg_response_time or 0.0
+        time_series[timestamp]["avg_ttft"] = row.avg_ttft or 0.0
+        time_series[timestamp]["prompt_cost"] += row.prompt_cost or 0.0
+        time_series[timestamp]["completion_cost"] += row.completion_cost or 0.0
+
+        if row.model not in model_distribution:
+            model_distribution[row.model] = {
+                "model": row.model,
+                "count": row.calls or 0,
+            }
+
+    # Safe summary calculations
+    total_calls = sum(ts["calls"] for ts in time_series.values())
 
     return {
         "summary": {
             "total_calls": total_calls,
             "total_tokens": sum(
-                row.prompt_tokens + row.completion_tokens for row in time_series
+                (ts["prompt_tokens"] or 0) + (ts["completion_tokens"] or 0)
+                for ts in time_series.values()
             ),
-            "avg_response_time": safe_weighted_avg(
-                [row.avg_response_time for row in time_series],
-                [row.calls for row in time_series],
+            "avg_response_time": (
+                sum(
+                    (ts["avg_response_time"] or 0.0) * ts["calls"]
+                    for ts in time_series.values()
+                )
+                / total_calls
+                if total_calls > 0
+                else 0.0
             ),
-            "avg_ttft": safe_weighted_avg(
-                [row.avg_ttft for row in time_series],
-                [row.calls for row in time_series],
+            "avg_ttft": (
+                sum(
+                    (ts["avg_ttft"] or 0.0) * ts["calls"] for ts in time_series.values()
+                )
+                / total_calls
+                if total_calls > 0
+                else 0.0
             ),
             "total_cost": sum(
-                row.prompt_cost + row.completion_cost for row in time_series
+                (ts["prompt_cost"] or 0.0) + (ts["completion_cost"] or 0.0)
+                for ts in time_series.values()
             ),
         },
-        "time_series": [
-            {
-                "timestamp": entry.timestamp.isoformat(),
-                "calls": entry.calls,
-                "prompt_tokens": entry.prompt_tokens,
-                "completion_tokens": entry.completion_tokens,
-                "avg_response_time": entry.avg_response_time,
-                "avg_ttft": entry.avg_ttft,
-                "prompt_cost": entry.prompt_cost,
-                "completion_cost": entry.completion_cost,
-            }
-            for entry in time_series
-        ],
-        "model_distribution": [
-            {"model": model, "count": count} for model, count in model_distribution
-        ],
+        "time_series": list(time_series.values()),
+        "model_distribution": list(model_distribution.values()),
     }
