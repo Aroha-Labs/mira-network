@@ -6,6 +6,8 @@ from src.router.models.logs import ApiLogs
 from src.router.db.session import get_session
 from src.router.core.security import verify_user
 from sqlalchemy import func
+from sqlalchemy.types import Float
+from datetime import datetime, timedelta
 
 router = APIRouter()
 
@@ -312,3 +314,152 @@ def total_inference_calls(
         select(func.count()).select_from(ApiLogs).where(ApiLogs.user_id == user.id)
     ).first()
     return {"total": total}
+
+
+@router.get("/api-logs/metrics")
+def get_logs_metrics(
+    db: Session = Depends(get_session),
+    user: User = Depends(verify_user),
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    machine_id: Optional[str] = None,
+    model: Optional[str] = None,
+    api_key_id: Optional[int] = None,
+    user_id: Optional[str] = None,
+    flow_id: Optional[str] = None,
+    time_bucket: str = "hour",  # hour, day, week, month
+):
+    """Get aggregated metrics without raw logs"""
+
+    # Base query
+    query = db.query(ApiLogs)
+
+    # Access control
+    if user_id:
+        if "admin" not in user.roles:
+            raise HTTPException(
+                status_code=403, detail="Only admins can query other users' logs"
+            )
+        query = query.filter(ApiLogs.user_id == user_id)
+    else:
+        if "admin" not in user.roles:
+            query = query.filter(ApiLogs.user_id == user.id)
+
+    # Set default date range based on time_bucket if not provided
+    now = datetime.utcnow()
+    if not start_date:
+        if time_bucket == "hour":
+            start_date = (now - timedelta(days=1)).isoformat()
+        elif time_bucket == "day":
+            start_date = (now - timedelta(days=7)).isoformat()
+        elif time_bucket == "week":
+            start_date = (now - timedelta(days=30)).isoformat()
+        else:  # month
+            start_date = (now - timedelta(days=90)).isoformat()
+
+    if not end_date:
+        end_date = now.isoformat()
+
+    # Apply filters
+    if machine_id:
+        query = query.filter(ApiLogs.machine_id == machine_id)
+    if model:
+        query = query.filter(ApiLogs.model == model)
+    if api_key_id:
+        query = query.filter(ApiLogs.api_key_id == api_key_id)
+    if flow_id:
+        query = query.filter(ApiLogs.flow_id == flow_id)
+
+    # Get time bucket function based on parameter
+    time_bucket_fn = {
+        "hour": lambda x: func.date_trunc("hour", x),
+        "day": lambda x: func.date_trunc("day", x),
+        "week": lambda x: func.date_trunc("week", x),
+        "month": lambda x: func.date_trunc("month", x),
+    }[time_bucket]
+
+    # Get time series data
+    time_series = db.execute(
+        select(
+            time_bucket_fn(ApiLogs.created_at).label("timestamp"),
+            func.count().label("calls"),
+            func.coalesce(func.sum(ApiLogs.prompt_tokens), 0).label("prompt_tokens"),
+            func.coalesce(func.sum(ApiLogs.completion_tokens), 0).label(
+                "completion_tokens"
+            ),
+            func.coalesce(func.avg(ApiLogs.total_response_time), 0).label(
+                "avg_response_time"
+            ),
+            func.coalesce(func.avg(ApiLogs.ttft), 0).label("avg_ttft"),
+            func.coalesce(
+                func.sum(
+                    ApiLogs.prompt_tokens
+                    * func.cast(ApiLogs.model_pricing["prompt_token"].astext, Float)
+                ),
+                0,
+            ).label("prompt_cost"),
+            func.coalesce(
+                func.sum(
+                    ApiLogs.completion_tokens
+                    * func.cast(ApiLogs.model_pricing["completion_token"].astext, Float)
+                ),
+                0,
+            ).label("completion_cost"),
+        )
+        .select_from(query.subquery())
+        .group_by(time_bucket_fn(ApiLogs.created_at))
+        .order_by(time_bucket_fn(ApiLogs.created_at))
+        .where(time_bucket_fn(ApiLogs.created_at) >= start_date)
+        .where(time_bucket_fn(ApiLogs.created_at) <= end_date)
+    ).all()
+
+    # Get model distribution
+    model_distribution = db.execute(
+        select(ApiLogs.model, func.count().label("count"))
+        .select_from(query.subquery())
+        .group_by(ApiLogs.model)
+    ).all()
+
+    # Calculate weighted averages and totals safely
+    total_calls = sum(row.calls for row in time_series)
+
+    def safe_weighted_avg(values, weights):
+        if not values or total_calls == 0:
+            return 0
+        return sum(v * w for v, w in zip(values, weights)) / total_calls
+
+    return {
+        "summary": {
+            "total_calls": total_calls,
+            "total_tokens": sum(
+                row.prompt_tokens + row.completion_tokens for row in time_series
+            ),
+            "avg_response_time": safe_weighted_avg(
+                [row.avg_response_time for row in time_series],
+                [row.calls for row in time_series],
+            ),
+            "avg_ttft": safe_weighted_avg(
+                [row.avg_ttft for row in time_series],
+                [row.calls for row in time_series],
+            ),
+            "total_cost": sum(
+                row.prompt_cost + row.completion_cost for row in time_series
+            ),
+        },
+        "time_series": [
+            {
+                "timestamp": entry.timestamp.isoformat(),
+                "calls": entry.calls,
+                "prompt_tokens": entry.prompt_tokens,
+                "completion_tokens": entry.completion_tokens,
+                "avg_response_time": entry.avg_response_time,
+                "avg_ttft": entry.avg_ttft,
+                "prompt_cost": entry.prompt_cost,
+                "completion_cost": entry.completion_cost,
+            }
+            for entry in time_series
+        ],
+        "model_distribution": [
+            {"model": model, "count": count} for model, count in model_distribution
+        ],
+    }

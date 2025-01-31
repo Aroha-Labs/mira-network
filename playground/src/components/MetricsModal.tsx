@@ -65,6 +65,31 @@ const ChartShimmer = () => (
   <div className="w-full h-full rounded-lg animate-pulse bg-gray-200/60" />
 );
 
+// Add new types for the metrics response
+interface MetricsResponse {
+  summary: {
+    total_calls: number;
+    total_tokens: number;
+    avg_response_time: number;
+    avg_ttft: number;
+    total_cost: number;
+  };
+  time_series: {
+    timestamp: string;
+    calls: number;
+    prompt_tokens: number;
+    completion_tokens: number;
+    avg_response_time: number;
+    avg_ttft: number;
+    prompt_cost: number;
+    completion_cost: number;
+  }[];
+  model_distribution: {
+    model: string;
+    count: number;
+  }[];
+}
+
 const MetricsModal = ({
   onClose,
   title,
@@ -122,10 +147,28 @@ const MetricsModal = ({
     return date;
   }, [dateRangeState]);
 
-  const { data, isLoading, error } = useQuery<{ logs: ApiLog[]; total: number }>({
-    queryKey: ["metrics-logs", machineId, apiKeyId, userId, modelFilter, dateRange, page],
+  // Replace the existing query with the new metrics endpoint
+  const { data, isLoading, error } = useQuery<MetricsResponse>({
+    queryKey: [
+      "metrics",
+      machineId,
+      apiKeyId,
+      userId,
+      modelFilter,
+      dateRange,
+      dateRangeState,
+    ],
     queryFn: async () => {
-      const resp = await api.get("/api-logs", {
+      const timeBucket =
+        dateRangeState === "1"
+          ? "hour"
+          : dateRangeState === "7"
+            ? "day"
+            : dateRangeState === "30"
+              ? "week"
+              : "month";
+
+      const resp = await api.get("/api-logs/metrics", {
         params: {
           ...(flowId && { flow_id: flowId }),
           ...(machineId && { machine_id: machineId }),
@@ -134,8 +177,7 @@ const MetricsModal = ({
           ...(modelFilter && { model: modelFilter }),
           ...(dateRange?.startDate && { start_date: dateRange.startDate }),
           ...(dateRange?.endDate && { end_date: dateRange.endDate }),
-          page_size: PAGE_SIZE,
-          page,
+          time_bucket: timeBucket,
         },
       });
       return resp.data;
@@ -143,192 +185,43 @@ const MetricsModal = ({
     enabled: !!userSession?.access_token,
   });
 
-  const metrics = useMemo(() => {
-    if (!data?.logs) return null;
-    const logs = data.logs;
-    const totalCalls = logs.length;
-    const totalTokens = logs.reduce((sum, log) => sum + log.total_tokens, 0);
-    const avgResponseTime =
-      logs.reduce((sum, log) => sum + log.total_response_time, 0) / totalCalls;
-    const avgTTFT = logs.reduce((sum, log) => sum + (log.ttft || 0), 0) / totalCalls;
-    const totalCost = logs.reduce((sum, log) => {
-      if (!log.model_pricing) return sum;
-      return (
-        sum +
-        (log.prompt_tokens * log.model_pricing.prompt_token +
-          log.completion_tokens * log.model_pricing.completion_token)
-      );
-    }, 0);
-
-    const modelUsage = logs.reduce(
-      (acc, log) => {
-        acc[log.model] = (acc[log.model] || 0) + 1;
-        return acc;
-      },
-      {} as Record<string, number>
-    );
-
-    return {
-      totalCalls,
-      totalTokens,
-      avgResponseTime,
-      avgTTFT,
-      totalCost,
-      modelUsage,
-    };
-  }, [data]);
-
-  const groupData = useCallback(
-    (logs: ApiLog[]) => {
-      const groups = new Map<string, ApiLog[]>();
-      const startDate = getStartDate();
-      const endDate = new Date();
-
-      // Generate all possible keys with proper ordering
-      const generateTimeSlots = () => {
-        const slots: { key: string; date: Date }[] = [];
-        let current = startDate;
-
-        while (isBefore(current, endDate)) {
-          let key = "";
-          switch (dateRangeState) {
-            case "1":
-              const hour = startOfHour(current).getHours();
-              const fourHourBlock = Math.floor(hour / 4);
-              key = `${format(current, "yyyy-MM-dd")}-${fourHourBlock}`;
-              slots.push({ key, date: current });
-              current = addHours(current, 4);
-              break;
-            case "7":
-              key = format(startOfDay(current), "yyyy-MM-dd");
-              slots.push({ key, date: current });
-              current = addDays(current, 1);
-              break;
-            case "30":
-              key = format(startOfWeek(current), "yyyy-MM-dd");
-              slots.push({ key, date: current });
-              current = addWeeks(current, 1);
-              break;
-            case "90":
-              key = format(startOfMonth(current), "yyyy-MM");
-              slots.push({ key, date: current });
-              current = addMonths(current, 1);
-              break;
-          }
-        }
-        return slots;
-      };
-
-      const timeSlots = generateTimeSlots();
-      timeSlots.forEach(({ key }) => {
-        groups.set(key, []);
-      });
-
-      // Group logs into slots
-      logs.forEach((log) => {
-        const date = parseISO(log.created_at);
-        const key = timeSlots.find((slot) => {
-          const nextSlot = timeSlots[timeSlots.indexOf(slot) + 1];
-          return (
-            (!nextSlot || isBefore(date, nextSlot.date)) && !isBefore(date, slot.date)
-          );
-        })?.key;
-
-        if (key && groups.has(key)) {
-          groups.get(key)?.push(log);
-        }
-      });
-
-      const getGroupLabel = (date: Date) => {
-        switch (dateRangeState) {
-          case "1":
-            const hour = startOfHour(date).getHours();
-            const hourBlock = Math.floor(hour / 4) * 4;
-            return `${hourBlock}:00-${hourBlock + 4}:00`;
-          case "7":
-            return format(date, "EEE, MMM d");
-          case "30":
-            return `Week ${format(date, "w")}`;
-          case "90":
-            return format(date, "MMM, yy");
-          default:
-            return format(date, "MMM d");
-        }
-      };
-
-      return {
-        keys: timeSlots.map(({ key }) => key),
-        labels: timeSlots.map(({ date }) => getGroupLabel(date)),
-        data: timeSlots.map(({ key }) => groups.get(key) || []),
-      };
-    },
-    [dateRangeState, getStartDate]
-  );
-
   const chartData = useMemo(() => {
-    if (!data?.logs || !metrics) return null;
+    if (!data) return null;
 
-    const grouped = groupData(
-      [...data.logs].sort(
-        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-      )
-    );
-
-    // Add calls data
-    const callsData = grouped.data.map((logs) => logs.length);
-
-    // Split tokens into prompt and completion, and calculate total
-    const promptTokens = grouped.data.map((logs) =>
-      logs.reduce((sum, log) => sum + log.prompt_tokens, 0)
-    );
-    const completionTokens = grouped.data.map((logs) =>
-      logs.reduce((sum, log) => sum + log.completion_tokens, 0)
-    );
-    const totalTokens = promptTokens.map((p, i) => p + completionTokens[i]);
-
-    const responseTimeData = grouped.data.map(
-      (logs) => logs.reduce((sum, log) => sum + log.total_response_time, 0) / logs.length
-    );
-
-    // Split costs into prompt and completion
-    const promptCost = grouped.data.map((logs) =>
-      logs.reduce((sum, log) => {
-        if (!log.model_pricing) return sum;
-        return sum + log.prompt_tokens * log.model_pricing.prompt_token;
-      }, 0)
-    );
-
-    const completionCost = grouped.data.map((logs) =>
-      logs.reduce((sum, log) => {
-        if (!log.model_pricing) return sum;
-        return sum + log.completion_tokens * log.model_pricing.completion_token;
-      }, 0)
-    );
-
-    const ttftData = grouped.data.map(
-      (logs) => logs.reduce((sum, log) => sum + (log.ttft || 0), 0) / (logs.length || 1)
-    );
-
-    const modelData = Object.entries(metrics.modelUsage);
+    const labels = data.time_series.map((entry) => {
+      const date = parseISO(entry.timestamp);
+      switch (dateRangeState) {
+        case "1":
+          return format(date, "HH:mm");
+        case "7":
+          return format(date, "EEE, MMM d");
+        case "30":
+          return `Week ${format(date, "w")}`;
+        case "90":
+          return format(date, "MMM, yy");
+        default:
+          return format(date, "MMM d");
+      }
+    });
 
     return {
       calls: {
-        labels: grouped.labels,
+        labels,
         datasets: [
           {
             label: "Number of Calls",
-            data: callsData,
-            backgroundColor: "rgba(99, 102, 241, 0.5)", // Different color from cost
+            data: data.time_series.map((entry) => entry.calls),
+            backgroundColor: "rgba(99, 102, 241, 0.5)",
           },
         ],
       },
       tokens: {
-        labels: grouped.labels,
+        labels,
         datasets: [
           {
             type: "bar" as const,
             label: "Completion Tokens",
-            data: completionTokens,
+            data: data.time_series.map((entry) => entry.completion_tokens),
             backgroundColor: "rgba(75, 192, 192, 0.5)",
             stack: "tokens",
             order: 2,
@@ -336,7 +229,7 @@ const MetricsModal = ({
           {
             type: "bar" as const,
             label: "Prompt Tokens",
-            data: promptTokens,
+            data: data.time_series.map((entry) => entry.prompt_tokens),
             backgroundColor: "rgba(54, 162, 235, 0.5)",
             stack: "tokens",
             order: 2,
@@ -344,7 +237,9 @@ const MetricsModal = ({
           {
             type: "line" as const,
             label: "Total Tokens",
-            data: totalTokens,
+            data: data.time_series.map(
+              (entry) => entry.prompt_tokens + entry.completion_tokens
+            ),
             borderColor: "rgb(234, 179, 8)",
             borderWidth: 2,
             tension: 0.1,
@@ -356,49 +251,49 @@ const MetricsModal = ({
         ],
       },
       responseTime: {
-        labels: grouped.labels,
+        labels,
         datasets: [
           {
             label: "Response Time (ms)",
-            data: responseTimeData,
+            data: data.time_series.map((entry) => entry.avg_response_time),
             borderColor: "rgb(255, 99, 132)",
             tension: 0.1,
           },
         ],
       },
       cost: {
-        labels: grouped.labels,
+        labels,
         datasets: [
           {
             label: "Completion Cost",
-            data: completionCost,
+            data: data.time_series.map((entry) => entry.completion_cost),
             backgroundColor: "rgba(75, 192, 192, 0.5)",
             stack: "cost",
           },
           {
             label: "Prompt Cost",
-            data: promptCost,
+            data: data.time_series.map((entry) => entry.prompt_cost),
             backgroundColor: "rgba(54, 162, 235, 0.5)",
             stack: "cost",
           },
         ],
       },
       ttft: {
-        labels: grouped.labels,
+        labels,
         datasets: [
           {
             label: "Time to First Token (ms)",
-            data: ttftData,
-            borderColor: "rgb(168, 85, 247)", // Purple color
+            data: data.time_series.map((entry) => entry.avg_ttft),
+            borderColor: "rgb(168, 85, 247)",
             tension: 0.1,
           },
         ],
       },
       models: {
-        labels: modelData.map(([model]) => model),
+        labels: data.model_distribution.map((entry) => entry.model),
         datasets: [
           {
-            data: modelData.map(([_, count]) => count),
+            data: data.model_distribution.map((entry) => entry.count),
             backgroundColor: [
               "rgba(255, 99, 132, 0.5)",
               "rgba(54, 162, 235, 0.5)",
@@ -409,7 +304,7 @@ const MetricsModal = ({
         ],
       },
     };
-  }, [data, metrics, groupData]);
+  }, [data, dateRangeState]);
 
   // Update chart options for the tokens chart
   const getChartOptions = useCallback((type: string) => {
@@ -570,7 +465,7 @@ const MetricsModal = ({
       );
     }
 
-    if (!metrics || !chartData) {
+    if (!data) {
       return <div className="text-center text-gray-600">No data available</div>;
     }
 
@@ -579,7 +474,7 @@ const MetricsModal = ({
         {/* Date range buttons */}
         <div className="bg-white px-2 py-1.5 rounded-lg shadow-sm border border-gray-100 flex justify-between items-center">
           <div className="text-sm text-gray-500">
-            {data?.total ? `${data.total} total logs` : ""}
+            {data.time_series.length ? `${data.time_series.length} total logs` : ""}
           </div>
           <div className="flex gap-1.5 overflow-x-auto">
             {[
@@ -606,12 +501,12 @@ const MetricsModal = ({
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {renderMetricBlock(
             "Cost Distribution",
-            `$${metrics.totalCost.toFixed(4)}`,
+            `$${data.summary.total_cost.toFixed(4)}`,
             chartData && <Bar data={chartData.cost} options={getChartOptions("cost")} />
           )}
           {renderMetricBlock(
             "Token Usage",
-            metrics.totalTokens.toLocaleString(),
+            data.summary.total_tokens.toLocaleString(),
             chartData && (
               <Chart
                 type="bar"
@@ -622,12 +517,12 @@ const MetricsModal = ({
           )}
           {renderMetricBlock(
             "Time to First Token",
-            `${metrics.avgTTFT.toFixed(2)}ms`,
+            `${data.summary.avg_ttft.toFixed(2)}ms`,
             chartData && <Line data={chartData.ttft} options={chartOptions} />
           )}
           {renderMetricBlock(
             "Avg Response Time",
-            `${metrics.avgResponseTime.toFixed(2)}ms`,
+            `${data.summary.avg_response_time.toFixed(2)}ms`,
             chartData && <Line data={chartData.responseTime} options={chartOptions} />
           )}
         </div>
@@ -640,14 +535,16 @@ const MetricsModal = ({
           <div className="p-3">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div className="space-y-1.5 text-sm">
-                {Object.entries(metrics.modelUsage).map(([model, count]) => (
+                {data.model_distribution.map((entry) => (
                   <div
-                    key={model}
+                    key={entry.model}
                     className="flex items-center justify-between px-2 py-1 rounded bg-gray-50"
                   >
-                    <span className="mr-2 text-xs text-gray-600 truncate">{model}</span>
+                    <span className="mr-2 text-xs text-gray-600 truncate">
+                      {entry.model}
+                    </span>
                     <span className="text-xs font-medium text-gray-900">
-                      {count} calls
+                      {entry.count} calls
                     </span>
                   </div>
                 ))}
@@ -680,48 +577,10 @@ const MetricsModal = ({
         {/* Total Calls */}
         {renderMetricBlock(
           "Total Calls",
-          metrics.totalCalls.toString(),
+          data.summary.total_calls.toString(),
           chartData && <Bar data={chartData.calls} options={chartOptions} />,
           true
         )}
-      </div>
-    );
-  };
-
-  // Add pagination control
-  const renderPagination = () => {
-    if (!data?.total) return null;
-
-    const totalPages = Math.ceil(data.total / PAGE_SIZE);
-    if (totalPages <= 1) return null;
-
-    return (
-      <div className="flex items-center justify-end gap-2 mt-4">
-        <button
-          onClick={() => setPage((p) => Math.max(1, p - 1))}
-          disabled={page === 1}
-          className={`px-3 py-1 text-sm rounded-md ${
-            page === 1
-              ? "bg-gray-100 text-gray-400"
-              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-          }`}
-        >
-          Previous
-        </button>
-        <span className="text-sm text-gray-600">
-          Page {page} of {totalPages}
-        </span>
-        <button
-          onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-          disabled={page === totalPages}
-          className={`px-3 py-1 text-sm rounded-md ${
-            page === totalPages
-              ? "bg-gray-100 text-gray-400"
-              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-          }`}
-        >
-          Next
-        </button>
       </div>
     );
   };
@@ -745,37 +604,7 @@ const MetricsModal = ({
       }
       maxWidth="sm:max-w-6xl"
     >
-      <div className="space-y-4">
-        {/* Date range buttons */}
-        {/* <div className="bg-white px-2 py-1.5 rounded-lg shadow-sm border border-gray-100 flex justify-between items-center">
-          <div className="text-sm text-gray-500">
-            {data?.total ? `${data.total} total logs` : ""}
-          </div>
-          <div className="flex gap-1.5 overflow-x-auto">
-            {[
-              { value: "1", label: "24h" },
-              { value: "7", label: "7d" },
-              { value: "30", label: "30d" },
-              { value: "90", label: "3m" },
-            ].map(({ value, label }) => (
-              <button
-                key={value}
-                onClick={() => setDateRangeState(value)}
-                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors duration-200 ${
-                  dateRangeState === value
-                    ? "bg-blue-500 text-white shadow-sm"
-                    : "bg-gray-50 text-gray-600 hover:bg-gray-100"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div> */}
-
-        {renderContent()}
-        {renderPagination()}
-      </div>
+      <div className="space-y-4">{renderContent()}</div>
     </Modal>
   );
 };
