@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { ApiLog } from "src/types/api-log";
 import { useSession } from "src/hooks/useSession";
 import Modal from "./Modal";
 import { useState, useMemo, useCallback } from "react";
@@ -16,19 +15,7 @@ import {
   ArcElement,
 } from "chart.js";
 import { Line, Bar, Doughnut, Chart } from "react-chartjs-2";
-import {
-  format,
-  startOfHour,
-  startOfDay,
-  startOfWeek,
-  startOfMonth,
-  addHours,
-  addDays,
-  addWeeks,
-  addMonths,
-  isBefore,
-  parseISO,
-} from "date-fns";
+import { format, parseISO } from "date-fns";
 import api from "src/lib/axios";
 
 ChartJS.register(
@@ -102,8 +89,6 @@ const MetricsModal = ({
 }: MetricsModalProps) => {
   const { data: userSession } = useSession();
   const [dateRangeState, setDateRangeState] = useState("7");
-  const [page, setPage] = useState(1);
-  const PAGE_SIZE = 10000; // Adjust based on your needs
 
   const chartOptions = useMemo(
     () => ({
@@ -128,24 +113,24 @@ const MetricsModal = ({
     []
   );
 
-  const getStartDate = useCallback(() => {
-    const date = new Date();
-    switch (dateRangeState) {
-      case "1":
-        date.setDate(date.getDate() - 1);
-        break;
-      case "7":
-        date.setDate(date.getDate() - 7);
-        break;
-      case "30":
-        date.setDate(date.getDate() - 30);
-        break;
-      case "90":
-        date.setDate(date.getDate() - 90);
-        break;
-    }
-    return date;
-  }, [dateRangeState]);
+  // const getStartDate = useCallback(() => {
+  //   const date = new Date();
+  //   switch (dateRangeState) {
+  //     case "1":
+  //       date.setDate(date.getDate() - 1);
+  //       break;
+  //     case "7":
+  //       date.setDate(date.getDate() - 7);
+  //       break;
+  //     case "30":
+  //       date.setDate(date.getDate() - 30);
+  //       break;
+  //     case "90":
+  //       date.setDate(date.getDate() - 90);
+  //       break;
+  //   }
+  //   return date;
+  // }, [dateRangeState]);
 
   // Replace the existing query with the new metrics endpoint
   const { data, isLoading, error } = useQuery<MetricsResponse>({
