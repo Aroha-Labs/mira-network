@@ -339,7 +339,21 @@ def get_logs_metrics(
         "month": lambda x: func.date_trunc("month", x),
     }[time_bucket]
 
-    # Build the aggregated query directly
+    # Get default time range based on bucket
+    end_dt = datetime.fromisoformat(end_date) if end_date else datetime.utcnow()
+    if not start_date:
+        start_dt = end_dt - timedelta(
+            days={
+                "hour": 1,  # Last 24 hours
+                "day": 7,  # Last week
+                "week": 30,  # Last month
+                "month": 365,  # Last year
+            }[time_bucket]
+        )
+    else:
+        start_dt = datetime.fromisoformat(start_date)
+
+    # Build query with time bucket and date filtering
     query = select(
         time_bucket_fn(ApiLogs.created_at).label("timestamp"),
         ApiLogs.model,
@@ -366,7 +380,7 @@ def get_logs_metrics(
             ),
             0.0,
         ).label("completion_cost"),
-    )
+    ).where(ApiLogs.created_at.between(start_dt, end_dt))
 
     # Access control
     if user_id:
