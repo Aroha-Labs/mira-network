@@ -4,6 +4,7 @@ from .logs import ApiLogs
 from .machines import Machine
 from .user import User, UserCreditsHistory
 from .system_settings import SystemSettings
+from .wallet import Wallet
 
 __all__ = [
     "Flows",
@@ -13,4 +14,5 @@ __all__ = [
     "ApiLogs",
     "Machine",
     "SystemSettings",
+    "Wallet",
 ]

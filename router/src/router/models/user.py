@@ -1,9 +1,11 @@
 from sqlmodel import SQLModel, Field, Column, Index
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from datetime import datetime
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy import DateTime, func, text, Float
 import uuid
+from sqlalchemy.orm import Relationship
+from .wallet import Wallet
 
 
 class UserCreditsHistory(SQLModel, table=True):
