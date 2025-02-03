@@ -5,6 +5,7 @@ from .machines import Machine
 from .user import User, UserCreditsHistory
 from .system_settings import SystemSettings
 from .wallet import Wallet
+from .thread import Thread
 
 __all__ = [
     "Flows",
@@ -15,4 +16,5 @@ __all__ = [
     "Machine",
     "SystemSettings",
     "Wallet",
+    "Thread",
 ]

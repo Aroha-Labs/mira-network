@@ -21,12 +21,14 @@ from src.router.core.security import verify_user
 from src.router.schemas.wallet import (
     WalletCreate,
     WalletResponse,
+    WalletLoginRequest,
+    WalletLoginResponse,
 )
-from src.router.core.config import SUPABASE_URL, SUPABASE_KEY, JWT_SECRET
+from src.router.core.config import SUPABASE_URL, SUPABASE_PUBLIC_KEY, JWT_SECRET
 
 from sqlmodel import Session, desc, select, func, text
 
-if not SUPABASE_URL or not SUPABASE_KEY:
+if not SUPABASE_URL or not SUPABASE_PUBLIC_KEY:
     raise ValueError(
         "SUPABASE_URL and SUPABASE_KEY must be set in environment variables"
     )
@@ -34,7 +36,7 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 if not JWT_SECRET:
     raise ValueError("JWT_SECRET must be set in environment variables")
 
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_PUBLIC_KEY)
 
 # Get the JWT secret from Supabase project settings
 SUPABASE_JWT_SECRET = (
@@ -133,20 +135,6 @@ def delete_wallet(
     return {"message": "Wallet deleted successfully"}
 
 
-class WalletLoginRequest(BaseModel):
-    address: str = Field(..., description="Wallet address")
-    signature: str = Field(..., description="Signed message")
-
-
-class WalletLoginResponse(BaseModel):
-    access_token: str
-    refresh_token: str
-    expires_in: int = 3600
-    token_type: str = "bearer"
-    user_id: str
-    wallet_address: str
-
-
 def get_wallet_password(wallet_address: str) -> str:
     """Generate deterministic password for wallet login that fits within 72 bytes."""
     # Create a hash of the wallet address and secret
@@ -174,24 +162,9 @@ def wallet_login(
     if not wallet:
         # Get or create Supabase user
         try:
-            # Create new user in Supabase
-            user_data = {
-                "wallet_address": wallet_address,
-                "role": "user",
-                "is_active": True,
-            }
-            result = supabase.auth.admin.create_user(
-                {
-                    "email": f"{wallet_address}@wallet.mira.network",
-                    "password": wallet_password,
-                    "user_metadata": user_data,
-                    "email_confirm": True,
-                }
-            )
-            supabase_user = result.user
 
             # Sign in the user to get session
-            auth_response = supabase.auth.sign_in_with_password(
+            auth_response = supabase.auth.sign_up(
                 {
                     "email": f"{wallet_address}@wallet.mira.network",
                     "password": wallet_password,
@@ -203,7 +176,7 @@ def wallet_login(
                 id=uuid.uuid4(),
                 address=wallet_address,
                 chain="ethereum",
-                user_id=str(supabase_user.id),
+                user_id=auth_response.user.id,
                 created_at=datetime.utcnow(),
                 updated_at=datetime.utcnow(),
             )
@@ -217,13 +190,6 @@ def wallet_login(
             ) from e
     else:
         try:
-            # Get existing user and sign in
-            supabase_user = supabase.auth.admin.get_user_by_id(wallet.user_id)
-
-            # Update password if needed and sign in
-            supabase.auth.admin.update_user_by_id(
-                wallet.user_id, {"password": wallet_password}
-            )
 
             # Sign in with password
             auth_response = supabase.auth.sign_in_with_password(

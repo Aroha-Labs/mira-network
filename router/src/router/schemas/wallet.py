@@ -21,11 +21,14 @@ class WalletResponse(BaseModel):
 
 
 class WalletLoginRequest(BaseModel):
-    address: str = Field(..., description="Wallet address to login with")
-    signature: str = Field(..., description="Signed message for verification")
+    address: str = Field(..., description="Wallet address")
+    signature: str = Field(..., description="Signed message")
 
 
 class WalletLoginResponse(BaseModel):
     access_token: str
     refresh_token: str
+    expires_in: int = 3600
+    token_type: str = "bearer"
     user_id: str
+    wallet_address: str

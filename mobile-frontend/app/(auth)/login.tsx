@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { View, StyleSheet } from "react-native";
+import { View, StyleSheet, ActivityIndicator } from "react-native";
 import Card from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
@@ -16,6 +16,7 @@ export default function LoginPage() {
   const { login, isLoggingIn, loginError } = useAuth();
   const router = useRouter();
   const [session, setSession] = useState<Session | null>(null);
+  const [isWalletLoading, setIsWalletLoading] = useState(false);
 
   const handleLogin = () => {
     if (!email.trim() || !password.trim()) {
@@ -48,6 +49,15 @@ export default function LoginPage() {
           editable={!isLoggingIn}
         />
 
+        {(isLoggingIn || isWalletLoading) && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#0000ff" />
+            <Typography variant="body" style={styles.loadingText}>
+              {isWalletLoading ? "Connecting wallet..." : "Signing in..."}
+            </Typography>
+          </View>
+        )}
+
         {loginError && (
           <Typography variant="caption" style={styles.errorText}>
             {loginError.message}
@@ -66,7 +76,7 @@ export default function LoginPage() {
           title={isLoggingIn ? "Signing in..." : "Sign In"}
           style={styles.loginButton}
           onPress={handleLogin}
-          disabled={isLoggingIn}
+          disabled={isLoggingIn || isWalletLoading}
         />
 
         <Typography variant="body" style={styles.dividerText}>
@@ -74,7 +84,10 @@ export default function LoginPage() {
         </Typography>
 
         <GoogleAuth />
-        <WalletAuth />
+        <WalletAuth 
+          isLoading={isWalletLoading}
+          setIsLoading={setIsWalletLoading}
+        />
 
         <View style={styles.signupContainer}>
           <Typography variant="caption" style={styles.signupText}>
@@ -84,7 +97,7 @@ export default function LoginPage() {
             title="Sign Up"
             variant="link"
             onPress={() => router.push("/(auth)/signup")}
-            disabled={isLoggingIn}
+            disabled={isLoggingIn || isWalletLoading}
           />
         </View>
       </Card>
@@ -127,5 +140,13 @@ const styles = StyleSheet.create({
   dividerText: {
     color: "#666",
     textAlign: "center",
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    marginVertical: 10,
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#666',
   },
 });

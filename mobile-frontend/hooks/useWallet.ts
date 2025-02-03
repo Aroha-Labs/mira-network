@@ -6,6 +6,7 @@ import { useAuth } from './useAuth';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
 import { api } from '@/utils/api';
+import { supabase } from '@/lib/supabase';
 
 export function useWallet() {
   const { session } = useAuth();
@@ -48,6 +49,7 @@ export function useWallet() {
         walletInfo.address,
         'ethereum', // or get this from config/env
       );
+
 
       return walletInfo;
     },

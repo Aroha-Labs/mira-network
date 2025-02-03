@@ -7,7 +7,12 @@ import { useWeb3Modal } from "@web3modal/wagmi-react-native";
 import { useAccount, useSignMessage } from "wagmi";
 import { useAppKit } from "@reown/appkit-wagmi-react-native";
 
-export default function WalletAuth() {
+interface WalletAuthProps {
+  isLoading: boolean;
+  setIsLoading: (loading: boolean) => void;
+}
+
+export default function WalletAuth({ isLoading, setIsLoading }: WalletAuthProps) {
   const [error, setError] = useState<string | null>(null);
   const { walletLogin } = useAuth();
   const { open } = useAppKit()
@@ -15,6 +20,7 @@ export default function WalletAuth() {
   const { signMessageAsync } = useSignMessage();
 
   const handleWalletConnect = async () => {
+    setIsLoading(true);
     console.log("handleWalletConnect");
     console.log(address);
     try {
@@ -35,6 +41,8 @@ export default function WalletAuth() {
     } catch (err) {
       console.error("Wallet connection error:", err);
       setError(err instanceof Error ? err.message : "Failed to connect wallet");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -42,14 +50,14 @@ export default function WalletAuth() {
     <View style={styles.container}>
       <Button
         title={
-          isConnecting
+          isLoading
             ? "Connecting..."
             : address
             ? "Sign Message"
             : "Connect Wallet"
         }
         onPress={handleWalletConnect}
-        disabled={isConnecting}
+        disabled={isLoading}
         style={styles.button}
       />
 
