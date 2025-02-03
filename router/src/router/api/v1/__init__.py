@@ -8,6 +8,8 @@ from .machines import router as machines_router
 from .proxy import router as proxy_router
 from .users import router as users_router  # Add users import
 from .wallet import router as wallet_router
+from .thread import router as thread_router
+
 router = APIRouter()
 
 # Include all routers
@@ -20,5 +22,6 @@ router.include_router(network_router, tags=["network"])
 router.include_router(proxy_router, tags=["proxy"])
 router.include_router(users_router, tags=["users"])  # Add users router
 router.include_router(wallet_router, tags=["wallet"])
+router.include_router(thread_router, tags=["thread"])
 
 __all__ = ["router"]

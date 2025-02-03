@@ -6,6 +6,7 @@ from sqlalchemy import DateTime, func, text, Float
 import uuid
 from sqlalchemy.orm import Relationship
 from .wallet import Wallet
+from sqlmodel import Boolean
 
 
 class UserCreditsHistory(SQLModel, table=True):
@@ -40,6 +41,7 @@ class User(SQLModel, table=True):
     updated_at: Optional[datetime] = Field(
         sa_column=Column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
     )
+    auto_credit: bool = Field(default=False, sa_column=Column(Boolean, default=False))
 
     class Config:
         table = True
