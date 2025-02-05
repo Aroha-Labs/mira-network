@@ -43,6 +43,9 @@ export default function WalletCreation() {
       }
 
       const newWallet = await createWallet();
+
+      
+
       setLocalWalletInfo(newWallet);
       // Refresh wallet data
       await refetchWallet();
