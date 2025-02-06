@@ -6,17 +6,6 @@ import uvicorn
 from prometheus_fastapi_instrumentator import Instrumentator
 from scalar_fastapi import get_scalar_api_reference
 import os
-from src.router.models.credit_trigger import setup_credit_triggers
-from src.router.services.credit_listener import start_credit_listener
-import threading
-
-
-def start_background_services():
-    """Start background services."""
-    # Start credit listener in a separate thread
-    credit_listener_thread = threading.Thread(target=start_credit_listener, daemon=True)
-    credit_listener_thread.start()
-
 
 app = FastAPI(
     title="Mira Client Dashboard",
