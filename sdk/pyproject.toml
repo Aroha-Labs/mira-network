@@ -18,8 +18,8 @@ description = "Python SDK for Mira Network API"
 license = {text = "MIT"}
 name = "mira-network"
 readme = "README.md"
-requires-python = ">=3.9,<3.14"
-version = "0.1.6"
+requires-python = ">=3.9,<=3.14"
+version = "0.1.8"
 
 [build-system]
 build-backend = "pdm.backend"
@@ -36,6 +36,6 @@ test = [
 ]
 
 [tool.pdm.scripts]
-lint = "ruff check ."
 format = "ruff format ."
 format-check = "ruff format . --check"
+lint = "ruff check ."
