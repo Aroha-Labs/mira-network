@@ -1,7 +1,6 @@
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.responses import PlainTextResponse, StreamingResponse
 import csv
-import uvicorn
 import io
 from typing import List, Dict, Optional
 from pydantic import BaseModel, Field
@@ -10,19 +9,11 @@ import os
 import asyncio
 import httpx
 import logging
-from fastapi.middleware.cors import CORSMiddleware
 import json
 import requests
+from config import MACHINE_IP
 
 app = FastAPI()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 ROUTER_BASE_URL = os.getenv(
     "ROUTER_BASE_URL",
@@ -395,14 +386,14 @@ async def verify(req: VerifyRequest):
     }
 
 
-async def update_liveness(machine_uid: str):
-    url = f"{ROUTER_BASE_URL}/liveness/{machine_uid}"
+async def update_liveness(machine_ip: str):
+    url = f"{ROUTER_BASE_URL}/liveness/{machine_ip}"
     while True:
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.post(url)
                 response.raise_for_status()
-                logging.info(f"Liveness check successful for {machine_uid}")
+                logging.info(f"Liveness check successful for {machine_ip}")
             except httpx.HTTPStatusError as exc:
                 logging.error(
                     f"HTTP error occurred: {exc.response.status_code} - {exc.response.text}"
@@ -414,9 +405,4 @@ async def update_liveness(machine_uid: str):
 
 @app.on_event("startup")
 async def startup_event():
-    machine_uid = os.getenv("MC_MACHINE_ID")
-    asyncio.create_task(update_liveness(machine_uid))
-
-
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    asyncio.create_task(update_liveness(MACHINE_IP))
