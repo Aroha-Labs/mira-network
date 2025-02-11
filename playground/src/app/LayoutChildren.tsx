@@ -23,7 +23,7 @@ const LayoutChildren = ({ children }: LayoutChildrenProps) => {
     return (
       <div className="flex items-center justify-center flex-1 bg-gray-100">
         <div
-          className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative"
+          className="relative px-4 py-3 text-red-700 bg-red-100 border border-red-400 rounded"
           role="alert"
         >
           <strong className="font-bold">Error: </strong>
