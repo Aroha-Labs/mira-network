@@ -180,7 +180,7 @@ export default function Workbench() {
   }, [models, selectedModel]);
 
   // Debug log for flows
-  console.log("Current flows:", flows);
+  // console.log("Current flows:", flows);
 
   // Add state for editable system prompt
   const [editableSystemPrompt, setEditableSystemPrompt] = useState("");
@@ -299,6 +299,7 @@ export default function Workbench() {
           messages,
           model: selectedModel || "claude-3-opus-20240229",
           endpoint: "/v1/chat/completions",
+          systemPrompt: editableSystemPrompt,
           variables,
           tools,
           flowId: Number(selectedFlow.id),
