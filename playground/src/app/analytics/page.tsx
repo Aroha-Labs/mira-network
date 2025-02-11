@@ -122,14 +122,14 @@ const AnalyticsPage = () => {
   };
 
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Analytics (last 30 days)</h1>
-      <div className="bg-white p-4 rounded shadow mb-8">
-        <h2 className="text-xl font-bold mb-4">Token Usage by Day</h2>
+    <div className="container p-4 mx-auto">
+      <h1 className="mb-4 text-2xl font-bold">Analytics (last 30 days)</h1>
+      <div className="p-4 mb-8 bg-white rounded shadow">
+        <h2 className="mb-4 text-xl font-bold">Token Usage by Day</h2>
         <Bar data={chartDataByDay} />
       </div>
-      <div className="bg-white p-4 rounded shadow">
-        <h2 className="text-xl font-bold mb-4">Token Usage by Model</h2>
+      <div className="p-4 bg-white rounded shadow">
+        <h2 className="mb-4 text-xl font-bold">Token Usage by Model</h2>
         <Bar data={chartDataByModel} />
       </div>
     </div>

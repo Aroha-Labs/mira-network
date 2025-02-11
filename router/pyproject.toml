@@ -5,7 +5,25 @@ description = "Default template for PDM package"
 authors = [
     {name = "Hamid Raza", email = "contact@hamidraza.com"},
 ]
-dependencies = ["fastapi>=0.115.5", "uvicorn>=0.32.1", "sqlmodel>=0.0.22", "redis>=5.2.0", "httpx>=0.27.2", "requests>=2.32.3", "prometheus-fastapi-instrumentator>=7.0.0", "supabase>=2.10.0", "newrelic", "psycopg2-binary>=2.9.10", "PyJWT>=2.10.1", "scalar-fastapi>=1.0.3", "alembic>=1.14.0"]
+dependencies = [
+    "fastapi>=0.115.5",
+    "uvicorn>=0.32.1",
+    "sqlmodel>=0.0.22",
+    "redis>=5.2.0",
+    "httpx>=0.27.2",
+    "requests>=2.32.3",
+    "prometheus-fastapi-instrumentator>=7.0.0",
+    "supabase>=2.10.0",
+    "newrelic",
+    "psycopg2-binary>=2.9.10",
+    "PyJWT>=2.10.1",
+    "scalar-fastapi>=1.0.3",
+    "alembic>=1.14.0",
+    "fastapi-profiler>=1.4.1",
+    "web3>=7.7.0",
+    "eth-account>=0.13.4",
+    "PyJWT>=2.10.1"
+]
 requires-python = "==3.11.*"
 readme = "README.md"
 license = {text = "MIT"}
@@ -15,6 +33,8 @@ license = {text = "MIT"}
 distribution = false
 
 [tool.pdm.scripts]
+"_".env_file = ".env.local"
+
 # Server commands
 dev = {cmd = "uvicorn src.router.main:app --host 0.0.0.0 --port 8000 --reload", env_file = ".env.local"}
 test = {cmd = "uvicorn src.router.main:app --host 0.0.0.0 --port 8001", env_file = ".env.test"}

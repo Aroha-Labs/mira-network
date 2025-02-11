@@ -1,0 +1,218 @@
+from datetime import datetime, timedelta
+from typing import List
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from pydantic import BaseModel, Field
+import uuid
+from supabase import create_client, Client
+from os import getenv
+import jwt
+import hashlib
+
+from web3 import Web3
+from eth_account.messages import encode_defunct
+
+
+from src.router.db.session import get_session
+from src.router.models.wallet import Wallet
+from src.router.models.user import User
+from src.router.core.security import verify_user
+from src.router.schemas.wallet import (
+    WalletCreate,
+    WalletResponse,
+    WalletLoginRequest,
+    WalletLoginResponse,
+)
+from src.router.core.config import SUPABASE_URL, SUPABASE_PUBLIC_KEY, JWT_SECRET
+
+from sqlmodel import Session, desc, select, func, text
+
+if not SUPABASE_URL or not SUPABASE_PUBLIC_KEY:
+    raise ValueError(
+        "SUPABASE_URL and SUPABASE_KEY must be set in environment variables"
+    )
+
+if not JWT_SECRET:
+    raise ValueError("JWT_SECRET must be set in environment variables")
+
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_PUBLIC_KEY)
+
+# Get the JWT secret from Supabase project settings
+SUPABASE_JWT_SECRET = (
+    JWT_SECRET  # This should be the JWT secret from your Supabase project settings
+)
+
+router = APIRouter()
+
+
+@router.post("/wallets", response_model=WalletResponse)
+def create_wallet(
+    wallet_data: WalletCreate,
+    db: Session = Depends(get_session),
+    user: User = Depends(verify_user),
+) -> Wallet:
+    """Create a new wallet for the current user."""
+
+    print("wallet_data", user)
+
+    # Check if wallet address already exists
+    existing_wallet = db.exec(select(Wallet).where(Wallet.user_id == str(user.id)))
+    if existing_wallet.one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Wallet address already registered",
+        )
+
+    # Create new wallet using model_dump() to properly handle default values
+    new_wallet = Wallet(
+        id=uuid.uuid4(),
+        address=wallet_data.address,
+        chain=wallet_data.chain,
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow(),
+        user_id=str(user.id),
+    )
+
+    db.add(new_wallet)
+    db.commit()
+    db.refresh(new_wallet)
+
+    return new_wallet
+
+
+@router.get("/wallets", response_model=WalletResponse | None)
+def get_wallets(
+    db: Session = Depends(get_session),
+    user: User = Depends(verify_user),
+) -> Wallet | None:
+    """Get all wallets for the current user."""
+    try:
+        result = db.exec(
+            select(Wallet)
+            .where(Wallet.user_id == str(user.id))
+            .order_by(desc(Wallet.created_at))
+        )
+
+        return result.one()
+    except Exception as e:
+        return None
+
+
+@router.get("/wallets/{wallet_id}", response_model=WalletResponse)
+def get_wallet(
+    wallet_id: str,
+    db: Session = Depends(get_session),
+    user: User = Depends(verify_user),
+) -> Wallet:
+    """Get a specific wallet by ID."""
+
+    wallet = db.exec(select(Wallet).where(Wallet.id == wallet_id))
+    if not wallet or wallet.one().user_id != str(user.id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Wallet not found"
+        )
+    return wallet.one()
+
+
+@router.delete("/wallets/{wallet_id}")
+def delete_wallet(
+    wallet_id: str,
+    db: Session = Depends(get_session),
+    user: User = Depends(verify_user),
+) -> dict:
+    """Delete a wallet."""
+
+    wallet = db.exec(select(Wallet).where(Wallet.id == wallet_id))
+    if not wallet or wallet.one().user_id != str(user.id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Wallet not found"
+        )
+
+    db.delete(wallet.one())
+    db.commit()
+
+    return {"message": "Wallet deleted successfully"}
+
+
+def get_wallet_password(wallet_address: str) -> str:
+    """Generate deterministic password for wallet login that fits within 72 bytes."""
+    # Create a hash of the wallet address and secret
+    hash_input = f"{wallet_address.lower()}{JWT_SECRET}".encode("utf-8")
+    # Use SHA-256 and take first 64 characters (32 bytes in hex) to stay well under 72 bytes
+    return hashlib.sha256(hash_input).hexdigest()[:64]
+
+
+@router.post("/wallet/login", response_model=WalletLoginResponse)
+def wallet_login(
+    login_data: WalletLoginRequest,
+    db: Session = Depends(get_session),
+) -> WalletLoginResponse:
+    """Login or register a user using their wallet signature."""
+
+    # Normalize the wallet address
+    wallet_address = login_data.address.lower()
+    wallet_password = get_wallet_password(wallet_address)
+    wallet_email = f"{wallet_address}@wallet.mira.network"
+
+    # Check if wallet exists in our database
+    result = db.exec(select(Wallet).where(Wallet.address == wallet_address))
+    wallet = result.first()
+
+    if not wallet:
+        # Get or create Supabase user
+        try:
+
+            # Sign in the user to get session
+            auth_response = supabase.auth.sign_up(
+                {
+                    "email": f"{wallet_address}@wallet.mira.network",
+                    "password": wallet_password,
+                }
+            )
+
+            # Create wallet in our database
+            new_wallet = Wallet(
+                id=uuid.uuid4(),
+                address=wallet_address,
+                chain="ethereum",
+                user_id=auth_response.user.id,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            )
+            db.add(new_wallet)
+            db.commit()
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error creating Supabase user: {str(e)}",
+            ) from e
+    else:
+        try:
+
+            # Sign in with password
+            auth_response = supabase.auth.sign_in_with_password(
+                {
+                    "email": f"{wallet_address}@wallet.mira.network",
+                    "password": wallet_password,
+                }
+            )
+
+            # Update wallet last login
+            wallet.updated_at = datetime.utcnow()
+            db.commit()
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error signing in user: {str(e)}",
+            ) from e
+
+    return WalletLoginResponse(
+        access_token=auth_response.session.access_token,
+        refresh_token=auth_response.session.refresh_token,
+        expires_in=auth_response.session.expires_in,
+        user_id=auth_response.user.id,
+        wallet_address=wallet_address,
+    )
