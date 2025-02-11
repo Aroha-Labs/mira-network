@@ -48,7 +48,6 @@ def create_flow(
         system_prompt=flow.system_prompt,
         name=flow.name,
         variables=variables,
-        user_id=user.id,
     )
     db.add(new_flow)
     db.commit()

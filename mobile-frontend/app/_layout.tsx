@@ -15,6 +15,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { useQueryClient } from "@/hooks/useQueryClient";
 import { AuthProvider } from "./_auth";
 import { useEffect } from "react";
+import { SplashScreen as ComponentSplashScreen } from "@/components/SplashScreen";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -31,7 +32,7 @@ export default function RootLayout() {
   }, [fontsLoaded]);
 
   if (!fontsLoaded) {
-    return null;
+    return <ComponentSplashScreen />;
   }
 
   return (
@@ -40,7 +41,7 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <Slot />
-            <StatusBar style="auto" />
+            <StatusBar style="dark" hidden={false} translucent={false} />
           </AuthProvider>
         </QueryClientProvider>
       </ThemeProvider>
