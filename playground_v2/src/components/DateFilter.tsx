@@ -24,7 +24,7 @@ const DateFilter: React.FC<DateFilterProps> = ({
         type="date"
         value={startDate ?? ""}
         onChange={(e) => onStartDateChange(e.target.value)}
-        className="mt-1 block w-full border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+        className="mt-1 block w-full border border-gray-300 shadow-xs focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
       />
     </div>
     <div>
@@ -39,7 +39,7 @@ const DateFilter: React.FC<DateFilterProps> = ({
         type="date"
         value={endDate ?? ""}
         onChange={(e) => onEndDateChange(e.target.value)}
-        className="mt-1 block w-full border border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+        className="mt-1 block w-full border border-gray-300 shadow-xs focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
       />
     </div>
   </div>

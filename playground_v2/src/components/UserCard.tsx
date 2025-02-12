@@ -121,7 +121,7 @@ const UserCard = ({ user }: { user: User }) => {
   };
 
   return (
-    <li className="p-4 bg-gray-100 shadow-sm">
+    <li className="p-4 bg-gray-100 shadow-xs">
       <div className="flex items-start justify-between">
         <div className="flex items-center space-x-4">
           <ProfileImage
