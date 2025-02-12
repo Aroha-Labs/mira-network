@@ -26,7 +26,7 @@ const Header = () => {
           <NetworkPopover />
         </div>
       </div>
-      <div className="hidden md:flex-grow md:border-t md:border-dashed md:border-[#9CB9AE] md:mx-4 md:flex-1 md:h-[2px]" />
+      <div className="hidden md:grow md:border-t md:border-dashed md:border-[#9CB9AE] md:mx-4 md:flex-1 md:h-[2px]" />
 
       <div className="md:flex gap-4 items-center hidden">
         <TotalTokens />

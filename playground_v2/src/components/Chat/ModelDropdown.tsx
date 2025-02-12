@@ -47,7 +47,7 @@ const ModelDropdown = ({
       onOpenChange={setIsModalOpen}
       onValueChange={setSelectedModel}
     >
-      <SelectTrigger className="w-fit border-none outline-none shadow-none p-0 m-0">
+      <SelectTrigger className="w-fit border-none outline-hidden shadow-none p-0 m-0">
         <SelectValue placeholder={selectedModel} />
       </SelectTrigger>
       <SelectContent align="end">
