@@ -56,7 +56,7 @@ const Root = ({ children }: RootProps) => {
           href="https://feedback.mira.network/"
           target="_blank"
           rel="noopener noreferrer"
-          className="fixed px-3 py-1 text-sm text-white bg-blue-500 shadow-lg bottom-4 right-4 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300"
+          className="fixed px-3 py-1 text-sm text-white bg-blue-500 shadow-lg bottom-4 right-4 hover:bg-blue-600 focus:outline-hidden focus:ring-2 focus:ring-blue-300"
         >
           Feedback
         </Link>

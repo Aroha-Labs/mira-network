@@ -29,7 +29,7 @@ const Header = ({
 
         <p className="text-[13px] leading-[22px] tracking-[-0.013em]">CHAT</p>
       </div>
-      <div className="flex-grow border-t border-dashed border-[#9CB9AE] mx-0 flex-1 h-[2px]" />
+      <div className="grow border-t border-dashed border-[#9CB9AE] mx-0 flex-1 h-[2px]" />
 
       <ModelDropdown
         isModalOpen={isModalOpen}

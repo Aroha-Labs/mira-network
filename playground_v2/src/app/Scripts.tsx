@@ -1197,7 +1197,7 @@ const Scripts = () => {
                     });
                     const n = r(860).K7.genericEvents,
                       i = ["auxclick", "click", "copy", "keydown", "paste", "scrollend"],
-                      o = ["focus", "blur"],
+                      o = ["focus", "blur-sm"],
                       a = 4,
                       s = 1e3,
                       c = ["PageAction", "UserAction", "BrowserPerformance"],
