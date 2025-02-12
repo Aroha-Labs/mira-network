@@ -101,7 +101,7 @@ export default function SystemPromptInput({
       <div className="max-w-2xl p-4 mx-auto bg-white shadow-md relative">
         <button
           className={c(
-            "text-blue-500 focus:outline-none",
+            "text-blue-500 focus:outline-hidden",
             isFormVisible ? "absolute top-4 right-4" : ""
           )}
           onClick={toggleFormVisibility}
@@ -124,7 +124,7 @@ export default function SystemPromptInput({
             </label>
             <input
               id="flowName"
-              className="w-full border border-gray-300 p-2 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
+              className="w-full border border-gray-300 p-2 focus:outline-hidden focus:ring-2 focus:ring-blue-500 mb-2"
               value={flowName}
               onChange={(e) => setFlowName(e.target.value)}
               placeholder="Flow name..."
@@ -138,7 +138,7 @@ export default function SystemPromptInput({
             </label>
             <AutoGrowTextarea
               id="systemPrompt"
-              className="w-full border border-gray-300 p-2 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none mt-1"
+              className="w-full border border-gray-300 p-2 focus:outline-hidden focus:ring-2 focus:ring-blue-500 resize-none mt-1"
               value={systemPrompt}
               onChange={handleSystemPromptChange}
               placeholder="System prompt... (Shift+Enter for new line)"
@@ -147,7 +147,7 @@ export default function SystemPromptInput({
             {error && <div className="text-red-500 text-sm mt-2">{error}</div>}
             <div className="flex justify-end mt-2">
               <button
-                className="bg-blue-500 text-white py-1 px-2 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center gap-2"
+                className="bg-blue-500 text-white py-1 px-2 hover:bg-blue-600 focus:outline-hidden focus:ring-2 focus:ring-blue-500 flex items-center gap-2"
                 onClick={handleSaveFlow}
                 disabled={saveFlowMutation.isPending}
               >
@@ -171,7 +171,7 @@ export default function SystemPromptInput({
                 </label>
                 <AutoGrowTextarea
                   id={varName}
-                  className="flex-1 border border-gray-300 p-1 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  className="flex-1 border border-gray-300 p-1 focus:outline-hidden focus:ring-2 focus:ring-blue-500 resize-none"
                   value={variables[varName]}
                   onChange={(e) => handleVariableChange(e, varName)}
                   disabled={saveFlowMutation.isPending}

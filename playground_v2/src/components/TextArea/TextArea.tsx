@@ -105,7 +105,7 @@ const TextArea = ({
         }}
         className={cn(
           "textArea w-full",
-          "bg-transparent focus:outline-none text-[12px] font-[400] leading-[18px] tracking-[-0.013em] text-left decoration-skip-ink-none opacity-[60%]",
+          "bg-transparent focus:outline-hidden text-[12px] font-[400] leading-[18px] tracking-[-0.013em] text-left decoration-skip-ink-none opacity-[60%]",
           className
         )}
         onInput={handleInput}
