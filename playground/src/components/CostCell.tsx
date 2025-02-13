@@ -35,7 +35,7 @@ const CostCell = ({ log }: { log: ApiLog }) => {
         ${costs.total.toFixed(3)}
       </span>
       {isHovered && (
-        <div className="absolute z-10 bg-gradient-to-b from-gray-50 to-white border shadow-lg rounded-md p-3 text-sm w-48 top-1/2 right-full mr-2 transform -translate-y-1/2">
+        <div className="absolute z-10 bg-linear-to-b from-gray-50 to-white border shadow-lg rounded-md p-3 text-sm w-48 top-1/2 right-full mr-2 transform -translate-y-1/2">
           <div className="space-y-2">
             <div className="flex justify-between">
               <span>Prompt:</span>

@@ -47,7 +47,7 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
   if (!isAdmin) {
     return (
       <div className="flex items-center justify-center flex-1 bg-gray-100">
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-sm relative">
           <strong className="font-bold">Error: </strong>
           <div>You don&apos;t have permission to access this page</div>
         </div>
@@ -103,7 +103,7 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Mobile header */}
-        <header className="lg:hidden bg-white shadow-sm px-4 py-3 flex items-center gap-3">
+        <header className="lg:hidden bg-white shadow-xs px-4 py-3 flex items-center gap-3">
           <button
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
             className="text-gray-500 hover:text-gray-600"

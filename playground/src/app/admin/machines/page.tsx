@@ -101,7 +101,7 @@ const MachineCard = ({ machine }: { machine: Machine }) => {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+    <div className="bg-white rounded-lg shadow-xs border border-gray-200">
       <div className="p-6">
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-start gap-4">
@@ -269,7 +269,7 @@ const RegisterMachineModal = ({
                   onChange={(e) =>
                     setFormData((prev) => ({ ...prev, name: e.target.value }))
                   }
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  className="w-full rounded-md border-gray-300 shadow-xs focus:border-blue-500 focus:ring-blue-500"
                   placeholder="Machine name"
                 />
               </div>
@@ -289,7 +289,7 @@ const RegisterMachineModal = ({
                   onChange={(e) =>
                     setFormData((prev) => ({ ...prev, network_ip: e.target.value }))
                   }
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  className="w-full rounded-md border-gray-300 shadow-xs focus:border-blue-500 focus:ring-blue-500"
                   placeholder="192.168.1.100"
                   required
                 />
@@ -309,7 +309,7 @@ const RegisterMachineModal = ({
                     setFormData((prev) => ({ ...prev, description: e.target.value }))
                   }
                   rows={3}
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  className="w-full rounded-md border-gray-300 shadow-xs focus:border-blue-500 focus:ring-blue-500"
                   placeholder="Machine description"
                 />
               </div>
@@ -418,7 +418,7 @@ const EditMachineModal = ({
                   onChange={(e) =>
                     setFormData((prev) => ({ ...prev, name: e.target.value }))
                   }
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-colors"
+                  className="w-full rounded-md border-gray-300 shadow-xs focus:border-blue-500 focus:ring-blue-500 transition-colors"
                   placeholder="Enter machine name"
                 />
               </div>
@@ -438,7 +438,7 @@ const EditMachineModal = ({
                   onChange={(e) =>
                     setFormData((prev) => ({ ...prev, network_ip: e.target.value }))
                   }
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-colors font-mono"
+                  className="w-full rounded-md border-gray-300 shadow-xs focus:border-blue-500 focus:ring-blue-500 transition-colors font-mono"
                   placeholder="192.168.1.100"
                   required
                   pattern="^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$"
@@ -463,7 +463,7 @@ const EditMachineModal = ({
                     setFormData((prev) => ({ ...prev, description: e.target.value }))
                   }
                   rows={3}
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-colors resize-none"
+                  className="w-full rounded-md border-gray-300 shadow-xs focus:border-blue-500 focus:ring-blue-500 transition-colors resize-none"
                   placeholder="Add a description for this machine..."
                 />
                 <p className="mt-1 text-sm text-gray-500">
@@ -618,12 +618,12 @@ const AuthTokenModal = ({
                     value={newTokenDescription}
                     onChange={(e) => setNewTokenDescription(e.target.value)}
                     placeholder="Token description (optional)"
-                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    className="w-full rounded-md border-gray-300 shadow-xs focus:border-blue-500 focus:ring-blue-500"
                   />
                   <button
                     onClick={() => createToken()}
                     disabled={isCreating}
-                    className="mt-2 w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                    className="mt-2 w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
                   >
                     {isCreating ? "Creating..." : "Create Token"}
                   </button>
@@ -659,7 +659,7 @@ const AuthTokenModal = ({
                         <button
                           onClick={() => handleDeleteClick(tokenId)}
                           disabled={isDeleting}
-                          className="ml-2 text-red-600 hover:text-red-700 flex-shrink-0"
+                          className="ml-2 text-red-600 hover:text-red-700 shrink-0"
                         >
                           <span className="sr-only">Delete token</span>
                           <svg
@@ -849,7 +849,7 @@ const AdminMachines = () => {
               leaveFrom="transform opacity-100 scale-100"
               leaveTo="transform opacity-0 scale-95"
             >
-              <Menu.Items className="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+              <Menu.Items className="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-hidden">
                 <div className="py-1">
                   {["all", "online", "offline"].map((status) => (
                     <Menu.Item key={status}>
@@ -993,17 +993,17 @@ const AdminMachines = () => {
       {/* Stats Summary - only show when no filters are active */}
       {data && data.length > 0 && !filters.search && filters.status === "all" && (
         <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="bg-white rounded-lg shadow-xs border border-gray-200 p-6">
             <h3 className="text-sm font-medium text-gray-500">Total Machines</h3>
             <p className="mt-2 text-3xl font-semibold text-gray-900">{data.length}</p>
           </div>
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="bg-white rounded-lg shadow-xs border border-gray-200 p-6">
             <h3 className="text-sm font-medium text-gray-500">Online Machines</h3>
             <p className="mt-2 text-3xl font-semibold text-green-600">
               {data.filter((m) => m.status === "online").length}
             </p>
           </div>
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="bg-white rounded-lg shadow-xs border border-gray-200 p-6">
             <h3 className="text-sm font-medium text-gray-500">Offline Machines</h3>
             <p className="mt-2 text-3xl font-semibold text-gray-600">
               {data.filter((m) => m.status === "offline").length}

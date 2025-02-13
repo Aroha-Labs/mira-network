@@ -61,7 +61,7 @@ const CreditHistoryPage = () => {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <div className="bg-white rounded-lg shadow-xs border border-gray-200 p-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-blue-50 rounded-lg">
               <ArrowDownIcon className="h-6 w-6 text-blue-600" />
@@ -74,7 +74,7 @@ const CreditHistoryPage = () => {
             </div>
           </div>
         </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <div className="bg-white rounded-lg shadow-xs border border-gray-200 p-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-red-50 rounded-lg">
               <ArrowUpIcon className="h-6 w-6 text-red-600" />
@@ -90,7 +90,7 @@ const CreditHistoryPage = () => {
       </div>
 
       {/* Timeline View */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+      <div className="bg-white rounded-lg shadow-xs border border-gray-200">
         <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
           <h3 className="text-lg font-medium leading-6 text-gray-900">
             Transaction Timeline
@@ -146,7 +146,7 @@ const CreditHistoryPage = () => {
                           {entry.description}
                         </p>
                       </div>
-                      <div className="flex-shrink-0 self-center">
+                      <div className="shrink-0 self-center">
                         <div
                           className={`
                           px-2 py-1 text-xs font-medium rounded-full

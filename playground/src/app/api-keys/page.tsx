@@ -133,22 +133,22 @@ const ApiKeyPage = () => {
     return (
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-3xl mx-auto px-4 sm:px-6">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 divide-y divide-gray-200">
+          <div className="bg-white rounded-lg shadow-xs border border-gray-200 divide-y divide-gray-200">
             <div className="p-6">
               <div className="flex justify-between items-center">
                 <div className="space-y-3">
-                  <div className="h-6 w-24 bg-gray-200 rounded animate-pulse"></div>
-                  <div className="h-4 w-48 bg-gray-200 rounded animate-pulse"></div>
+                  <div className="h-6 w-24 bg-gray-200 rounded-sm animate-pulse"></div>
+                  <div className="h-4 w-48 bg-gray-200 rounded-sm animate-pulse"></div>
                 </div>
-                <div className="h-10 w-24 bg-gray-200 rounded animate-pulse"></div>
+                <div className="h-10 w-24 bg-gray-200 rounded-sm animate-pulse"></div>
               </div>
             </div>
             <div className="p-6">
               {[1, 2].map((i) => (
                 <div key={i} className="mb-6 last:mb-0">
                   <div className="space-y-3">
-                    <div className="h-5 w-32 bg-gray-200 rounded animate-pulse"></div>
-                    <div className="h-8 w-48 bg-gray-200 rounded animate-pulse"></div>
+                    <div className="h-5 w-32 bg-gray-200 rounded-sm animate-pulse"></div>
+                    <div className="h-8 w-48 bg-gray-200 rounded-sm animate-pulse"></div>
                   </div>
                 </div>
               ))}
@@ -163,7 +163,7 @@ const ApiKeyPage = () => {
     return (
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-3xl mx-auto px-4 sm:px-6">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 text-center">
+          <div className="bg-white rounded-lg shadow-xs border border-gray-200 p-6 text-center">
             <div className="text-red-500 mb-2">
               <svg
                 className="mx-auto h-12 w-12"
@@ -187,7 +187,7 @@ const ApiKeyPage = () => {
             </p>
             <button
               onClick={() => queryClient.invalidateQueries({ queryKey: ["apiKeys"] })}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-xs text-white bg-blue-600 hover:bg-blue-700"
             >
               Retry
             </button>
@@ -200,7 +200,7 @@ const ApiKeyPage = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-3xl mx-auto px-4 sm:px-6">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 divide-y divide-gray-200">
+        <div className="bg-white rounded-lg shadow-xs border border-gray-200 divide-y divide-gray-200">
           {/* API Keys header */}
           <div className="p-6">
             <div className="flex flex-wrap sm:flex-nowrap justify-between items-center gap-4">
@@ -211,7 +211,7 @@ const ApiKeyPage = () => {
                 </p>
               </div>
               <button
-                className="shrink-0 inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
+                className="shrink-0 inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-xs text-white bg-blue-600 hover:bg-blue-700"
                 onClick={() => setIsModalOpen(true)}
               >
                 <PlusIcon className="h-4 w-4 mr-1.5" />
@@ -228,7 +228,7 @@ const ApiKeyPage = () => {
                   <h3 className="text-base font-medium text-gray-900">
                     Web Authentication Usage
                   </h3>
-                  <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                  <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-medium bg-blue-100 text-blue-800">
                     Browser Sessions
                   </span>
                 </div>
@@ -284,7 +284,7 @@ const ApiKeyPage = () => {
                           </span>
                         </div>
                         <div className="mt-2 flex items-center gap-2">
-                          <code className="text-sm bg-gray-100 px-2 py-0.5 rounded text-gray-600">
+                          <code className="text-sm bg-gray-100 px-2 py-0.5 rounded-sm text-gray-600">
                             {getTokenDisplay(apiKey.token)}
                           </code>
                           <CopyToClipboardIcon text={apiKey.token} />
@@ -311,7 +311,7 @@ const ApiKeyPage = () => {
                             leaveFrom="transform opacity-100 scale-100"
                             leaveTo="transform opacity-0 scale-95"
                           >
-                            <Menu.Items className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 focus:outline-none">
+                            <Menu.Items className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 focus:outline-hidden">
                               <div className="py-1">
                                 <Menu.Item>
                                   {({ active }) => (
@@ -366,7 +366,7 @@ const ApiKeyPage = () => {
                   placeholder="e.g., Production API Key"
                   maxLength={100}
                   disabled={addMutation.isPending}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:bg-gray-50 disabled:text-gray-500"
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-xs focus:outline-hidden focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:bg-gray-50 disabled:text-gray-500"
                 />
                 <p className="mt-1 text-xs text-gray-500">
                   {description.length}/100 characters
@@ -374,7 +374,7 @@ const ApiKeyPage = () => {
               </div>
 
               {addMutation.isError && (
-                <div className="text-sm text-red-600 bg-red-50 p-3 rounded">
+                <div className="text-sm text-red-600 bg-red-50 p-3 rounded-sm">
                   {addMutation.error.message}
                 </div>
               )}
@@ -440,7 +440,7 @@ const ApiKeyPage = () => {
                 any applications using it will stop working.
               </p>
               {deleteMutation.isError && (
-                <div className="text-sm text-red-600 bg-red-50 p-3 rounded">
+                <div className="text-sm text-red-600 bg-red-50 p-3 rounded-sm">
                   {deleteMutation.error.message}
                 </div>
               )}

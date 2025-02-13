@@ -57,7 +57,7 @@ const MachineItem = ({ machine_uid, network_ip, status }: MachineProps) => {
               status === "online"
                 ? "border-gray-300 text-gray-700 bg-white hover:bg-gray-50"
                 : "border-gray-200 text-gray-600 bg-white hover:bg-gray-50"
-            } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
+            } focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
           >
             View Metrics {status === "offline" && "(Historical)"}
           </button>

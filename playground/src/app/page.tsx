@@ -33,7 +33,7 @@ export default function Home() {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-100">
         <div
-          className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative"
+          className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-sm relative"
           role="alert"
         >
           <strong className="font-bold">Error: </strong>
@@ -55,13 +55,13 @@ export default function Home() {
       <UserInfo user={userSession?.user}>
         <AnalyticsSection />
       </UserInfo>
-      <div className="bg-white p-4 rounded shadow w-full max-w-md">
+      <div className="bg-white p-4 rounded-sm shadow-sm w-full max-w-md">
         <div className="flex justify-between items-center">
           <div>
             <p className="text-sm text-gray-600">Credits remaining</p>
             <div className="font-bold text-lg">
               {isUserLoading ? (
-                <div className="animate-pulse bg-gray-300 h-6 w-12 rounded mt-1"></div>
+                <div className="animate-pulse bg-gray-300 h-6 w-12 rounded-sm mt-1"></div>
               ) : userSession?.user ? (
                 <Link
                   href="/credit-history"
