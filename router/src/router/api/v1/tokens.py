@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session, select
+from sqlmodel import Session
 from src.router.core.types import User
 from src.router.models.tokens import ApiToken
 from src.router.schemas.tokens import ApiTokenRequest
@@ -23,7 +23,8 @@ router = APIRouter()
 ### Request Body
 ```json
 {
-    "description": string | null  // Optional description for the token
+    "description": string | null,  // Optional description for the token
+    "meta_data": object | null     // Optional metadata for the token
 }
 ```
 
@@ -33,6 +34,7 @@ router = APIRouter()
     "id": int,              // Unique identifier for the token
     "token": string,        // The generated API token
     "description": string | null,
+    "meta_data": object,    // Metadata associated with the token
     "created_at": string    // ISO 8601 datetime
 }
 ```
@@ -71,20 +73,19 @@ router = APIRouter()
                         "id": 1,
                         "token": "sk-mira-a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6",
                         "description": "Development environment token",
-                        "created_at": "2024-01-15T10:30:00Z"
+                        "meta_data": {"env": "development"},
+                        "created_at": "2024-01-15T10:30:00Z",
                     }
                 }
-            }
+            },
         },
         401: {
             "description": "Unauthorized - Invalid or missing authentication",
             "content": {
                 "application/json": {
-                    "example": {
-                        "detail": "Could not validate credentials"
-                    }
+                    "example": {"detail": "Could not validate credentials"}
                 }
-            }
+            },
         },
         500: {
             "description": "Internal server error while creating token",
@@ -94,9 +95,9 @@ router = APIRouter()
                         "detail": "Database error occurred while creating token"
                     }
                 }
-            }
-        }
-    }
+            },
+        },
+    },
 )
 def create_api_token(
     request: ApiTokenRequest,
@@ -109,6 +110,7 @@ def create_api_token(
             user_id=user.id,
             token=token,
             description=request.description,
+            meta_data=request.meta_data,
         )
         db.add(api_token)
         db.commit()
@@ -121,6 +123,7 @@ def create_api_token(
         "id": api_token.id,
         "token": api_token.token,
         "description": api_token.description,
+        "meta_data": api_token.meta_data,
         "created_at": api_token.created_at,
     }
 
@@ -141,6 +144,7 @@ def create_api_token(
         "id": int,              // Unique identifier for the token
         "token": string,        // The API token
         "description": string | null,
+        "meta_data": object,    // Metadata associated with the token
         "created_at": string    // ISO 8601 datetime
     }
 ]
@@ -170,32 +174,33 @@ def create_api_token(
                             "id": 1,
                             "token": "sk-mira-a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6",
                             "description": "Production token",
-                            "created_at": "2024-01-15T10:30:00Z"
+                            "meta_data": {"env": "production"},
+                            "created_at": "2024-01-15T10:30:00Z",
                         },
                         {
                             "id": 2,
                             "token": "sk-mira-b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7",
                             "description": "Development token",
-                            "created_at": "2024-01-14T15:45:00Z"
-                        }
+                            "meta_data": {"env": "development"},
+                            "created_at": "2024-01-14T15:45:00Z",
+                        },
                     ]
                 }
-            }
+            },
         },
         401: {
             "description": "Unauthorized - Invalid or missing authentication",
             "content": {
                 "application/json": {
-                    "example": {
-                        "detail": "Could not validate credentials"
-                    }
+                    "example": {"detail": "Could not validate credentials"}
                 }
-            }
-        }
-    }
+            },
+        },
+    },
 )
 def list_api_tokens(
-    db: Session = Depends(get_session), user: User = Depends(verify_user)
+    db: Session = Depends(get_session),
+    user: User = Depends(verify_user),
 ):
     tokens = (
         db.query(ApiToken)
@@ -207,6 +212,7 @@ def list_api_tokens(
             "id": token.id,
             "token": token.token,
             "description": token.description,
+            "meta_data": token.meta_data,
             "created_at": token.created_at,
         }
         for token in tokens
@@ -257,36 +263,28 @@ def list_api_tokens(
             "description": "Successfully deleted API token",
             "content": {
                 "application/json": {
-                    "example": {
-                        "message": "Token deleted successfully"
-                    }
+                    "example": {"message": "Token deleted successfully"}
                 }
-            }
+            },
         },
         401: {
             "description": "Unauthorized - Invalid or missing authentication",
             "content": {
                 "application/json": {
-                    "example": {
-                        "detail": "Could not validate credentials"
-                    }
+                    "example": {"detail": "Could not validate credentials"}
                 }
-            }
+            },
         },
         404: {
             "description": "Token not found",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "detail": "Token not found"
-                    }
-                }
-            }
-        }
-    }
+            "content": {"application/json": {"example": {"detail": "Token not found"}}},
+        },
+    },
 )
 def delete_api_token(
-    token: str, db: Session = Depends(get_session), user: User = Depends(verify_user)
+    token: str,
+    db: Session = Depends(get_session),
+    user: User = Depends(verify_user),
 ):
     api_token = (
         db.query(ApiToken)
