@@ -25,7 +25,7 @@ const TypeSelector = ({
   <select
     value={value}
     onChange={(e) => onChange(e.target.value as ValueType)}
-    className="text-sm border rounded px-2 py-1"
+    className="text-sm border rounded-sm px-2 py-1"
   >
     <option value="string">String</option>
     <option value="number">Number</option>
@@ -83,7 +83,7 @@ const AutoResizeTextarea = ({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       disabled={disabled}
-      className="border rounded px-2 py-1 disabled:bg-gray-100 disabled:cursor-not-allowed min-w-[60px] resize-none overflow-hidden"
+      className="border rounded-sm px-2 py-1 disabled:bg-gray-100 disabled:cursor-not-allowed min-w-[60px] resize-none overflow-hidden"
       rows={1}
       style={{ minHeight: "28px" }}
     />
@@ -116,7 +116,7 @@ const JsonValueEditor = ({
           type="number"
           value={value as number}
           onChange={(e) => onChange(Number(e.target.value))}
-          className="flex-1 border rounded px-2 py-1 disabled:bg-gray-100 disabled:cursor-not-allowed"
+          className="flex-1 border rounded-sm px-2 py-1 disabled:bg-gray-100 disabled:cursor-not-allowed"
           disabled={disabled}
         />
       );
@@ -212,7 +212,7 @@ const ValueRow = ({
   return (
     <div
       ref={rowRef}
-      className="flex flex-col gap-1 p-1 rounded transition-colors duration-150"
+      className="flex flex-col gap-1 p-1 rounded-sm transition-colors duration-150"
     >
       <div className="flex items-center gap-2">
         <div className="font-medium">{keyName}</div>
@@ -223,7 +223,7 @@ const ValueRow = ({
         {isExpandable && onToggleExpand && (
           <button
             onClick={onToggleExpand}
-            className="p-1 hover:bg-gray-100 rounded"
+            className="p-1 hover:bg-gray-100 rounded-sm"
             disabled={disabled}
           >
             {isExpanded ? (
@@ -295,12 +295,12 @@ const NestedObjectEditor = ({
           value={newKey}
           onChange={(e) => setNewKey(e.target.value)}
           placeholder="New key"
-          className="flex-1 border rounded px-2 py-1"
+          className="flex-1 border rounded-sm px-2 py-1"
           disabled={disabled}
         />
         <button
           onClick={handleAddKey}
-          className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
+          className="bg-blue-500 text-white px-3 py-1 rounded-sm hover:bg-blue-600"
           disabled={disabled}
         >
           <PlusIcon className="h-5 w-5" />
@@ -358,7 +358,7 @@ const ArrayEditor = ({
     <div className={`space-y-1 ${level > 0 ? "ml-2 border-l pl-2" : ""}`}>
       <button
         onClick={handleAddItem}
-        className="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 text-sm"
+        className="bg-blue-500 text-white px-2 py-1 rounded-sm hover:bg-blue-600 text-sm"
         disabled={disabled}
       >
         <PlusIcon className="h-4 w-4" />
@@ -417,14 +417,14 @@ const RawJsonEditor = ({
         <div className="space-x-2">
           <button
             onClick={onCancel}
-            className="px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 rounded"
+            className="px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 rounded-sm"
             disabled={disabled}
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
-            className="px-3 py-1 text-sm bg-blue-500 text-white hover:bg-blue-600 rounded"
+            className="px-3 py-1 text-sm bg-blue-500 text-white hover:bg-blue-600 rounded-sm"
             disabled={disabled}
           >
             Apply Changes
@@ -437,7 +437,7 @@ const RawJsonEditor = ({
           setJsonString(e.target.value);
           setError(null);
         }}
-        className="w-full h-[400px] font-mono text-sm p-3 border rounded focus:ring-1 focus:ring-blue-500"
+        className="w-full h-[400px] font-mono text-sm p-3 border rounded-sm focus:ring-1 focus:ring-blue-500"
         disabled={disabled}
       />
     </div>

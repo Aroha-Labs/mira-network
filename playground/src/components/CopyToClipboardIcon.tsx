@@ -26,7 +26,7 @@ export default function CopyToClipboardIcon({
       onClick={copyToClipboard}
       className={c(
         "group/copy relative inline-flex items-center justify-center p-1 rounded-md",
-        "hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500",
+        "hover:bg-gray-100 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-blue-500",
         className
       )}
     >
@@ -40,7 +40,7 @@ export default function CopyToClipboardIcon({
       <span
         className={c(
           "absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 z-50",
-          "text-xs text-white bg-gray-900 rounded shadow-sm",
+          "text-xs text-white bg-gray-900 rounded-sm shadow-xs",
           "opacity-0 group-hover/copy:opacity-100 transition-opacity duration-200",
           "pointer-events-none whitespace-nowrap"
         )}

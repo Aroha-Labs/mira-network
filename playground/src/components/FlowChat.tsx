@@ -335,7 +335,7 @@ export default function FlowChat({ flow, onClose }: FlowChatProps) {
           <select
             value={selectedModel}
             onChange={(e) => setSelectedModel(e.target.value)}
-            className="px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-xs focus:outline-hidden focus:ring-2 focus:ring-blue-500"
           >
             {supportedModelsOptions.map((o) => (
               <option key={o.value} value={o.value}>
@@ -347,7 +347,7 @@ export default function FlowChat({ flow, onClose }: FlowChatProps) {
 
         <div className="flex flex-1 overflow-hidden">
           {/* Left Panel */}
-          <div className="flex-shrink-0 p-6 overflow-y-auto bg-white border-r border-gray-200 w-80">
+          <div className="shrink-0 p-6 overflow-y-auto bg-white border-r border-gray-200 w-80">
             {/* System Prompt Section */}
             <div className="mb-8">
               <div className="flex items-center mb-4 text-gray-900">
@@ -376,7 +376,7 @@ export default function FlowChat({ flow, onClose }: FlowChatProps) {
                         type="text"
                         value={variables[variable] || ""}
                         onChange={(e) => handleVariableChange(variable, e.target.value)}
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                         placeholder={`Enter ${variable}`}
                       />
                     </div>
@@ -484,21 +484,21 @@ export default function FlowChat({ flow, onClose }: FlowChatProps) {
                       }
                     }}
                     placeholder="Type your message... (Shift+Enter for new line)"
-                    className="flex-1 p-3 text-sm border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="flex-1 p-3 text-sm border border-gray-300 rounded-lg resize-none focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                     disabled={isLoading}
                   />
                   <div className="flex space-x-2">
                     <button
                       onClick={() => handleSubmit()}
                       disabled={isLoading}
-                      className="px-4 py-2 text-sm font-medium text-white transition-colors duration-200 bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="px-4 py-2 text-sm font-medium text-white transition-colors duration-200 bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                     >
                       {isLoading ? "Sending..." : "Send"}
                     </button>
                     {isLoading && (
                       <button
                         onClick={handleStop}
-                        className="p-2 text-white transition-colors duration-200 bg-red-500 rounded-lg hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
+                        className="p-2 text-white transition-colors duration-200 bg-red-500 rounded-lg hover:bg-red-600 focus:outline-hidden focus:ring-2 focus:ring-red-500"
                       >
                         <StopIcon className="w-5 h-5" />
                       </button>

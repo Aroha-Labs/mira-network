@@ -55,7 +55,7 @@ const Root = ({ children }: RootProps) => {
           <Header />
 
           {!isOnline && (
-            <div className="relative px-4 py-3 text-center text-red-700 bg-red-100 border border-red-400 rounded">
+            <div className="relative px-4 py-3 text-center text-red-700 bg-red-100 border border-red-400 rounded-sm">
               <span className="font-medium">No internet connection.</span>
               <span className="block sm:inline"> Please check your network.</span>
             </div>
@@ -67,7 +67,7 @@ const Root = ({ children }: RootProps) => {
                 href="https://feedback.mira.network"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-3 py-1 text-sm text-white bg-blue-500 rounded-full shadow-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300 flex items-center gap-2"
+                className="px-3 py-1 text-sm text-white bg-blue-500 rounded-full shadow-lg hover:bg-blue-600 focus:outline-hidden focus:ring-2 focus:ring-blue-300 flex items-center gap-2"
               >
                 <span>Feedback</span>
                 <span className="text-[10px] opacity-60">
@@ -80,7 +80,7 @@ const Root = ({ children }: RootProps) => {
                     Please include this version number when reporting issues or requesting
                     features
                   </p>
-                  <div className="flex items-center gap-2 bg-gray-800 rounded px-2 py-1">
+                  <div className="flex items-center gap-2 bg-gray-800 rounded-sm px-2 py-1">
                     <code className="font-mono">
                       {process.env.NEXT_PUBLIC_VERSION || "0.0.0"}
                     </code>
@@ -91,7 +91,7 @@ const Root = ({ children }: RootProps) => {
                           `v${process.env.NEXT_PUBLIC_VERSION || "0.0.0"}`
                         );
                       }}
-                      className="ml-auto p-1 hover:bg-gray-700 rounded transition-colors pointer-events-auto"
+                      className="ml-auto p-1 hover:bg-gray-700 rounded-sm transition-colors pointer-events-auto"
                       title="Copy to clipboard"
                     >
                       <svg

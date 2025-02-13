@@ -157,7 +157,7 @@ const ApiLogsPage = () => {
           <div className="bg-white rounded-md border border-gray-300 p-0.5 flex items-center">
             <button
               onClick={() => setViewMode("table")}
-              className={`p-1.5 rounded ${viewMode === "table"
+              className={`p-1.5 rounded-sm ${viewMode === "table"
                 ? "bg-gray-100 text-gray-900"
                 : "text-gray-500 hover:text-gray-700"
                 }`}
@@ -167,7 +167,7 @@ const ApiLogsPage = () => {
             </button>
             <button
               onClick={() => setViewMode("card")}
-              className={`p-1.5 rounded ${viewMode === "card"
+              className={`p-1.5 rounded-sm ${viewMode === "card"
                 ? "bg-gray-100 text-gray-900"
                 : "text-gray-500 hover:text-gray-700"
                 }`}
@@ -178,7 +178,7 @@ const ApiLogsPage = () => {
           </div>
           <button
             onClick={() => setShowMetrics(true)}
-            className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-xs hover:bg-gray-50 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
           >
             <ChartBarIcon className="h-4 w-4 mr-1.5" />
             View Metrics
@@ -187,7 +187,7 @@ const ApiLogsPage = () => {
       </div>
 
       {/* Filters */}
-      <div className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
+      <div className="p-4 bg-white border border-gray-200 rounded-lg shadow-xs">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <label className="block mb-1 text-sm font-medium text-gray-700">
@@ -197,7 +197,7 @@ const ApiLogsPage = () => {
               type="date"
               value={startDate || ""}
               onChange={handleStartDateChange}
-              className="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+              className="w-full border-gray-300 rounded-md shadow-xs focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
             />
           </div>
           <div>
@@ -208,7 +208,7 @@ const ApiLogsPage = () => {
               type="date"
               value={endDate || ""}
               onChange={handleEndDateChange}
-              className="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+              className="w-full border-gray-300 rounded-md shadow-xs focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
             />
           </div>
           <div>
@@ -218,7 +218,7 @@ const ApiLogsPage = () => {
             <select
               value={machineId}
               onChange={(e) => setMachineId(e.target.value)}
-              className="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+              className="w-full border-gray-300 rounded-md shadow-xs focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
             >
               <option value="">All Nodes</option>
               {machines.map((machine) => (
@@ -236,7 +236,7 @@ const ApiLogsPage = () => {
             <select
               value={modelFilter}
               onChange={(e) => setModelFilter(e.target.value)}
-              className="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+              className="w-full border-gray-300 rounded-md shadow-xs focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
             >
               <option value="">All Models</option>
               {models?.data.map((model) => (
@@ -251,7 +251,7 @@ const ApiLogsPage = () => {
 
       {/* Content */}
       {viewMode === "table" ? (
-        <div className="overflow-hidden bg-white border border-gray-200 rounded-lg shadow-sm">
+        <div className="overflow-hidden bg-white border border-gray-200 rounded-lg shadow-xs">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead>
@@ -349,10 +349,10 @@ const ApiLogsPage = () => {
                 .map((_, i) => (
                   <div key={i} className="animate-pulse">
                     <div className="p-4 bg-white border border-gray-200 rounded-lg">
-                      <div className="w-1/4 h-4 mb-4 bg-gray-200 rounded"></div>
+                      <div className="w-1/4 h-4 mb-4 bg-gray-200 rounded-sm"></div>
                       <div className="space-y-3">
-                        <div className="w-3/4 h-4 bg-gray-200 rounded"></div>
-                        <div className="w-1/2 h-4 bg-gray-200 rounded"></div>
+                        <div className="w-3/4 h-4 bg-gray-200 rounded-sm"></div>
+                        <div className="w-1/2 h-4 bg-gray-200 rounded-sm"></div>
                       </div>
                     </div>
                   </div>
@@ -446,7 +446,7 @@ const ApiLogsPage = () => {
       )}
 
       {/* Pagination */}
-      <div className="p-4 mt-4 bg-white border border-gray-200 rounded-lg shadow-sm">
+      <div className="p-4 mt-4 bg-white border border-gray-200 rounded-lg shadow-xs">
         <div className="flex items-center justify-between">
           <div className="text-sm text-gray-500">
             Showing page {page} of{" "}
@@ -563,7 +563,7 @@ const ApiLogsPage = () => {
                       >
                         <div className="flex items-center mb-1">
                           <span
-                            className={`text-xs font-medium px-1.5 py-0.5 rounded ${message.role === "user"
+                            className={`text-xs font-medium px-1.5 py-0.5 rounded-sm ${message.role === "user"
                               ? "bg-blue-100 text-blue-700"
                               : "bg-gray-200 text-gray-700"
                               }`}
@@ -579,7 +579,7 @@ const ApiLogsPage = () => {
                   )}
                 <div className="p-3 border border-green-100 rounded-md bg-green-50">
                   <div className="flex items-center mb-1">
-                    <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-green-100 text-green-700">
+                    <span className="text-xs font-medium px-1.5 py-0.5 rounded-sm bg-green-100 text-green-700">
                       assistant
                     </span>
                   </div>

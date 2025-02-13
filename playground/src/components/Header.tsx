@@ -48,7 +48,7 @@ const UserProfile = () => {
         leaveFrom="transform opacity-100 scale-100"
         leaveTo="transform opacity-0 scale-95"
       >
-        <Menu.Items className="absolute right-0 w-48 mt-2 bg-white border border-gray-200 rounded-md shadow-lg focus:outline-none">
+        <Menu.Items className="absolute right-0 w-48 mt-2 bg-white border border-gray-200 rounded-md shadow-lg focus:outline-hidden">
           <div className="py-1">
             <Menu.Item>
               {({ active }) => (
@@ -108,7 +108,7 @@ export const Header = () => {
               <img src="/img/logo.svg" alt="Mira" className="w-auto h-8" />
               <div className="flex items-center gap-1">
                 <h3 className="text-lg font-medium">console</h3>
-                <div className="px-1 ml-1 text-xs font-medium text-blue-600 border border-blue-200 rounded bg-blue-50">
+                <div className="px-1 ml-1 text-xs font-medium text-blue-600 border border-blue-200 rounded-sm bg-blue-50">
                   beta
                 </div>
               </div>

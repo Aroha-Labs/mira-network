@@ -47,7 +47,7 @@ const ToolDisplay: React.FC<ToolDisplayProps> = ({ toolCalls, toolResponses }) =
       if (content.trim().startsWith("{") || content.trim().startsWith("[")) {
         const parsed = JSON.parse(content);
         return (
-          <pre className="bg-white rounded p-2 overflow-x-auto">
+          <pre className="bg-white rounded-sm p-2 overflow-x-auto">
             <code>{JSON.stringify(parsed, null, 2)}</code>
           </pre>
         );
@@ -76,7 +76,7 @@ const ToolDisplay: React.FC<ToolDisplayProps> = ({ toolCalls, toolResponses }) =
               Tool Call: {tool.name}
             </div>
             <div className="text-xs text-gray-500 mb-2">ID: {tool.id}</div>
-            <pre className="mt-2 text-sm bg-white rounded p-2 overflow-x-auto">
+            <pre className="mt-2 text-sm bg-white rounded-sm p-2 overflow-x-auto">
               <code>{formatArguments(tool.arguments)}</code>
             </pre>
             {tool.response && (
