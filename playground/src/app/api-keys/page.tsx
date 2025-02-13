@@ -27,6 +27,7 @@ interface ApiKey {
   id: number;
   token: string;
   description: string;
+  meta_data: Record<string, unknown>;
   created_at: string;
 }
 
@@ -35,9 +36,12 @@ const fetchApiKeys = async () => {
   return response.data;
 };
 
-const addApiKey = async (description: string) => {
+const addApiKey = async (params: {
+  description: string;
+  meta_data?: Record<string, unknown>;
+}) => {
   try {
-    const response = await api.post("/api-tokens", { description });
+    const response = await api.post("/api-tokens", params);
     return response.data;
   } catch (e) {
     const error = e as AxiosError<{ detail: string }>;
@@ -48,6 +52,11 @@ const addApiKey = async (description: string) => {
 const deleteApiKey = async (tokenId: string) => {
   const response = await api.delete(`/api-tokens/${tokenId}`);
   return response.data;
+};
+
+type MetaDataEntry = {
+  key: string;
+  value: string;
 };
 
 const ApiKeyPage = () => {
@@ -61,6 +70,7 @@ const ApiKeyPage = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [description, setDescription] = useState("");
+  const [metaDataEntries, setMetaDataEntries] = useState<MetaDataEntry[]>([]);
   const [tokenToDelete, setTokenToDelete] = useState<string | null>(null);
   const [selectedApiKeyId, setSelectedApiKeyId] = useState<number | null>(null);
 
@@ -99,7 +109,49 @@ const ApiKeyPage = () => {
       toast.error("Description is required");
       return;
     }
-    addMutation.mutate(description.trim());
+
+    // Convert entries to metadata object
+    const metadata: Record<string, unknown> = {};
+    metaDataEntries.forEach((entry) => {
+      if (entry.key.trim()) {
+        try {
+          // Attempt to parse value as JSON if it looks like a JSON value
+          const value = entry.value.trim();
+          if (
+            value.startsWith("{") ||
+            value.startsWith("[") ||
+            value === "true" ||
+            value === "false" ||
+            !isNaN(Number(value))
+          ) {
+            metadata[entry.key.trim()] = JSON.parse(value);
+          } else {
+            metadata[entry.key.trim()] = value;
+          }
+        } catch {
+          metadata[entry.key.trim()] = entry.value.trim();
+        }
+      }
+    });
+
+    addMutation.mutate({
+      description: description.trim(),
+      meta_data: Object.keys(metadata).length > 0 ? metadata : undefined,
+    });
+  };
+
+  const handleAddMetaDataEntry = () => {
+    setMetaDataEntries([...metaDataEntries, { key: "", value: "" }]);
+  };
+
+  const handleRemoveMetaDataEntry = (index: number) => {
+    setMetaDataEntries(metaDataEntries.filter((_, i) => i !== index));
+  };
+
+  const handleMetaDataChange = (index: number, field: "key" | "value", value: string) => {
+    const newEntries = [...metaDataEntries];
+    newEntries[index][field] = value;
+    setMetaDataEntries(newEntries);
   };
 
   const handleDeleteApiKey = (tokenId: string) => {
@@ -289,6 +341,21 @@ const ApiKeyPage = () => {
                           </code>
                           <CopyToClipboardIcon text={apiKey.token} />
                         </div>
+                        {Object.keys(apiKey.meta_data || {}).length > 0 && (
+                          <div className="mt-2">
+                            <div className="flex flex-wrap gap-2">
+                              {Object.entries(apiKey.meta_data).map(([key, value]) => (
+                                <span
+                                  key={key}
+                                  className="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-medium bg-gray-100 text-gray-800"
+                                  title={`${key}: ${JSON.stringify(value)}`}
+                                >
+                                  {key}: {JSON.stringify(value)}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                       <div className="mt-4 sm:mt-0 flex items-center gap-3">
                         <button
@@ -370,6 +437,64 @@ const ApiKeyPage = () => {
                 />
                 <p className="mt-1 text-xs text-gray-500">
                   {description.length}/100 characters
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Metadata (optional)
+                </label>
+                <div className="mt-1 space-y-2">
+                  {metaDataEntries.map((entry, index) => (
+                    <div key={index} className="flex gap-2">
+                      <input
+                        type="text"
+                        value={entry.key}
+                        onChange={(e) =>
+                          handleMetaDataChange(index, "key", e.target.value)
+                        }
+                        placeholder="Key"
+                        disabled={addMutation.isPending}
+                        className="block w-1/3 px-3 py-2 border border-gray-300 rounded-md shadow-xs focus:outline-hidden focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:bg-gray-50 disabled:text-gray-500"
+                      />
+                      <input
+                        type="text"
+                        value={entry.value}
+                        onChange={(e) =>
+                          handleMetaDataChange(index, "value", e.target.value)
+                        }
+                        placeholder="Value"
+                        disabled={addMutation.isPending}
+                        className="block flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-xs focus:outline-hidden focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:bg-gray-50 disabled:text-gray-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveMetaDataEntry(index)}
+                        disabled={addMutation.isPending}
+                        className="p-2 text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                      >
+                        <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                          <path
+                            fillRule="evenodd"
+                            d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={handleAddMetaDataEntry}
+                    disabled={addMutation.isPending}
+                    className="mt-2 inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    <PlusIcon className="h-4 w-4 mr-1.5" />
+                    Add Metadata Field
+                  </button>
+                </div>
+                <p className="mt-1 text-xs text-gray-500">
+                  Add key/value pairs for additional metadata
                 </p>
               </div>
 
