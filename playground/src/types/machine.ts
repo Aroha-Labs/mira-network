@@ -1,4 +1,5 @@
 export interface Machine {
+  id: number; // Added id field
   network_ip: string;
   name: string | null;
   description: string | null;
