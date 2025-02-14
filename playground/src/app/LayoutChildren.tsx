@@ -3,17 +3,26 @@ import Loading from "src/components/PageLoading";
 import { useLogout } from "src/hooks/useLogout";
 import { usePermissions } from "src/hooks/usePermissions";
 import { userRolesState } from "src/state/userRolesState";
+import { usePathname } from "next/navigation";
+import { redirectToLogin } from "src/utils/auth";
+import { isPublicRoute } from "src/config/routes";
 
 interface LayoutChildrenProps {
   children: React.ReactNode;
 }
 
 const LayoutChildren = ({ children }: LayoutChildrenProps) => {
+  const pathname = usePathname();
   const { isLoading, session } = usePermissions();
   const userRoles = useStore(userRolesState, (state) => state);
   const logoutMutation = useLogout();
 
   const hasPermission = userRoles.includes("user");
+
+  if (!isLoading && !session && !isPublicRoute(pathname)) {
+    redirectToLogin(pathname);
+    return <Loading fullPage />;
+  }
 
   if (isLoading) {
     return <Loading fullPage />;
