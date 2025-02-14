@@ -287,7 +287,7 @@ def save_log(
     usage: dict,
     ttfs: Optional[float],
     timeStart: float,
-    machine_uid: str,
+    machine_id: int,
     flow_id: Optional[str] = None,
 ) -> None:
     sm = get_setting_value(
@@ -325,7 +325,7 @@ def save_log(
         total_response_time=time.time() - timeStart,
         model=req.model,
         model_pricing=model_pricing,
-        machine_id=machine_uid,
+        machine_id=str(machine_id),
         flow_id=flow_id,
     )
 
@@ -662,7 +662,7 @@ async def generate(
             usage=usage,
             ttfs=ttfs,
             timeStart=timeStart,
-            machine_uid=machine.machine_uid,
+            machine_id=machine.id,
             flow_id=flow_id,
         )
 
@@ -684,7 +684,7 @@ async def generate(
             usage=usage,
             ttfs=ttfs,
             timeStart=timeStart,
-            machine_uid=machine.machine_uid,
+            machine_id=machine.id,
             flow_id=flow_id,
         )
 

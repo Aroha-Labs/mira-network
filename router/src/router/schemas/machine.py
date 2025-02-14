@@ -3,6 +3,7 @@ from typing import Dict
 
 
 class MachineInfo(BaseModel):
+    id: int
     network_ip: str
 
 
