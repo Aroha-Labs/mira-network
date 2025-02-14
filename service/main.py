@@ -11,7 +11,7 @@ import httpx
 import logging
 import json
 import requests
-from config import MACHINE_IP
+from config import MACHINE_IP, MACHINE_API_TOKEN
 
 app = FastAPI()
 
@@ -388,10 +388,12 @@ async def verify(req: VerifyRequest):
 
 async def update_liveness(machine_ip: str):
     url = f"{ROUTER_BASE_URL}/liveness/{machine_ip}"
+    headers = {"Authorization": f"Bearer {MACHINE_API_TOKEN}"}
+
     while True:
         async with httpx.AsyncClient() as client:
             try:
-                response = await client.post(url)
+                response = await client.post(url, headers=headers)
                 response.raise_for_status()
                 logging.info(f"Liveness check successful for {machine_ip}")
             except httpx.HTTPStatusError as exc:

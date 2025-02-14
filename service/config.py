@@ -17,3 +17,4 @@ def validate_ip(ip: str | None) -> str:
 
 
 MACHINE_IP = validate_ip(os.getenv("MACHINE_IP"))
+MACHINE_API_TOKEN = os.getenv("MACHINE_API_TOKEN")
