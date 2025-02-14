@@ -1,15 +1,45 @@
 "use client";
 
+import { useSearchParams, useRouter } from "next/navigation";
+import { useEffect } from "react";
+import { useSession } from "src/hooks/useSession";
 import React from "react";
 import { supabase } from "src/utils/supabase/client";
+import Loading from "src/components/PageLoading";
 
 export default function Login() {
+  const router = useRouter();
+  const { data: session, isLoading } = useSession();
+  const searchParams = useSearchParams();
+  const redirect = searchParams.get("redirect") || "/";
+
+  useEffect(() => {
+    if (!isLoading && session) {
+      router.replace(redirect);
+    }
+  }, [session, isLoading, redirect, router]);
+
+  if (isLoading || session) {
+    return (
+      <div className="flex flex-1">
+        <Loading
+          fullPage
+          text={
+            isLoading
+              ? "Loading..."
+              : `Redirecting to ${redirect === "/" ? "home" : redirect}...`
+          }
+        />
+      </div>
+    );
+  }
+
   const handleLogin = async (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
     e.preventDefault();
     supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: window.location.origin,
+        redirectTo: `${window.location.origin}${redirect}`,
       },
     });
   };
