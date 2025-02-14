@@ -185,6 +185,7 @@ def list_all_machines(
 
     return [
         {
+            "id": machine.id,  # Added machine id
             "network_ip": machine.network_ip,
             "name": machine.name,
             "description": machine.description,
@@ -229,4 +230,7 @@ def list_online_machines(
         enabled_machines = session.exec(query).all()
         online_machines = [m.network_ip for m in enabled_machines]
 
-    return [{"network_ip": ip} for ip in online_machines]
+    machines = session.exec(query).all()
+    return [
+        {"id": m.id, "network_ip": m.network_ip} for m in machines
+    ]  # Added machine id

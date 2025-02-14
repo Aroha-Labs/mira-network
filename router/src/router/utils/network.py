@@ -29,6 +29,6 @@ def get_random_machines(number_of_machines: int = 1):
         raise HTTPException(status_code=404, detail="Machine not found")
 
     return [
-        MachineInfo(machine_uid=machine_id, network_ip=network_ip.decode("utf-8"))
+        MachineInfo(id=machine_id, network_ip=network_ip.decode("utf-8"))
         for machine_id, network_ip in zip(random_machine_ids, network_ips)
     ]
