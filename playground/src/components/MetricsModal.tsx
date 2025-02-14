@@ -31,9 +31,9 @@ ChartJS.register(
 );
 
 interface MetricsModalProps {
+  machineId?: number; // Changed from machineIP: string
   onClose: () => void;
   title?: string;
-  machineId?: string;
   apiKeyId?: number;
   userId?: string;
   modelFilter?: string;
@@ -44,9 +44,13 @@ interface MetricsModalProps {
   flowId?: string;
 }
 
-const Shimmer = () => <div className="w-full h-full bg-gray-200 rounded-sm animate-pulse" />;
+const Shimmer = () => (
+  <div className="w-full h-full bg-gray-200 rounded-sm animate-pulse" />
+);
 
-const ValueShimmer = () => <div className="w-16 h-6 bg-gray-200 rounded-sm animate-pulse" />;
+const ValueShimmer = () => (
+  <div className="w-16 h-6 bg-gray-200 rounded-sm animate-pulse" />
+);
 
 const ChartShimmer = () => (
   <div className="w-full h-full rounded-lg animate-pulse bg-gray-200/60" />
@@ -78,9 +82,9 @@ interface MetricsResponse {
 }
 
 const MetricsModal = ({
+  machineId, // Changed from machineIP
   onClose,
   title,
-  machineId,
   apiKeyId,
   userId,
   modelFilter,
@@ -136,7 +140,7 @@ const MetricsModal = ({
   const { data, isLoading, error } = useQuery<MetricsResponse>({
     queryKey: [
       "metrics",
-      machineId,
+      machineId, // Changed from machineIP
       apiKeyId,
       userId,
       modelFilter,
@@ -156,7 +160,7 @@ const MetricsModal = ({
       const resp = await api.get("/api-logs/metrics", {
         params: {
           ...(flowId && { flow_id: flowId }),
-          ...(machineId && { machine_id: machineId }),
+          ...(machineId && { machine_id: machineId }), // Changed from machine_ip: machineIP
           ...(apiKeyId && { api_key_id: apiKeyId }),
           ...(userId && { user_id: userId }),
           ...(modelFilter && { model: modelFilter }),
@@ -577,7 +581,7 @@ const MetricsModal = ({
         title ||
         `Metrics for ${
           machineId
-            ? `Machine ${machineId}`
+            ? `Machine ${machineId}` // Changed from machineIP
             : apiKeyId
               ? `API Key ${apiKeyId}`
               : userId
