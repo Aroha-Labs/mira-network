@@ -1,7 +1,12 @@
 export interface Machine {
-  machine_uid: string;
   network_ip: string;
+  name: string | null;
+  description: string | null;
+  created_at: string;
+  disabled: boolean;
   status: "online" | "offline";
+  last_seen: number | null;
+  auth_tokens: Record<string, { description: string | null }>;
 }
 
 export interface ModelsResponse {
