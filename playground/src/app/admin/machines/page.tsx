@@ -22,7 +22,7 @@ import CopyToClipboardIcon from "src/components/CopyToClipboardIcon";
 import ConfirmModal from "src/components/ConfirmModal";
 
 interface Machine {
-  machine_uid: string;
+  id: number;
   network_ip: string;
   status: "online" | "offline";
   name?: string;
@@ -30,11 +30,7 @@ interface Machine {
   created_at: string;
   last_seen?: string;
   disabled: boolean;
-  auth_tokens: Record<string, AuthToken>;
-}
-
-interface AuthToken {
-  description: string | null;
+  auth_tokens?: MachineToken[];
 }
 
 interface RegisterMachineRequest {
@@ -47,6 +43,7 @@ interface UpdateMachineRequest {
   name?: string;
   description?: string;
   network_ip: string;
+  disabled?: boolean;
 }
 
 interface SortConfig {
@@ -58,20 +55,39 @@ interface FilterState {
   status?: "online" | "offline" | "all";
   search: string;
   sort: SortConfig;
+  includeDisabled: boolean; // Add this line
+}
+
+interface MachineToken {
+  id: string;
+  api_token: string;
+  description: string | null;
+  created_at: string;
+  machine_id: number;
+}
+
+interface MachineTokenResponse {
+  id: string;
+  api_token: string;
+  description?: string;
+  created_at: string;
+  machine_id: number;
 }
 
 const fetchMachines = async () => {
-  const response = await api.get<Machine[]>("/machines");
+  const response = await api.get<Machine[]>("/machines", {
+    params: { include_disabled: true }, // Always fetch all machines
+  });
   return response.data;
 };
 
 const registerMachine = async (data: RegisterMachineRequest) => {
-  const response = await api.post<Machine>("/machines/register", data);
+  const response = await api.post<Machine>("/admin/machines/register", data);
   return response.data;
 };
 
-const updateMachine = async (machine_uid: string, data: UpdateMachineRequest) => {
-  const response = await api.put<Machine>(`/machines/${machine_uid}`, data);
+const updateMachine = async (network_ip: string, data: UpdateMachineRequest) => {
+  const response = await api.put<Machine>(`/admin/machines/${network_ip}`, data);
   return response.data;
 };
 
@@ -83,6 +99,22 @@ const truncateString = (str: string, showLength: number = 4) => {
 const MachineCard = ({ machine }: { machine: Machine }) => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isAuthTokenModalOpen, setIsAuthTokenModalOpen] = useState(false);
+  const [showStatusConfirmation, setShowStatusConfirmation] = useState(false);
+  const queryClient = useQueryClient();
+
+  const { mutate: updateStatus, isPending: isUpdatingStatus } = useMutation({
+    mutationFn: () =>
+      updateMachine(machine.network_ip, {
+        network_ip: machine.network_ip,
+        name: machine.name,
+        description: machine.description,
+        disabled: !machine.disabled, // Toggle the disabled state
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["machines"] });
+      setShowStatusConfirmation(false);
+    },
+  });
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString();
@@ -101,104 +133,166 @@ const MachineCard = ({ machine }: { machine: Machine }) => {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-xs border border-gray-200">
-      <div className="p-6">
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex items-start gap-4">
-            <div
-              className={`p-3 rounded-lg ${getStatusColor(
-                machine.status,
-                machine.disabled
-              )}`}
-            >
-              <ComputerDesktopIcon className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-base font-medium text-gray-900">
-                  {machine.name || "Unnamed Machine"}
-                </h3>
-                <div
-                  className={`px-2.5 py-0.5 text-xs font-medium rounded-full ${getStatusColor(
-                    machine.status,
-                    machine.disabled
-                  )}`}
-                >
-                  {getStatusText(machine.status, machine.disabled)}
-                </div>
-              </div>
-              <p className="text-sm text-gray-500 mt-1">ID: {machine.machine_uid}</p>
-              {machine.description && (
-                <p className="text-sm text-gray-600 mt-2">{machine.description}</p>
-              )}
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setIsAuthTokenModalOpen(true)}
-              className="p-1.5 text-gray-400 hover:text-gray-600 rounded-md hover:bg-gray-50"
-              title="Manage auth tokens"
-            >
-              <KeyIcon className="w-5 h-5" />
-            </button>
-            <button
-              onClick={() => setIsEditModalOpen(true)}
-              className="p-1.5 text-gray-400 hover:text-gray-600 rounded-md hover:bg-gray-50"
-              title="Edit machine"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={1.5}
-                stroke="currentColor"
-                className="w-5 h-5"
+    <>
+      <div className="bg-white rounded-lg shadow-xs border border-gray-200">
+        <div className="p-6">
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex items-start gap-4">
+              <div
+                className={`p-3 rounded-lg ${getStatusColor(
+                  machine.status,
+                  machine.disabled
+                )}`}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"
-                />
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        <div className="pt-4 border-t border-gray-100">
-          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
-            <div>
-              <dt className="text-sm font-medium text-gray-500">Network IP</dt>
-              <dd className="mt-1 text-sm text-gray-900 font-mono">
-                {machine.network_ip}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-sm font-medium text-gray-500">Created</dt>
-              <dd className="mt-1 text-sm text-gray-900">
-                {formatDate(machine.created_at)}
-              </dd>
-            </div>
-            {machine.last_seen && (
+                <ComputerDesktopIcon className="w-6 h-6" />
+              </div>
               <div>
-                <dt className="text-sm font-medium text-gray-500">Last Seen</dt>
-                <dd className="mt-1 text-sm text-gray-900">
-                  {formatDate(machine.last_seen)}
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-medium text-gray-900">
+                    {machine.name || "Unnamed Machine"}
+                  </h3>
+                  <div
+                    className={`px-2.5 py-0.5 text-xs font-medium rounded-full ${getStatusColor(
+                      machine.status,
+                      machine.disabled
+                    )}`}
+                  >
+                    {getStatusText(machine.status, machine.disabled)}
+                  </div>
+                </div>
+                {machine.description && (
+                  <p className="text-sm text-gray-600 mt-2">{machine.description}</p>
+                )}
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowStatusConfirmation(true)}
+                disabled={isUpdatingStatus}
+                className={`p-1.5 rounded-md hover:bg-gray-50 ${
+                  machine.disabled ? "text-gray-400" : "text-green-600"
+                }`}
+                title={`${machine.disabled ? "Enable" : "Disable"} machine`}
+              >
+                {isUpdatingStatus ? (
+                  <svg
+                    className="w-5 h-5 animate-spin"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
+                  </svg>
+                ) : machine.disabled ? (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={1.5}
+                    stroke="currentColor"
+                    className="w-5 h-5"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"
+                    />
+                  </svg>
+                ) : (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={1.5}
+                    stroke="currentColor"
+                    className="w-5 h-5"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75M3.75 21.75h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H3.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"
+                    />
+                  </svg>
+                )}
+              </button>
+              <button
+                onClick={() => setIsAuthTokenModalOpen(true)}
+                className="p-1.5 text-gray-400 hover:text-gray-600 rounded-md hover:bg-gray-50"
+                title="Manage auth tokens"
+              >
+                <KeyIcon className="w-5 h-5" />
+              </button>
+              <button
+                onClick={() => setIsEditModalOpen(true)}
+                className="p-1.5 text-gray-400 hover:text-gray-600 rounded-md hover:bg-gray-50"
+                title="Edit machine"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                  stroke="currentColor"
+                  className="w-5 h-5"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div className="pt-4 border-t border-gray-100">
+            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+              <div>
+                <dt className="text-sm font-medium text-gray-500">Network IP</dt>
+                <dd className="mt-1 text-sm text-gray-900 font-mono">
+                  {machine.network_ip}
                 </dd>
               </div>
-            )}
-            <div>
-              <dt className="text-sm font-medium text-gray-500">Status</dt>
-              <dd className="mt-1 text-sm">
-                {machine.disabled ? (
-                  <span className="text-gray-500">Disabled</span>
-                ) : machine.status === "online" ? (
-                  <span className="text-green-600">Active</span>
-                ) : (
-                  <span className="text-red-600">Inactive</span>
-                )}
-              </dd>
-            </div>
-          </dl>
+              <div>
+                <dt className="text-sm font-medium text-gray-500">Created</dt>
+                <dd className="mt-1 text-sm text-gray-900">
+                  {formatDate(machine.created_at)}
+                </dd>
+              </div>
+              {machine.last_seen && (
+                <div>
+                  <dt className="text-sm font-medium text-gray-500">Last Seen</dt>
+                  <dd className="mt-1 text-sm text-gray-900">
+                    {formatDate(machine.last_seen)}
+                  </dd>
+                </div>
+              )}
+              <div>
+                <dt className="text-sm font-medium text-gray-500">Status</dt>
+                <dd className="mt-1 text-sm">
+                  {machine.disabled ? (
+                    <span className="text-gray-500">Disabled</span>
+                  ) : machine.status === "online" ? (
+                    <span className="text-green-600">Active</span>
+                  ) : (
+                    <span className="text-red-600">Inactive</span>
+                  )}
+                </dd>
+              </div>
+            </dl>
+          </div>
         </div>
       </div>
 
@@ -212,7 +306,41 @@ const MachineCard = ({ machine }: { machine: Machine }) => {
         isOpen={isAuthTokenModalOpen}
         onClose={() => setIsAuthTokenModalOpen(false)}
       />
-    </div>
+
+      {/* Status Change Confirmation Modal */}
+      {showStatusConfirmation && (
+        <ConfirmModal
+          title={`${machine.disabled ? "Enable" : "Disable"} Machine`}
+          onConfirm={() => updateStatus()}
+          onCancel={() => setShowStatusConfirmation(false)}
+          isLoading={isUpdatingStatus}
+          confirmLabel={machine.disabled ? "Enable" : "Disable"}
+          confirmLoadingLabel={machine.disabled ? "Enabling..." : "Disabling..."}
+          confirmButtonClassName={
+            machine.disabled
+              ? "bg-green-600 hover:bg-green-700 focus:ring-green-500"
+              : "bg-red-600 hover:bg-red-700 focus:ring-red-500"
+          }
+        >
+          <p className="text-sm text-gray-500">
+            Are you sure you want to {machine.disabled ? "enable" : "disable"} this
+            machine?
+          </p>
+          <div className="mt-2 p-3 bg-gray-50 rounded-md">
+            <p className="text-sm font-medium text-gray-900">
+              {machine.name || "Unnamed Machine"}
+            </p>
+            <p className="text-sm text-gray-500 font-mono mt-1">{machine.network_ip}</p>
+          </div>
+          {!machine.disabled && (
+            <p className="mt-3 text-sm text-red-500">
+              Warning: Disabling this machine will prevent it from communicating with the
+              server.
+            </p>
+          )}
+        </ConfirmModal>
+      )}
+    </>
   );
 };
 
@@ -362,7 +490,7 @@ const EditMachineModal = ({
   const queryClient = useQueryClient();
 
   const { mutate, isPending, error } = useMutation({
-    mutationFn: (data: UpdateMachineRequest) => updateMachine(machine.machine_uid, data),
+    mutationFn: (data: UpdateMachineRequest) => updateMachine(machine.network_ip, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["machines"] });
       onClose();
@@ -554,32 +682,51 @@ const AuthTokenModal = ({
   const [tokenToDelete, setTokenToDelete] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
-  const { mutate: createToken, isPending: isCreating } = useMutation({
+  // Add handleDeleteClick function
+  const handleDeleteClick = (api_token: string) => {
+    setTokenToDelete(api_token);
+  };
+
+  const { data: tokens, isLoading } = useQuery<MachineTokenResponse[]>({
+    queryKey: ["machine-tokens", machine.network_ip],
+    queryFn: async () => {
+      const response = await api.get<MachineTokenResponse[]>(
+        `/admin/machines/${machine.network_ip}/auth-tokens`
+      );
+      return response.data;
+    },
+    enabled: isOpen,
+  });
+
+  const { mutate: createToken, isPending: isCreating } = useMutation<
+    MachineTokenResponse,
+    Error,
+    void
+  >({
     mutationFn: async () => {
-      const response = await api.post(`/machines/${machine.machine_uid}/auth-tokens`, {
-        description: newTokenDescription || null,
-      });
+      const response = await api.post<MachineTokenResponse>(
+        `/admin/machines/${machine.network_ip}/auth-tokens`,
+        {
+          description: newTokenDescription || null,
+        }
+      );
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["machines"] });
+      queryClient.invalidateQueries({ queryKey: ["machine-tokens", machine.network_ip] });
       setNewTokenDescription("");
     },
   });
 
   const { mutate: deleteToken, isPending: isDeleting } = useMutation({
-    mutationFn: async (tokenId: string) => {
-      await api.delete(`/machines/${machine.machine_uid}/auth-tokens/${tokenId}`);
+    mutationFn: async (api_token: string) => {
+      await api.delete(`/admin/machines/${machine.network_ip}/auth-tokens/${api_token}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["machines"] });
+      queryClient.invalidateQueries({ queryKey: ["machine-tokens", machine.network_ip] });
       setTokenToDelete(null);
     },
   });
-
-  const handleDeleteClick = (tokenId: string) => {
-    setTokenToDelete(tokenId);
-  };
 
   return (
     <>
@@ -635,10 +782,16 @@ const AuthTokenModal = ({
                   Existing Tokens
                 </h3>
                 <div className="space-y-2">
-                  {machine.auth_tokens && Object.keys(machine.auth_tokens).length > 0 ? (
-                    Object.entries(machine.auth_tokens).map(([tokenId, token]) => (
+                  {isLoading ? (
+                    <div className="text-center py-4">
+                      <Loading />
+                    </div>
+                  ) : !tokens?.length ? (
+                    <p className="text-sm text-gray-500">No tokens created yet</p>
+                  ) : (
+                    tokens.map((token) => (
                       <div
-                        key={tokenId}
+                        key={token.id}
                         className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
                       >
                         <div className="flex-1 min-w-0">
@@ -647,17 +800,17 @@ const AuthTokenModal = ({
                           </p>
                           <div className="flex items-center gap-1.5 mt-0.5">
                             <p className="text-xs text-gray-500 font-mono truncate">
-                              {truncateString(tokenId)}
+                              {truncateString(token.api_token)}
                             </p>
                             <CopyToClipboardIcon
-                              text={tokenId}
+                              text={token.api_token}
                               className="text-gray-400"
-                              tooltipText="Copy token ID"
+                              tooltipText="Copy token"
                             />
                           </div>
                         </div>
                         <button
-                          onClick={() => handleDeleteClick(tokenId)}
+                          onClick={() => handleDeleteClick(token.api_token)}
                           disabled={isDeleting}
                           className="ml-2 text-red-600 hover:text-red-700 shrink-0"
                         >
@@ -678,8 +831,6 @@ const AuthTokenModal = ({
                         </button>
                       </div>
                     ))
-                  ) : (
-                    <p className="text-sm text-gray-500">No tokens created yet</p>
                   )}
                 </div>
               </div>
@@ -695,14 +846,14 @@ const AuthTokenModal = ({
           onConfirm={() => deleteToken(tokenToDelete)}
           onCancel={() => setTokenToDelete(null)}
           isLoading={isDeleting}
+          confirmLabel="Delete"
+          confirmLoadingLabel="Deleting..."
+          confirmButtonClassName="bg-red-600 hover:bg-red-700 focus:ring-red-500"
         >
           <p className="text-sm text-gray-500">
             Are you sure you want to delete this auth token? This action cannot be undone.
           </p>
           <div className="mt-2 p-3 bg-gray-50 rounded-md">
-            <p className="text-sm font-medium text-gray-900">
-              {machine.auth_tokens[tokenToDelete]?.description || "Unnamed Token"}
-            </p>
             <p className="text-xs text-gray-500 font-mono mt-1">
               {truncateString(tokenToDelete)}
             </p>
@@ -741,11 +892,12 @@ const AdminMachines = () => {
     status: "all",
     search: "",
     sort: { field: "created_at", direction: "desc" },
+    includeDisabled: false, // Add this line
   });
   const { data: userSession } = useSession();
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: ["machines"],
-    queryFn: fetchMachines,
+    queryFn: fetchMachines, // Use the fetchMachines function
     enabled: !!userSession?.access_token,
     refetchInterval: 30000,
   });
@@ -754,6 +906,12 @@ const AdminMachines = () => {
     if (!data) return [];
 
     const result = data.filter((machine) => {
+      // First filter by disabled status unless includeDisabled is true
+      if (!filters.includeDisabled && machine.disabled) {
+        return false;
+      }
+
+      // Then apply other filters
       if (filters.status && filters.status !== "all") {
         if (machine.status !== filters.status) return false;
       }
@@ -761,7 +919,6 @@ const AdminMachines = () => {
       if (filters.search) {
         const searchLower = filters.search.toLowerCase();
         return (
-          machine.machine_uid.toLowerCase().includes(searchLower) ||
           machine.network_ip.toLowerCase().includes(searchLower) ||
           machine.name?.toLowerCase().includes(searchLower) ||
           machine.description?.toLowerCase().includes(searchLower)
@@ -824,7 +981,7 @@ const AdminMachines = () => {
             <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
             <input
               type="text"
-              placeholder="Search by name, ID, IP, or description..."
+              placeholder="Search by name, IP, or description..."
               value={filters.search}
               onChange={(e) =>
                 setFilters((prev) => ({ ...prev, search: e.target.value }))
@@ -877,13 +1034,28 @@ const AdminMachines = () => {
             </Transition>
           </Menu>
 
-          {(filters.status !== "all" || filters.search) && (
+          {/* Include disabled toggle button without role check */}
+          <button
+            onClick={() =>
+              setFilters((prev) => ({ ...prev, includeDisabled: !prev.includeDisabled }))
+            }
+            className={`px-4 py-2 text-sm border rounded-lg transition-colors ${
+              filters.includeDisabled
+                ? "bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+                : "bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
+            }`}
+          >
+            {filters.includeDisabled ? "Including disabled" : "Show disabled"}
+          </button>
+
+          {(filters.status !== "all" || filters.search || filters.includeDisabled) && (
             <button
               onClick={() =>
                 setFilters((prev) => ({
                   status: "all",
                   search: "",
                   sort: prev.sort,
+                  includeDisabled: false,
                 }))
               }
               className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-50"
@@ -983,7 +1155,7 @@ const AdminMachines = () => {
           ) : (
             <>
               {filteredAndSortedMachines.map((machine) => (
-                <MachineCard key={machine.machine_uid} machine={machine} />
+                <MachineCard key={machine.network_ip} machine={machine} />
               ))}
             </>
           )}
