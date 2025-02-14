@@ -1,9 +1,8 @@
 from pydantic import BaseModel
-from typing import Dict, Any
+from typing import Dict
 
 
 class MachineInfo(BaseModel):
-    machine_uid: str
     network_ip: str
 
 
@@ -16,3 +15,4 @@ class RegisterMachineRequest(BaseModel):
     name: str | None = None
     description: str | None = None
     auth_tokens: Dict[str, MachineAuthToken] = {}
+    disabled: bool | None = None
