@@ -127,7 +127,9 @@ def check_liveness(network_ip: str, session: SessionDep):
     },
 )
 def set_liveness(
-    network_ip: str, session: SessionDep, machine_auth: dict = Depends(verify_machine)
+    network_ip: str,
+    session: SessionDep,
+    machine_auth: dict = Depends(verify_machine),
 ):
     # Verify the token is authorized for this machine
     authorized_ips = [m["network_ip"] for m in machine_auth["machines"]]
@@ -145,17 +147,19 @@ def set_liveness(
     machine = session.exec(
         select(Machine).where(Machine.network_ip == network_ip)
     ).first()
+
     if not machine:
         raise HTTPException(status_code=404, detail="Machine not found")
 
     redis_client.hset(
-        f"liveness:{network_ip}",
+        f"liveness:{machine.id}",
         mapping={
             "network_ip": network_ip,
             "timestamp": now,
         },
     )
-    redis_client.expire(f"liveness:{network_ip}", 6)
+
+    redis_client.expire(f"liveness:{machine.id}", 6)
 
     return {"network_ip": network_ip, "status": "online"}
 
@@ -202,35 +206,3 @@ def list_all_machines(
         }
         for machine in machines
     ]
-
-
-@router.get(
-    "/machines/online",
-    summary="List Online Machines",
-    description="""Retrieves a list of currently online machines.
-    By default, disabled machines are excluded. Only admins can request disabled machines.""",
-)
-def list_online_machines(
-    session: SessionDep,
-    include_disabled: bool = False,
-    user: User = Depends(verify_user),
-):
-    if include_disabled and "admin" not in user.roles:
-        raise HTTPException(
-            status_code=403, detail="Only admins can view disabled machines"
-        )
-
-    online_machines = get_online_machines()
-    if not include_disabled:
-        # Filter out disabled machines
-        query = select(Machine).where(
-            Machine.network_ip.in_(online_machines),
-            Machine.disabled == False,
-        )
-        enabled_machines = session.exec(query).all()
-        online_machines = [m.network_ip for m in enabled_machines]
-
-    machines = session.exec(query).all()
-    return [
-        {"id": m.id, "network_ip": m.network_ip} for m in machines
-    ]  # Added machine id
