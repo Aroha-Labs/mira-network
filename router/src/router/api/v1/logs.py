@@ -175,7 +175,7 @@ def list_all_logs(
     page_size: int = 10,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
-    machine_id: Optional[int] = None,  # Type hint remains int
+    machine_id: Optional[str] = None,
     model: Optional[str] = None,
     api_key_id: Optional[int] = None,
     user_id: Optional[str] = None,
@@ -210,7 +210,9 @@ def list_all_logs(
     if end_date:
         query = query.filter(ApiLogs.created_at <= end_date)
     if machine_id:
-        query = query.filter(ApiLogs.machine_id == str(machine_id))  # Convert to string
+        query = query.filter(
+            ApiLogs.machine_id == machine_id
+        )  # Removed str() conversion
     if model:
         query = query.filter(ApiLogs.model == model)
     if api_key_id:
