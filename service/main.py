@@ -1,3 +1,4 @@
+import socket
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.responses import PlainTextResponse, StreamingResponse
 import csv
@@ -11,14 +12,11 @@ import httpx
 import logging
 import json
 import requests
-from config import MACHINE_IP, MACHINE_API_TOKEN
+from config import Env
 
 app = FastAPI()
 
-ROUTER_BASE_URL = os.getenv(
-    "ROUTER_BASE_URL",
-    "https://mira-client-balancer.alts.dev",
-)
+ROUTER_BASE_URL = os.getenv("ROUTER_BASE_URL")
 
 logging.basicConfig(level=logging.INFO)
 
@@ -388,7 +386,7 @@ async def verify(req: VerifyRequest):
 
 async def update_liveness(machine_ip: str):
     url = f"{ROUTER_BASE_URL}/liveness/{machine_ip}"
-    headers = {"Authorization": f"Bearer {MACHINE_API_TOKEN}"}
+    headers = {"Authorization": f"Bearer {Env.MACHINE_API_TOKEN}"}
 
     while True:
         async with httpx.AsyncClient() as client:
@@ -405,6 +403,23 @@ async def update_liveness(machine_ip: str):
         await asyncio.sleep(3)
 
 
+def get_local_ip():
+    """Returns the local IP address of the container running on AWS Fargate"""
+    try:
+        hostname = socket.gethostname()
+        print("hostname", hostname)
+        local_ip = socket.gethostbyname(hostname)
+        return local_ip
+    except Exception as e:
+        return str(e)
+
+
 @app.on_event("startup")
 async def startup_event():
+    # Get the machine IP from environment or determine the local IP
+    MACHINE_IP = Env.MACHINE_IP
+    if MACHINE_IP is None:
+        MACHINE_IP = get_local_ip()
+
+    # Start the liveness update task
     asyncio.create_task(update_liveness(MACHINE_IP))
