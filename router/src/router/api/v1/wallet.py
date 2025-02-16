@@ -1,17 +1,9 @@
-from datetime import datetime, timedelta
-from typing import List
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-from pydantic import BaseModel, Field
 import uuid
 from supabase import create_client, Client
-from os import getenv
-import jwt
 import hashlib
-
-from web3 import Web3
-from eth_account.messages import encode_defunct
 
 
 from src.router.db.session import get_session
@@ -26,7 +18,7 @@ from src.router.schemas.wallet import (
 )
 from src.router.core.config import SUPABASE_URL, SUPABASE_PUBLIC_KEY, JWT_SECRET
 
-from sqlmodel import Session, desc, select, func, text
+from sqlmodel import Session, desc
 
 if not SUPABASE_URL or not SUPABASE_PUBLIC_KEY:
     raise ValueError(
@@ -53,9 +45,6 @@ def create_wallet(
     user: User = Depends(verify_user),
 ) -> Wallet:
     """Create a new wallet for the current user."""
-
-    print("wallet_data", user)
-
     # Check if wallet address already exists
     existing_wallet = db.exec(select(Wallet).where(Wallet.user_id == str(user.id)))
     if existing_wallet.one_or_none():
@@ -96,6 +85,7 @@ def get_wallets(
 
         return result.one()
     except Exception as e:
+        print(e)
         return None
 
 
@@ -162,11 +152,10 @@ def wallet_login(
     if not wallet:
         # Get or create Supabase user
         try:
-
             # Sign in the user to get session
             auth_response = supabase.auth.sign_up(
                 {
-                    "email": f"{wallet_address}@wallet.mira.network",
+                    "email": wallet_email,
                     "password": wallet_password,
                 }
             )
@@ -190,7 +179,6 @@ def wallet_login(
             ) from e
     else:
         try:
-
             # Sign in with password
             auth_response = supabase.auth.sign_in_with_password(
                 {
