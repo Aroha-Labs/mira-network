@@ -7,7 +7,7 @@ from sqlalchemy import pool
 from alembic import context
 from sqlmodel import SQLModel
 
-from src.router.models import *
+from src.router.models import *  # noqa: F403
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -29,8 +29,12 @@ target_metadata = SQLModel.metadata
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.
 
+# Set the database URL from the environment variable
+db_connection_string = os.environ.get("DB_CONNECTION_STRING")
+if db_connection_string is None:
+    raise ValueError("DB_CONNECTION_STRING environment variable is not set")
 
-config.set_main_option("sqlalchemy.url", os.environ.get("DB_CONNECTION_STRING"))
+config.set_main_option("sqlalchemy.url", db_connection_string)
 
 
 def run_migrations_offline() -> None:
