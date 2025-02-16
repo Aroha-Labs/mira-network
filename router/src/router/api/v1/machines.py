@@ -195,11 +195,9 @@ def list_all_machines(
             "description": machine.description,
             "created_at": machine.created_at.isoformat(),
             "disabled": machine.disabled,
-            "status": (
-                "online" if machine.network_ip in online_machines else "offline"
-            ),
+            "status": ("online" if machine.id in online_machines else "offline"),
             "last_seen": (
-                redis_client.hget(f"liveness:{machine.network_ip}", "timestamp")
+                redis_client.hget(f"liveness:{machine.id}", "timestamp")
                 if machine.network_ip in online_machines
                 else None
             ),
