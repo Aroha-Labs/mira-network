@@ -15,65 +15,58 @@ SessionDep = Annotated[Session, Depends(get_session)]
 
 @router.get(
     "/liveness/{network_ip}",
-    summary="Check Machine Liveness",
-    description="""Checks if a specific machine is currently online and responding.
+    summary="Check Machine Liveness [DEPRECATED]",
+    description="""[DEPRECATED] Please use /liveness/id/{machine_id} endpoint instead.
+
+This endpoint will be removed in future versions.
+
+Checks if a specific machine is currently online and responding.
 
 ### Path Parameters
-- `machine_uid`: UUID of the machine to check
+- `network_ip`: Network IP address of the machine to check
 
 ### Response Format
 ```json
 {
-    "machine_uid": string,
+    "network_ip": string,
     "status": "online" | "offline"
 }
-```
-
-### Error Responses
-- `404 Not Found`:
-    ```json
-    {
-        "detail": "Machine not found"
-    }
-    ```
-
-### Notes
-- Status is determined by checking Redis cache
-- "online" indicates the machine has recently sent a heartbeat
-- "offline" indicates no recent heartbeat received""",
+```""",
     response_description="Returns the machine's current status",
-    responses={
-        200: {
-            "description": "Successfully retrieved machine status",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "machine_uid": "550e8400-e29b-41d4-a716-446655440000",
-                        "status": "online",
-                    }
-                }
-            },
-        },
-        404: {
-            "description": "Machine not found",
-            "content": {
-                "application/json": {"example": {"detail": "Machine not found"}}
-            },
-        },
-    },
+    deprecated=True,
 )
 def check_liveness(network_ip: str, session: SessionDep):
-    machine = session.exec(
-        select(Machine).where(Machine.network_ip == network_ip)
-    ).first()
-    if not machine:
-        raise HTTPException(status_code=404, detail="Machine not found")
+    # Check if machine is in Redis liveness records
+    for key in redis_client.scan_iter(match="liveness:*"):
+        if redis_client.hget(key, "network_ip") == network_ip:
+            return {"network_ip": network_ip, "status": "online"}
 
-    status = redis_client.get(machine.id)
-    if status:
-        return {"network_ip": network_ip, "status": "online"}
-    else:
-        return {"network_ip": network_ip, "status": "offline"}
+    return {"network_ip": network_ip, "status": "offline"}
+
+
+@router.get(
+    "/liveness/id/{machine_id}",
+    summary="Check Machine Liveness by ID",
+    description="""Checks if a specific machine is currently online and responding.
+
+### Path Parameters
+- `machine_id`: ID of the machine to check
+
+### Response Format
+```json
+{
+    "machine_id": string,
+    "status": "online" | "offline"
+}
+```""",
+    response_description="Returns the machine's current status",
+)
+def check_liveness_by_id(machine_id: str):
+    # Direct check in Redis using machine_id
+    if redis_client.exists(f"liveness:{machine_id}"):
+        return {"machine_id": machine_id, "status": "online"}
+
+    return {"machine_id": machine_id, "status": "offline"}
 
 
 @router.post(
