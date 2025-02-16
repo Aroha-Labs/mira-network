@@ -10,6 +10,7 @@ from src.router.models.machine_tokens import MachineToken
 from typing import Annotated
 import secrets
 from datetime import datetime
+from src.router.utils.redis import redis_client
 
 router = APIRouter()
 
@@ -41,6 +42,8 @@ def register_machine(
     session.commit()
     session.refresh(new_machine)
 
+    redis_client.set(f"network_ip:{new_machine.id}", new_machine.network_ip)
+
     return {
         "network_ip": request.network_ip,
         "name": request.name,
@@ -67,10 +70,15 @@ def update_machine(
     if not machine:
         raise HTTPException(status_code=404, detail="Machine not found")
 
+    # If network IP changed, update Redis cache
+    if machine.network_ip != request.network_ip:
+        redis_client.set(f"network_ip:{machine.id}", request.network_ip)
+
     machine.network_ip = request.network_ip
     machine.name = request.name
     machine.description = request.description
     machine.disabled = request.disabled
+    machine.updated_at = datetime.utcnow()  # Add this line to update timestamp
 
     session.add(machine)
     session.commit()
@@ -139,7 +147,7 @@ def delete_auth_token(
         select(MachineToken).where(
             MachineToken.machine_id == machine.id,
             MachineToken.api_token == api_token,  # updated field name
-            MachineToken.deleted_at == None,
+            MachineToken.deleted_at == None,  # noqa: E711
         )
     ).first()
     if not token:
@@ -171,7 +179,7 @@ def list_machine_tokens(
     tokens = session.exec(
         select(MachineToken).where(
             MachineToken.machine_id == machine.id,
-            MachineToken.deleted_at == None,
+            MachineToken.deleted_at == None,  # noqa: E711
         )
     ).all()
 
