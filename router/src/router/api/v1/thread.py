@@ -137,8 +137,6 @@ def get_thread(
     thread = session.get(Thread, thread_id)
     if not thread:
         raise HTTPException(status_code=404, detail="Thread not found")
-    print("Thread user_id:", str(thread.user_id))
-    print("Current user id:", str(current_user.id))
     if str(thread.user_id) != str(current_user.id):
         raise HTTPException(
             status_code=403, detail="Not authorized to access this thread"
@@ -263,16 +261,19 @@ async def create_message(
         session.commit()
 
         if message.stream:
+
             async def content_stream() -> AsyncGenerator[bytes, None]:
                 accumulated_content = []
                 try:
                     response = await generate(
                         req=ai_request, db=session, user=current_user
                     )
-                    
+
                     async for chunk in response.body_iterator:
                         if chunk:
-                            chunk_str = chunk.decode() if isinstance(chunk, bytes) else chunk
+                            chunk_str = (
+                                chunk.decode() if isinstance(chunk, bytes) else chunk
+                            )
                             if chunk_str.startswith("data: "):
                                 try:
                                     data = json.loads(chunk_str[6:])
@@ -311,7 +312,7 @@ async def create_message(
                     "Content-Type": "text/event-stream",
                     "Access-Control-Allow-Origin": "*",
                     "Access-Control-Expose-Headers": "X-Thread-Id",
-                }
+                },
             )
         else:
             # For non-streaming responses

@@ -551,8 +551,6 @@ async def generate(
     db: Session = Depends(get_session),
     flow_id: Optional[str] = None,
 ) -> Response:
-    print("Generating...")
-    print(req)
     timeStart = time.time()
 
     user_row = db.exec(select(UserModel).where(UserModel.user_id == user.id)).first()
