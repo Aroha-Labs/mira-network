@@ -182,25 +182,20 @@ def list_all_machines(
 
     query = select(Machine)
     if not include_disabled:
-        query = query.where(Machine.disabled == False)
+        query = query.where(Machine.disabled == False)  # noqa: E712
 
     machines = session.exec(query).all()
     online_machines = get_online_machines()
 
     return [
         {
-            "id": machine.id,  # Added machine id
+            "id": machine.id,
             "network_ip": machine.network_ip,
             "name": machine.name,
             "description": machine.description,
             "created_at": machine.created_at.isoformat(),
             "disabled": machine.disabled,
-            "status": ("online" if machine.id in online_machines else "offline"),
-            "last_seen": (
-                redis_client.hget(f"liveness:{machine.id}", "timestamp")
-                if machine.network_ip in online_machines
-                else None
-            ),
+            "status": ("online" if str(machine.id) in online_machines else "offline"),
         }
         for machine in machines
     ]

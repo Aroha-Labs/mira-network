@@ -6,7 +6,6 @@ export interface Machine {
   created_at: string;
   disabled: boolean;
   status: "online" | "offline";
-  last_seen: number | null;
   auth_tokens: Record<string, { description: string | null }>;
 }
 
