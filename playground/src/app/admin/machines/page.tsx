@@ -28,7 +28,6 @@ interface Machine {
   name?: string;
   description?: string;
   created_at: string;
-  last_seen?: string;
   disabled: boolean;
   auth_tokens?: MachineToken[];
 }
@@ -271,14 +270,6 @@ const MachineCard = ({ machine }: { machine: Machine }) => {
                   {formatDate(machine.created_at)}
                 </dd>
               </div>
-              {machine.last_seen && (
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Last Seen</dt>
-                  <dd className="mt-1 text-sm text-gray-900">
-                    {formatDate(machine.last_seen)}
-                  </dd>
-                </div>
-              )}
               <div>
                 <dt className="text-sm font-medium text-gray-500">Status</dt>
                 <dd className="mt-1 text-sm">
@@ -1073,7 +1064,6 @@ const AdminMachines = () => {
           {renderSortButton("name", "Name")}
           {renderSortButton("status", "Status")}
           {renderSortButton("created_at", "Created")}
-          {renderSortButton("last_seen", "Last Seen")}
         </div>
 
         {data && (
