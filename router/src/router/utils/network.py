@@ -1,21 +1,17 @@
 import random
 from typing import List
 
-from fastapi import HTTPException, Depends
-from typing import Annotated
+from fastapi import HTTPException
 from src.router.schemas.machine import MachineInfo
 from src.router.utils.redis import get_online_machines, redis_client
-from sqlmodel import Session, col, select
+from sqlmodel import col, select
 from src.router.models.machines import Machine
 from src.router.db.session import get_session
 
 PROXY_PORT = 34523
-SessionDep = Annotated[Session, Depends(get_session)]
 
 
-def get_random_machines(
-    number_of_machines: int = 1, session: SessionDep = Depends()
-) -> List[MachineInfo]:
+def get_random_machines(number_of_machines: int = 1) -> List[MachineInfo]:
     if number_of_machines < 1:
         raise HTTPException(
             status_code=422,  # Changed from 400 to 422 (Unprocessable Entity) for invalid input
@@ -24,7 +20,10 @@ def get_random_machines(
 
     machine_ids = get_online_machines()
     if not machine_ids:
-        return []  # Changed from 404 to empty list as discussed earlier
+        raise HTTPException(
+            status_code=503,  # Changed from 404 to 503 (Service Unavailable) as this is a capacity issue
+            detail="No online machines available",
+        )
 
     if number_of_machines > len(machine_ids):
         raise HTTPException(
@@ -49,7 +48,8 @@ def get_random_machines(
 
     # Handle missing IPs if any
     if missing_ids:
-        db_machines = session.exec(
+        db = next(get_session())
+        db_machines = db.exec(
             select(Machine).where(col(Machine.id).in_(missing_ids))
         ).all()
 
