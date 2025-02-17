@@ -4,6 +4,8 @@ import os
 redis_client = redis.Redis(
     host=os.getenv("REDIS_HOST"),
     port=int(os.getenv("REDIS_PORT", 6379)),
+    username=os.getenv("REDIS_USERNAME"),
+    password=os.getenv("REDIS_PASSWORD"),
     db=int(os.getenv("REDIS_DB", 0)),
     decode_responses=True,
 )
