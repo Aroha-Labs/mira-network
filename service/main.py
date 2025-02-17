@@ -93,6 +93,11 @@ model_providers = {
         api_key=os.getenv("MIRA_API_KEY"),
         provider_name="mira",
     ),
+    "groq": ModelProvider(
+        base_url=os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1"),
+        api_key=os.getenv("GROQ_API_KEY"),
+        provider_name="groq",
+    ),
 }
 
 
