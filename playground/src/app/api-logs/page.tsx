@@ -17,6 +17,8 @@ import {
 } from "@heroicons/react/24/outline";
 import MetricsModal from "src/components/MetricsModal";
 import { format } from "date-fns";
+import { useStore } from "@tanstack/react-store";
+import { userRolesState } from "src/state/userRolesState";
 
 const fetchApiLogs = async (
   page: number = 1,
@@ -26,7 +28,8 @@ const fetchApiLogs = async (
   machineId?: string,
   model?: string,
   orderBy: string = "created_at",
-  order: string = "desc"
+  order: string = "desc",
+  userId?: string
 ): Promise<ApiLogsResponse> => {
   const response = await api.get(`/api-logs`, {
     params: {
@@ -38,6 +41,7 @@ const fetchApiLogs = async (
       model,
       order_by: orderBy,
       order,
+      user_id: userId,
     },
   });
   return response.data;
@@ -55,6 +59,10 @@ const ApiLogsPage = () => {
   const [order, setOrder] = useState<string>("desc");
   const [showMetrics, setShowMetrics] = useState(false);
   const [viewMode, setViewMode] = useState<"table" | "card">("table");
+  const [showOnlyMyLogs, setShowOnlyMyLogs] = useState(true);
+
+  const userRoles = useStore(userRolesState, (state) => state);
+  const isAdmin = userRoles.includes("admin");
 
   const { data, error, isLoading } = useQuery({
     queryKey: [
@@ -66,6 +74,7 @@ const ApiLogsPage = () => {
       modelFilter,
       orderBy,
       order,
+      showOnlyMyLogs,
     ],
     queryFn: () =>
       fetchApiLogs(
@@ -76,7 +85,8 @@ const ApiLogsPage = () => {
         machineId,
         modelFilter,
         orderBy,
-        order
+        order,
+        showOnlyMyLogs ? userSession?.user?.id : undefined
       ),
     enabled: !!userSession?.access_token,
   });
@@ -189,59 +199,94 @@ const ApiLogsPage = () => {
       </div>
 
       {/* Filters */}
-      <div className="p-4 bg-white border border-gray-200 rounded-lg shadow-xs">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div>
-            <label className="block mb-1 text-sm font-medium text-gray-700">
-              Start Date
-            </label>
-            <input
-              type="date"
-              value={startDate || ""}
-              onChange={handleStartDateChange}
-              className="w-full border-gray-300 rounded-md shadow-xs focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-            />
-          </div>
-          <div>
-            <label className="block mb-1 text-sm font-medium text-gray-700">
-              End Date
-            </label>
-            <input
-              type="date"
-              value={endDate || ""}
-              onChange={handleEndDateChange}
-              className="w-full border-gray-300 rounded-md shadow-xs focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-            />
-          </div>
-          <div>
-            <label className="block mb-1 text-sm font-medium text-gray-700">Node</label>
-            <select
-              value={machineId}
-              onChange={(e) => setMachineId(e.target.value)}
-              className="w-full border-gray-300 rounded-md shadow-xs focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-            >
-              <option value="">All Nodes</option>
-              {machines.map((machine) => (
-                <option key={machine.id} value={machine.id}>
-                  {machine.name} {machine.status === "offline" ? "(Offline)" : ""}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block mb-1 text-sm font-medium text-gray-700">Model</label>
-            <select
-              value={modelFilter}
-              onChange={(e) => setModelFilter(e.target.value)}
-              className="w-full border-gray-300 rounded-md shadow-xs focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-            >
-              <option value="">All Models</option>
-              {models?.data.map((model) => (
-                <option key={model.id} value={model.id}>
-                  {model.id}
-                </option>
-              ))}
-            </select>
+      <div className="bg-white border border-gray-200 rounded-lg shadow-xs">
+        <div className="p-4 border-b border-gray-200">
+          <h3 className="text-sm font-medium text-gray-700">Filters</h3>
+        </div>
+        <div className="p-4">
+          <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-12">
+            {isAdmin && (
+              <div className="lg:col-span-12">
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showOnlyMyLogs}
+                    onChange={(e) => setShowOnlyMyLogs(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-100 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
+                  <span className="ms-3 text-sm font-medium text-gray-700">
+                    Show only my logs
+                  </span>
+                </label>
+              </div>
+            )}
+
+            <div className="lg:col-span-3">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Model
+              </label>
+              <select
+                value={modelFilter}
+                onChange={(e) => setModelFilter(e.target.value)}
+                className="block w-full rounded-md border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500 bg-white transition-colors"
+              >
+                <option value="">All Models</option>
+                {models?.data.map((model) => (
+                  <option key={model.id} value={model.id}>
+                    {model.id}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="lg:col-span-3">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Node
+              </label>
+              <select
+                value={machineId}
+                onChange={(e) => setMachineId(e.target.value)}
+                className="block w-full rounded-md border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500 bg-white transition-colors"
+              >
+                <option value="">All Nodes</option>
+                {machines.map((machine) => (
+                  <option key={machine.id} value={machine.id}>
+                    {machine.name} {machine.status === "offline" ? "(Offline)" : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="lg:col-span-3">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Start Date
+              </label>
+              <div className="relative">
+                <input
+                  type="date"
+                  value={startDate || ""}
+                  onChange={handleStartDateChange}
+                  className="block w-full rounded-md border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500 bg-white pr-10 transition-colors"
+                />
+                <CalendarIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+              </div>
+            </div>
+
+            <div className="lg:col-span-3">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                End Date
+              </label>
+              <div className="relative">
+                <input
+                  type="date"
+                  value={endDate || ""}
+                  onChange={handleEndDateChange}
+                  className="block w-full rounded-md border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500 bg-white pr-10 transition-colors"
+                />
+                <CalendarIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+              </div>
+            </div>
           </div>
         </div>
       </div>
