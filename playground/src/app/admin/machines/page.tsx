@@ -476,6 +476,7 @@ const EditMachineModal = ({
     name: machine.name || "",
     description: machine.description || "",
     network_ip: machine.network_ip,
+    disabled: machine.disabled,
   });
 
   const queryClient = useQueryClient();
