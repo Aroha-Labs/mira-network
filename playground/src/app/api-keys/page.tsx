@@ -14,6 +14,8 @@ import {
   ChartBarIcon,
   KeyIcon,
   TrashIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
 } from "@heroicons/react/24/outline";
 import MetricsModal from "src/components/MetricsModal";
 import api from "src/lib/axios";
@@ -31,8 +33,22 @@ interface ApiKey {
   created_at: string;
 }
 
-const fetchApiKeys = async () => {
-  const response = await api.get<ApiKey[]>("/api-tokens");
+interface PaginatedApiKeys {
+  items: ApiKey[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+const fetchApiKeys = async (page?: number, pageSize?: number) => {
+  const params = new URLSearchParams();
+  if (page) params.append("page", page.toString());
+  if (pageSize) params.append("page_size", pageSize.toString());
+
+  const response = await api.get<ApiKey[] | PaginatedApiKeys>("/api-tokens", {
+    params,
+  });
   return response.data;
 };
 
@@ -62,9 +78,12 @@ type MetaDataEntry = {
 const ApiKeyPage = () => {
   const { data: userSession } = useSession();
   const queryClient = useQueryClient();
-  const { data, error, isLoading } = useQuery<ApiKey[]>({
-    queryKey: ["apiKeys"],
-    queryFn: fetchApiKeys,
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10; // Fixed page size
+
+  const { data, error, isLoading } = useQuery<PaginatedApiKeys | ApiKey[]>({
+    queryKey: ["apiKeys", currentPage, pageSize],
+    queryFn: () => fetchApiKeys(currentPage, pageSize),
     enabled: !!userSession?.access_token,
   });
 
@@ -181,6 +200,9 @@ const ApiKeyPage = () => {
     return { relativeTime, fullDate };
   };
 
+  const isPaginated = data && !Array.isArray(data);
+  const items = isPaginated ? data.items : data;
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 py-8">
@@ -196,7 +218,7 @@ const ApiKeyPage = () => {
               </div>
             </div>
             <div className="p-6">
-              {[1, 2].map((i) => (
+              {[1, 2, 3].map((i) => (
                 <div key={i} className="mb-6 last:mb-0">
                   <div className="space-y-3">
                     <div className="h-5 w-32 bg-gray-200 rounded-sm animate-pulse"></div>
@@ -204,6 +226,12 @@ const ApiKeyPage = () => {
                   </div>
                 </div>
               ))}
+            </div>
+            <div className="p-4 bg-gray-50">
+              <div className="flex justify-between items-center">
+                <div className="w-20 h-8 bg-gray-200 rounded-sm animate-pulse"></div>
+                <div className="w-32 h-8 bg-gray-200 rounded-sm animate-pulse"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -301,7 +329,7 @@ const ApiKeyPage = () => {
           </div>
 
           {/* API keys list */}
-          {data?.length === 0 ? (
+          {items?.length === 0 ? (
             <div className="p-6 text-center">
               <KeyIcon className="mx-auto h-10 w-10 text-gray-400" />
               <h3 className="mt-2 text-sm font-medium text-gray-900">No API keys</h3>
@@ -311,7 +339,7 @@ const ApiKeyPage = () => {
             </div>
           ) : (
             <div className="divide-y divide-gray-200">
-              {data?.map((apiKey) => {
+              {items?.map((apiKey) => {
                 const { relativeTime, fullDate } = formatDate(apiKey.created_at);
                 return (
                   <div key={apiKey.token} className="p-6">
@@ -402,6 +430,44 @@ const ApiKeyPage = () => {
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {isPaginated && data.total > 0 && (
+            <div className="p-4 bg-gray-50">
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-gray-700">
+                  Showing{" "}
+                  <span className="font-medium">
+                    {(data.page - 1) * data.page_size + 1}
+                  </span>{" "}
+                  to{" "}
+                  <span className="font-medium">
+                    {Math.min(data.page * data.page_size, data.total)}
+                  </span>{" "}
+                  of <span className="font-medium">{data.total}</span> results
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                    disabled={data.page <= 1}
+                    className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ChevronLeftIcon className="h-4 w-4 mr-1" />
+                    Previous
+                  </button>
+                  <button
+                    onClick={() =>
+                      setCurrentPage((prev) => Math.min(prev + 1, data.total_pages))
+                    }
+                    disabled={data.page >= data.total_pages}
+                    className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                    <ChevronRightIcon className="h-4 w-4 ml-1" />
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>
