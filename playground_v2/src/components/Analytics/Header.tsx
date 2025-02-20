@@ -32,7 +32,7 @@ const Header = ({
           INEFRENCE ANALYTICS
         </p>
       </div>
-      <div className="flex-grow border-t border-dashed border-[#9CB9AE] mx-4 flex-1 h-[2px]" />
+      <div className="grow border-t border-dashed border-[#9CB9AE] mx-4 flex-1 h-[2px]" />
 
       <DatePickerWithRange
         dateFrom={startDate ?? ""}

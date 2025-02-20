@@ -116,7 +116,7 @@ export async function processStream(
 
           try {
             const parsed = JSON.parse(data);
-            console.log("Parsed SSE data:", parsed); // Debug log
+            // console.log("Parsed SSE data:", parsed); // Debug log
             if (parsed.content) {
               onMessage(parsed.content);
             }
@@ -231,6 +231,7 @@ export async function streamChatCompletion(
 
     let body;
     if (endpoint === "/v1/chat/completions") {
+      console.log("Direct chat completion", systemPrompt, options.variables, chatOptions.variables);
       // Direct chat completion - include system prompt in messages
       const messages = systemPrompt
         ? [{ role: "system" as const, content: systemPrompt }, ...chatOptions.messages]
@@ -238,11 +239,13 @@ export async function streamChatCompletion(
 
       // Replace variables in system prompt if both are present
       if (systemPrompt && options.variables) {
+        console.log("Replacing variables in system prompt");
         const systemMessage = messages[0];
         let content = systemMessage.content;
         Object.entries(options.variables).forEach(([key, value]) => {
           content = content.replace(new RegExp(`{{${key}}}`, "g"), value);
         });
+        console.log("Replaced variables in system prompt", content);
         messages[0] = { ...systemMessage, content };
       }
 
@@ -276,6 +279,7 @@ export async function streamChatCompletion(
     let url = `${api.defaults.baseURL}${endpoint}`;
 
     if (flowId && endpoint === "/v1/chat/completions") {
+      console.log("Adding flow ID to URL");
       url = `${url}?flow_id=${flowId}`;
     }
 

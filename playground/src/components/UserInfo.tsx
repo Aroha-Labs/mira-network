@@ -19,7 +19,7 @@ const UserInfo: React.FC<UserInfoProps> = ({ user, children }) => {
   const isLoggedIn = !!user;
 
   return (
-    <div className="bg-white rounded shadow w-full max-w-md">
+    <div className="bg-white rounded-sm shadow-sm w-full max-w-md">
       <div className="bg-gray-50 p-4 rounded-t">
         <div className="flex items-center justify-between">
           <div className="flex items-center">

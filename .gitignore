@@ -9,3 +9,5 @@ cli/bin
 *test.py
 
 node_modules/
+android/
+ios/

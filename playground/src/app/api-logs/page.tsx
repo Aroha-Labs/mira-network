@@ -17,6 +17,8 @@ import {
 } from "@heroicons/react/24/outline";
 import MetricsModal from "src/components/MetricsModal";
 import { format } from "date-fns";
+import { useStore } from "@tanstack/react-store";
+import { userRolesState } from "src/state/userRolesState";
 
 const fetchApiLogs = async (
   page: number = 1,
@@ -26,7 +28,8 @@ const fetchApiLogs = async (
   machineId?: string,
   model?: string,
   orderBy: string = "created_at",
-  order: string = "desc"
+  order: string = "desc",
+  userId?: string
 ): Promise<ApiLogsResponse> => {
   const response = await api.get(`/api-logs`, {
     params: {
@@ -38,6 +41,7 @@ const fetchApiLogs = async (
       model,
       order_by: orderBy,
       order,
+      user_id: userId,
     },
   });
   return response.data;
@@ -55,6 +59,10 @@ const ApiLogsPage = () => {
   const [order, setOrder] = useState<string>("desc");
   const [showMetrics, setShowMetrics] = useState(false);
   const [viewMode, setViewMode] = useState<"table" | "card">("table");
+  const [showOnlyMyLogs, setShowOnlyMyLogs] = useState(true);
+
+  const userRoles = useStore(userRolesState, (state) => state);
+  const isAdmin = userRoles.includes("admin");
 
   const { data, error, isLoading } = useQuery({
     queryKey: [
@@ -66,6 +74,7 @@ const ApiLogsPage = () => {
       modelFilter,
       orderBy,
       order,
+      showOnlyMyLogs,
     ],
     queryFn: () =>
       fetchApiLogs(
@@ -76,7 +85,8 @@ const ApiLogsPage = () => {
         machineId,
         modelFilter,
         orderBy,
-        order
+        order,
+        showOnlyMyLogs ? userSession?.user?.id : undefined
       ),
     enabled: !!userSession?.access_token,
   });
@@ -157,20 +167,22 @@ const ApiLogsPage = () => {
           <div className="bg-white rounded-md border border-gray-300 p-0.5 flex items-center">
             <button
               onClick={() => setViewMode("table")}
-              className={`p-1.5 rounded ${viewMode === "table"
-                ? "bg-gray-100 text-gray-900"
-                : "text-gray-500 hover:text-gray-700"
-                }`}
+              className={`p-1.5 rounded-sm ${
+                viewMode === "table"
+                  ? "bg-gray-100 text-gray-900"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
               title="Table view"
             >
               <TableCellsIcon className="w-5 h-5" />
             </button>
             <button
               onClick={() => setViewMode("card")}
-              className={`p-1.5 rounded ${viewMode === "card"
-                ? "bg-gray-100 text-gray-900"
-                : "text-gray-500 hover:text-gray-700"
-                }`}
+              className={`p-1.5 rounded-sm ${
+                viewMode === "card"
+                  ? "bg-gray-100 text-gray-900"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
               title="Card view"
             >
               <Squares2X2Icon className="w-5 h-5" />
@@ -178,7 +190,7 @@ const ApiLogsPage = () => {
           </div>
           <button
             onClick={() => setShowMetrics(true)}
-            className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-xs hover:bg-gray-50 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
           >
             <ChartBarIcon className="h-4 w-4 mr-1.5" />
             View Metrics
@@ -187,71 +199,101 @@ const ApiLogsPage = () => {
       </div>
 
       {/* Filters */}
-      <div className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div>
-            <label className="block mb-1 text-sm font-medium text-gray-700">
-              Start Date
-            </label>
-            <input
-              type="date"
-              value={startDate || ""}
-              onChange={handleStartDateChange}
-              className="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-            />
-          </div>
-          <div>
-            <label className="block mb-1 text-sm font-medium text-gray-700">
-              End Date
-            </label>
-            <input
-              type="date"
-              value={endDate || ""}
-              onChange={handleEndDateChange}
-              className="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-            />
-          </div>
-          <div>
-            <label className="block mb-1 text-sm font-medium text-gray-700">
-              Node
-            </label>
-            <select
-              value={machineId}
-              onChange={(e) => setMachineId(e.target.value)}
-              className="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-            >
-              <option value="">All Nodes</option>
-              {machines.map((machine) => (
-                <option key={machine.machine_uid} value={machine.machine_uid}>
-                  {machine.machine_uid}{" "}
-                  {machine.status === "offline" ? "(Offline)" : ""}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block mb-1 text-sm font-medium text-gray-700">
-              Model
-            </label>
-            <select
-              value={modelFilter}
-              onChange={(e) => setModelFilter(e.target.value)}
-              className="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-            >
-              <option value="">All Models</option>
-              {models?.data.map((model) => (
-                <option key={model.id} value={model.id}>
-                  {model.id}
-                </option>
-              ))}
-            </select>
+      <div className="bg-white border border-gray-200 rounded-lg shadow-xs">
+        <div className="p-4 border-b border-gray-200">
+          <h3 className="text-sm font-medium text-gray-700">Filters</h3>
+        </div>
+        <div className="p-4">
+          <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-12">
+            {isAdmin && (
+              <div className="lg:col-span-12">
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showOnlyMyLogs}
+                    onChange={(e) => setShowOnlyMyLogs(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-100 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
+                  <span className="ms-3 text-sm font-medium text-gray-700">
+                    Show only my logs
+                  </span>
+                </label>
+              </div>
+            )}
+
+            <div className="lg:col-span-3">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Model
+              </label>
+              <select
+                value={modelFilter}
+                onChange={(e) => setModelFilter(e.target.value)}
+                className="block w-full rounded-md border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500 bg-white transition-colors"
+              >
+                <option value="">All Models</option>
+                {models?.data.map((model) => (
+                  <option key={model.id} value={model.id}>
+                    {model.id}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="lg:col-span-3">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Node
+              </label>
+              <select
+                value={machineId}
+                onChange={(e) => setMachineId(e.target.value)}
+                className="block w-full rounded-md border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500 bg-white transition-colors"
+              >
+                <option value="">All Nodes</option>
+                {machines.map((machine) => (
+                  <option key={machine.id} value={machine.id}>
+                    {machine.name} {machine.status === "offline" ? "(Offline)" : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="lg:col-span-3">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Start Date
+              </label>
+              <div className="relative">
+                <input
+                  type="date"
+                  value={startDate || ""}
+                  onChange={handleStartDateChange}
+                  className="block w-full rounded-md border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500 bg-white pr-10 transition-colors"
+                />
+                <CalendarIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+              </div>
+            </div>
+
+            <div className="lg:col-span-3">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                End Date
+              </label>
+              <div className="relative">
+                <input
+                  type="date"
+                  value={endDate || ""}
+                  onChange={handleEndDateChange}
+                  className="block w-full rounded-md border-gray-300 text-sm focus:border-blue-500 focus:ring-blue-500 bg-white pr-10 transition-colors"
+                />
+                <CalendarIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Content */}
       {viewMode === "table" ? (
-        <div className="overflow-hidden bg-white border border-gray-200 rounded-lg shadow-sm">
+        <div className="overflow-hidden bg-white border border-gray-200 rounded-lg shadow-xs">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead>
@@ -272,14 +314,11 @@ const ApiLogsPage = () => {
                     <th
                       key={column.key}
                       onClick={() =>
-                        column.sortable
-                          ? handleOrderByChange(column.key)
-                          : undefined
+                        column.sortable ? handleOrderByChange(column.key) : undefined
                       }
-                      className={`px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${column.sortable
-                        ? "cursor-pointer hover:bg-gray-100"
-                        : ""
-                        }`}
+                      className={`px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
+                        column.sortable ? "cursor-pointer hover:bg-gray-100" : ""
+                      }`}
                     >
                       <div className="flex items-center gap-1">
                         {column.label}
@@ -296,44 +335,40 @@ const ApiLogsPage = () => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {isLoading
                   ? Array(5)
-                    .fill(0)
-                    .map((_, i) => <TableLoadingRow key={i} />)
+                      .fill(0)
+                      .map((_, i) => <TableLoadingRow key={i} />)
                   : data?.logs?.map((log) => (
-                    <tr
-                      key={log.id}
-                      onClick={() => handleRowClick(log)}
-                      className="cursor-pointer hover:bg-gray-50"
-                    >
-                      <td className="px-4 py-3 text-sm text-gray-500">
-                        {format(new Date(log.created_at), "MMM d, HH:mm")}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-500">
-                        {log.total_tokens}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-500">
-                        {log.ttft ? log.ttft.toFixed(2) : "N/A"}s
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-500">
-                        {log.total_response_time.toFixed(2)}s
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-500">
-                        {log.machine_id || "N/A"}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-500">
-                        {log.model}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-500">
-                        {log.model_pricing
-                          ? (
-                            log.prompt_tokens *
-                            log.model_pricing.prompt_token +
-                            log.completion_tokens *
-                            log.model_pricing.completion_token
-                          ).toFixed(4)
-                          : "N/A"}
-                      </td>
-                    </tr>
-                  ))}
+                      <tr
+                        key={log.id}
+                        onClick={() => handleRowClick(log)}
+                        className="cursor-pointer hover:bg-gray-50"
+                      >
+                        <td className="px-4 py-3 text-sm text-gray-500">
+                          {format(new Date(log.created_at), "MMM d, HH:mm")}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-500">
+                          {log.total_tokens}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-500">
+                          {log.ttft ? log.ttft.toFixed(2) : "N/A"}s
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-500">
+                          {log.total_response_time.toFixed(2)}s
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-500">
+                          {log.machine_id || "N/A"}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-500">{log.model}</td>
+                        <td className="px-4 py-3 text-sm text-gray-500">
+                          {log.model_pricing
+                            ? (
+                                log.prompt_tokens * log.model_pricing.prompt_token +
+                                log.completion_tokens * log.model_pricing.completion_token
+                              ).toFixed(4)
+                            : "N/A"}
+                        </td>
+                      </tr>
+                    ))}
               </tbody>
             </table>
           </div>
@@ -349,10 +384,10 @@ const ApiLogsPage = () => {
                 .map((_, i) => (
                   <div key={i} className="animate-pulse">
                     <div className="p-4 bg-white border border-gray-200 rounded-lg">
-                      <div className="w-1/4 h-4 mb-4 bg-gray-200 rounded"></div>
+                      <div className="w-1/4 h-4 mb-4 bg-gray-200 rounded-sm"></div>
                       <div className="space-y-3">
-                        <div className="w-3/4 h-4 bg-gray-200 rounded"></div>
-                        <div className="w-1/2 h-4 bg-gray-200 rounded"></div>
+                        <div className="w-3/4 h-4 bg-gray-200 rounded-sm"></div>
+                        <div className="w-1/2 h-4 bg-gray-200 rounded-sm"></div>
                       </div>
                     </div>
                   </div>
@@ -391,9 +426,7 @@ const ApiLogsPage = () => {
                         <div className="flex gap-3 text-sm">
                           <div className="flex-1 p-2 rounded-md bg-gray-50">
                             <div className="text-xs text-gray-500">Tokens</div>
-                            <div className="font-medium">
-                              {log.total_tokens}
-                            </div>
+                            <div className="font-medium">{log.total_tokens}</div>
                           </div>
                           {log.model_pricing && (
                             <div className="flex-1 p-2 rounded-md bg-gray-50">
@@ -401,10 +434,9 @@ const ApiLogsPage = () => {
                               <div className="font-medium">
                                 $
                                 {(
-                                  log.prompt_tokens *
-                                  log.model_pricing.prompt_token +
+                                  log.prompt_tokens * log.model_pricing.prompt_token +
                                   log.completion_tokens *
-                                  log.model_pricing.completion_token
+                                    log.model_pricing.completion_token
                                 ).toFixed(4)}
                               </div>
                             </div>
@@ -412,9 +444,7 @@ const ApiLogsPage = () => {
                           {log.ttft && (
                             <div className="flex-1 p-2 rounded-md bg-gray-50">
                               <div className="text-xs text-gray-500">TTFT</div>
-                              <div className="font-medium">
-                                {log.ttft.toFixed(2)}s
-                              </div>
+                              <div className="font-medium">{log.ttft.toFixed(2)}s</div>
                             </div>
                           )}
                         </div>
@@ -446,11 +476,10 @@ const ApiLogsPage = () => {
       )}
 
       {/* Pagination */}
-      <div className="p-4 mt-4 bg-white border border-gray-200 rounded-lg shadow-sm">
+      <div className="p-4 mt-4 bg-white border border-gray-200 rounded-lg shadow-xs">
         <div className="flex items-center justify-between">
           <div className="text-sm text-gray-500">
-            Showing page {page} of{" "}
-            {data ? Math.ceil(data.total / pageSize) : "..."}
+            Showing page {page} of {data ? Math.ceil(data.total / pageSize) : "..."}
           </div>
           <div className="flex gap-2">
             <button
@@ -476,7 +505,7 @@ const ApiLogsPage = () => {
         <MetricsModal
           onClose={() => setShowMetrics(false)}
           title="API Logs Metrics"
-          machineId={machineId || undefined}
+          machineId={machineId ? Number(machineId) : undefined}
           modelFilter={modelFilter || undefined}
           dateRange={{
             startDate,
@@ -507,16 +536,12 @@ const ApiLogsPage = () => {
             {selectedLog.ttft && (
               <div className="px-3 py-2 rounded-md bg-gray-50">
                 <div className="text-gray-500">TTFT</div>
-                <div className="font-medium">
-                  {selectedLog.ttft.toFixed(2)}s
-                </div>
+                <div className="font-medium">{selectedLog.ttft.toFixed(2)}s</div>
               </div>
             )}
             <div className="px-3 py-2 rounded-md bg-gray-50">
               <div className="text-gray-500">Node</div>
-              <div className="font-medium truncate">
-                {selectedLog.machine_id || "-"}
-              </div>
+              <div className="font-medium truncate">{selectedLog.machine_id || "-"}</div>
             </div>
           </div>
 
@@ -525,19 +550,21 @@ const ApiLogsPage = () => {
             <nav className="flex space-x-4">
               <button
                 onClick={() => setActiveTab("messages")}
-                className={`${activeTab === "messages"
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                  } whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm`}
+                className={`${
+                  activeTab === "messages"
+                    ? "border-blue-500 text-blue-600"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                } whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm`}
               >
                 Messages
               </button>
               <button
                 onClick={() => setActiveTab("raw")}
-                className={`${activeTab === "raw"
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                  } whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm`}
+                className={`${
+                  activeTab === "raw"
+                    ? "border-blue-500 text-blue-600"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                } whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm`}
               >
                 Raw Request
               </button>
@@ -550,23 +577,22 @@ const ApiLogsPage = () => {
               <>
                 {selectedLog.payload &&
                   JSON.parse(selectedLog.payload).messages.map(
-                    (
-                      message: { role: string; content: string },
-                      index: number
-                    ) => (
+                    (message: { role: string; content: string }, index: number) => (
                       <div
                         key={index}
-                        className={`p-3 rounded-md ${message.role === "user"
-                          ? "bg-blue-50 border border-blue-100"
-                          : "bg-gray-50 border border-gray-100"
-                          }`}
+                        className={`p-3 rounded-md ${
+                          message.role === "user"
+                            ? "bg-blue-50 border border-blue-100"
+                            : "bg-gray-50 border border-gray-100"
+                        }`}
                       >
                         <div className="flex items-center mb-1">
                           <span
-                            className={`text-xs font-medium px-1.5 py-0.5 rounded ${message.role === "user"
-                              ? "bg-blue-100 text-blue-700"
-                              : "bg-gray-200 text-gray-700"
-                              }`}
+                            className={`text-xs font-medium px-1.5 py-0.5 rounded-sm ${
+                              message.role === "user"
+                                ? "bg-blue-100 text-blue-700"
+                                : "bg-gray-200 text-gray-700"
+                            }`}
                           >
                             {message.role}
                           </span>
@@ -579,7 +605,7 @@ const ApiLogsPage = () => {
                   )}
                 <div className="p-3 border border-green-100 rounded-md bg-green-50">
                   <div className="flex items-center mb-1">
-                    <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-green-100 text-green-700">
+                    <span className="text-xs font-medium px-1.5 py-0.5 rounded-sm bg-green-100 text-green-700">
                       assistant
                     </span>
                   </div>
@@ -590,11 +616,7 @@ const ApiLogsPage = () => {
               </>
             ) : (
               <pre className="p-3 overflow-x-auto text-sm border border-gray-200 rounded-md bg-gray-50">
-                {JSON.stringify(
-                  JSON.parse(selectedLog.payload || "{}"),
-                  null,
-                  2
-                )}
+                {JSON.stringify(JSON.parse(selectedLog.payload || "{}"), null, 2)}
               </pre>
             )}
           </div>

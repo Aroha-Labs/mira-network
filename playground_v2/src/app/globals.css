@@ -1,25 +1,45 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
 
-html {
-  height: 100%;
+@config '../../tailwind.config.ts';
+
+/*
+  The default border color has changed to `currentColor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentColor);
+  }
 }
 
-body {
-  background: url("/img/Background-Pattern.png") no-repeat center center fixed;
-  background-size: cover;
-  font-family: var(--font-geist-sans), sans-serif;
-  min-height: 100%;
-}
+@layer utilities {
+  html {
+    height: 100%;
+  }
 
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
-  font-family: var(--font-geist-mono);
+  body {
+    background: url('/img/Background-Pattern.png') no-repeat center center fixed;
+    background-size: cover;
+    font-family: var(--font-geist-sans), sans-serif;
+    min-height: 100%;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-geist-mono);
+  }
 }
 
 @layer base {

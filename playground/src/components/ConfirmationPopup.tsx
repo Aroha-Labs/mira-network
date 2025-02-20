@@ -69,13 +69,13 @@ const ConfirmationPopup = ({
       <div className="flex justify-end gap-2">
         <button
           onClick={onCancel}
-          className="px-2 py-1 text-sm text-gray-600 hover:bg-gray-100 rounded"
+          className="px-2 py-1 text-sm text-gray-600 hover:bg-gray-100 rounded-sm"
         >
           Cancel
         </button>
         <button
           onClick={onConfirm}
-          className="px-2 py-1 text-sm bg-red-500 text-white hover:bg-red-600 rounded"
+          className="px-2 py-1 text-sm bg-red-500 text-white hover:bg-red-600 rounded-sm"
         >
           Delete
         </button>

@@ -61,7 +61,7 @@ const ParameterEditor = ({
         <input
           type="text"
           value={localName}
-          className="px-2 py-1 border rounded"
+          className="px-2 py-1 border rounded-sm"
           placeholder="Parameter name"
           onChange={(e) => setLocalName(e.target.value)}
           onBlur={handleNameBlur}
@@ -77,7 +77,7 @@ const ParameterEditor = ({
           onChange={(e) =>
             onChange({ ...parameter, type: e.target.value as ToolParameter["type"] })
           }
-          className="w-full px-2 py-1 border rounded"
+          className="w-full px-2 py-1 border rounded-sm"
         >
           <option value="string">String</option>
           <option value="number">Number</option>
@@ -90,7 +90,7 @@ const ParameterEditor = ({
           value={localDescription}
           onChange={(e) => setLocalDescription(e.target.value)}
           onBlur={handleDescriptionBlur}
-          className="w-full px-2 py-1 border rounded"
+          className="w-full px-2 py-1 border rounded-sm"
           placeholder="Parameter description"
           rows={2}
         />
@@ -118,7 +118,7 @@ const ParameterEditor = ({
                   },
                 })
               }
-              className="w-full px-2 py-1 border rounded"
+              className="w-full px-2 py-1 border rounded-sm"
             >
               <option value="string">String</option>
               <option value="number">Number</option>

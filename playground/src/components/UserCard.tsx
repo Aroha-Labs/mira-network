@@ -133,7 +133,7 @@ const UserCard = ({ user }: { user: User }) => {
               <ProfileImage
                 src={user.avatar_url}
                 alt={user.full_name}
-                className="w-11 h-11 rounded-lg ring-1 ring-gray-200 shadow-sm"
+                className="w-11 h-11 rounded-lg ring-1 ring-gray-200 shadow-xs"
               />
             </div>
 
@@ -182,7 +182,7 @@ const UserCard = ({ user }: { user: User }) => {
                   {userRoles.length > 0 ? (
                     userRoles.map((role) => <RoleTag key={role} role={role} />)
                   ) : (
-                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-gray-50 text-gray-600 border border-gray-200">
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-sm text-xs font-medium bg-gray-50 text-gray-600 border border-gray-200">
                       No roles
                     </span>
                   )}

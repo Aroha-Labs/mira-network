@@ -120,7 +120,7 @@ const AdminUsers = () => {
           leaveFrom="transform opacity-100 scale-100"
           leaveTo="transform opacity-0 scale-95"
         >
-          <Menu.Items className="absolute left-0 z-10 mt-2 w-56 origin-top-left rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+          <Menu.Items className="absolute left-0 z-10 mt-2 w-56 origin-top-left rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-hidden">
             <div className="py-1">
               {["created_at", "last_login_at", "credits", "email", "full_name"].map(
                 (field) => (
@@ -167,7 +167,7 @@ const AdminUsers = () => {
           leaveFrom="transform opacity-100 scale-100"
           leaveTo="transform opacity-0 scale-95"
         >
-          <Menu.Items className="absolute left-0 z-10 mt-2 w-72 origin-top-left rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none p-4">
+          <Menu.Items className="absolute left-0 z-10 mt-2 w-72 origin-top-left rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-hidden p-4">
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -177,7 +177,7 @@ const AdminUsers = () => {
                   <input
                     type="number"
                     placeholder="Min"
-                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                    className="w-full rounded-md border-gray-300 shadow-xs focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                     value={filters.minCredits || ""}
                     onChange={(e) =>
                       setFilters((f) => ({
@@ -189,7 +189,7 @@ const AdminUsers = () => {
                   <input
                     type="number"
                     placeholder="Max"
-                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                    className="w-full rounded-md border-gray-300 shadow-xs focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                     value={filters.maxCredits || ""}
                     onChange={(e) =>
                       setFilters((f) => ({
@@ -252,7 +252,7 @@ const AdminUsers = () => {
           >
             <ArrowPathIcon className={`w-5 h-5 ${isFetching ? "animate-spin" : ""}`} />
             {isFetching && (
-              <span className="absolute top-1/2 -translate-y-1/2 -left-24 px-2 py-1 text-xs text-white bg-gray-900 rounded shadow-sm whitespace-nowrap">
+              <span className="absolute top-1/2 -translate-y-1/2 -left-24 px-2 py-1 text-xs text-white bg-gray-900 rounded-sm shadow-xs whitespace-nowrap">
                 Refreshing...
               </span>
             )}
@@ -261,7 +261,7 @@ const AdminUsers = () => {
 
         <form onSubmit={handleSearch} className="mb-6 sm:mb-8">
           <div className="relative max-w-2xl mx-auto">
-            <div className="flex items-center bg-white shadow-sm border border-gray-300 rounded-lg hover:shadow-md transition-shadow duration-200">
+            <div className="flex items-center bg-white shadow-xs border border-gray-300 rounded-lg hover:shadow-md transition-shadow duration-200">
               <div className="pl-4">
                 <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
               </div>
@@ -271,14 +271,14 @@ const AdminUsers = () => {
                 placeholder='Search users... (Press "/" to focus)'
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full px-3 py-3 bg-transparent border-0 focus:ring-0 focus:outline-none text-gray-900 placeholder-gray-500"
+                className="w-full px-3 py-3 bg-transparent border-0 focus:ring-0 focus:outline-hidden text-gray-900 placeholder-gray-500"
               />
               <div className="flex items-center pr-2 space-x-2">
                 {(searchQuery || submittedQuery) && (
                   <button
                     type="button"
                     onClick={handleClearSearch}
-                    className="p-1.5 text-gray-500 hover:text-gray-700 rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
+                    className="p-1.5 text-gray-500 hover:text-gray-700 rounded-md hover:bg-gray-100 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
@@ -298,7 +298,7 @@ const AdminUsers = () => {
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="px-4 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                  className="px-4 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
                 >
                   {isLoading ? <Loading size="sm" className="text-white" /> : "Search"}
                 </button>

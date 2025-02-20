@@ -14,6 +14,8 @@ import {
   ChartBarIcon,
   KeyIcon,
   TrashIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
 } from "@heroicons/react/24/outline";
 import MetricsModal from "src/components/MetricsModal";
 import api from "src/lib/axios";
@@ -27,17 +29,35 @@ interface ApiKey {
   id: number;
   token: string;
   description: string;
+  meta_data: Record<string, unknown>;
   created_at: string;
 }
 
-const fetchApiKeys = async () => {
-  const response = await api.get<ApiKey[]>("/api-tokens");
+interface PaginatedApiKeys {
+  items: ApiKey[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+const fetchApiKeys = async (page?: number, pageSize?: number) => {
+  const params = new URLSearchParams();
+  if (page) params.append("page", page.toString());
+  if (pageSize) params.append("page_size", pageSize.toString());
+
+  const response = await api.get<ApiKey[] | PaginatedApiKeys>("/api-tokens", {
+    params,
+  });
   return response.data;
 };
 
-const addApiKey = async (description: string) => {
+const addApiKey = async (params: {
+  description: string;
+  meta_data?: Record<string, unknown>;
+}) => {
   try {
-    const response = await api.post("/api-tokens", { description });
+    const response = await api.post("/api-tokens", params);
     return response.data;
   } catch (e) {
     const error = e as AxiosError<{ detail: string }>;
@@ -50,17 +70,26 @@ const deleteApiKey = async (tokenId: string) => {
   return response.data;
 };
 
+type MetaDataEntry = {
+  key: string;
+  value: string;
+};
+
 const ApiKeyPage = () => {
   const { data: userSession } = useSession();
   const queryClient = useQueryClient();
-  const { data, error, isLoading } = useQuery<ApiKey[]>({
-    queryKey: ["apiKeys"],
-    queryFn: fetchApiKeys,
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10; // Fixed page size
+
+  const { data, error, isLoading } = useQuery<PaginatedApiKeys | ApiKey[]>({
+    queryKey: ["apiKeys", currentPage, pageSize],
+    queryFn: () => fetchApiKeys(currentPage, pageSize),
     enabled: !!userSession?.access_token,
   });
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [description, setDescription] = useState("");
+  const [metaDataEntries, setMetaDataEntries] = useState<MetaDataEntry[]>([]);
   const [tokenToDelete, setTokenToDelete] = useState<string | null>(null);
   const [selectedApiKeyId, setSelectedApiKeyId] = useState<number | null>(null);
 
@@ -99,7 +128,49 @@ const ApiKeyPage = () => {
       toast.error("Description is required");
       return;
     }
-    addMutation.mutate(description.trim());
+
+    // Convert entries to metadata object
+    const metadata: Record<string, unknown> = {};
+    metaDataEntries.forEach((entry) => {
+      if (entry.key.trim()) {
+        try {
+          // Attempt to parse value as JSON if it looks like a JSON value
+          const value = entry.value.trim();
+          if (
+            value.startsWith("{") ||
+            value.startsWith("[") ||
+            value === "true" ||
+            value === "false" ||
+            !isNaN(Number(value))
+          ) {
+            metadata[entry.key.trim()] = JSON.parse(value);
+          } else {
+            metadata[entry.key.trim()] = value;
+          }
+        } catch {
+          metadata[entry.key.trim()] = entry.value.trim();
+        }
+      }
+    });
+
+    addMutation.mutate({
+      description: description.trim(),
+      meta_data: Object.keys(metadata).length > 0 ? metadata : undefined,
+    });
+  };
+
+  const handleAddMetaDataEntry = () => {
+    setMetaDataEntries([...metaDataEntries, { key: "", value: "" }]);
+  };
+
+  const handleRemoveMetaDataEntry = (index: number) => {
+    setMetaDataEntries(metaDataEntries.filter((_, i) => i !== index));
+  };
+
+  const handleMetaDataChange = (index: number, field: "key" | "value", value: string) => {
+    const newEntries = [...metaDataEntries];
+    newEntries[index][field] = value;
+    setMetaDataEntries(newEntries);
   };
 
   const handleDeleteApiKey = (tokenId: string) => {
@@ -129,29 +200,38 @@ const ApiKeyPage = () => {
     return { relativeTime, fullDate };
   };
 
+  const isPaginated = data && !Array.isArray(data);
+  const items = isPaginated ? data.items : data;
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-3xl mx-auto px-4 sm:px-6">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 divide-y divide-gray-200">
+          <div className="bg-white rounded-lg shadow-xs border border-gray-200 divide-y divide-gray-200">
             <div className="p-6">
               <div className="flex justify-between items-center">
                 <div className="space-y-3">
-                  <div className="h-6 w-24 bg-gray-200 rounded animate-pulse"></div>
-                  <div className="h-4 w-48 bg-gray-200 rounded animate-pulse"></div>
+                  <div className="h-6 w-24 bg-gray-200 rounded-sm animate-pulse"></div>
+                  <div className="h-4 w-48 bg-gray-200 rounded-sm animate-pulse"></div>
                 </div>
-                <div className="h-10 w-24 bg-gray-200 rounded animate-pulse"></div>
+                <div className="h-10 w-24 bg-gray-200 rounded-sm animate-pulse"></div>
               </div>
             </div>
             <div className="p-6">
-              {[1, 2].map((i) => (
+              {[1, 2, 3].map((i) => (
                 <div key={i} className="mb-6 last:mb-0">
                   <div className="space-y-3">
-                    <div className="h-5 w-32 bg-gray-200 rounded animate-pulse"></div>
-                    <div className="h-8 w-48 bg-gray-200 rounded animate-pulse"></div>
+                    <div className="h-5 w-32 bg-gray-200 rounded-sm animate-pulse"></div>
+                    <div className="h-8 w-48 bg-gray-200 rounded-sm animate-pulse"></div>
                   </div>
                 </div>
               ))}
+            </div>
+            <div className="p-4 bg-gray-50">
+              <div className="flex justify-between items-center">
+                <div className="w-20 h-8 bg-gray-200 rounded-sm animate-pulse"></div>
+                <div className="w-32 h-8 bg-gray-200 rounded-sm animate-pulse"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -163,7 +243,7 @@ const ApiKeyPage = () => {
     return (
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-3xl mx-auto px-4 sm:px-6">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 text-center">
+          <div className="bg-white rounded-lg shadow-xs border border-gray-200 p-6 text-center">
             <div className="text-red-500 mb-2">
               <svg
                 className="mx-auto h-12 w-12"
@@ -187,7 +267,7 @@ const ApiKeyPage = () => {
             </p>
             <button
               onClick={() => queryClient.invalidateQueries({ queryKey: ["apiKeys"] })}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-xs text-white bg-blue-600 hover:bg-blue-700"
             >
               Retry
             </button>
@@ -200,7 +280,7 @@ const ApiKeyPage = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-3xl mx-auto px-4 sm:px-6">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 divide-y divide-gray-200">
+        <div className="bg-white rounded-lg shadow-xs border border-gray-200 divide-y divide-gray-200">
           {/* API Keys header */}
           <div className="p-6">
             <div className="flex flex-wrap sm:flex-nowrap justify-between items-center gap-4">
@@ -211,7 +291,7 @@ const ApiKeyPage = () => {
                 </p>
               </div>
               <button
-                className="shrink-0 inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
+                className="shrink-0 inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-xs text-white bg-blue-600 hover:bg-blue-700"
                 onClick={() => setIsModalOpen(true)}
               >
                 <PlusIcon className="h-4 w-4 mr-1.5" />
@@ -228,7 +308,7 @@ const ApiKeyPage = () => {
                   <h3 className="text-base font-medium text-gray-900">
                     Web Authentication Usage
                   </h3>
-                  <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                  <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-medium bg-blue-100 text-blue-800">
                     Browser Sessions
                   </span>
                 </div>
@@ -249,7 +329,7 @@ const ApiKeyPage = () => {
           </div>
 
           {/* API keys list */}
-          {data?.length === 0 ? (
+          {items?.length === 0 ? (
             <div className="p-6 text-center">
               <KeyIcon className="mx-auto h-10 w-10 text-gray-400" />
               <h3 className="mt-2 text-sm font-medium text-gray-900">No API keys</h3>
@@ -259,7 +339,7 @@ const ApiKeyPage = () => {
             </div>
           ) : (
             <div className="divide-y divide-gray-200">
-              {data?.map((apiKey) => {
+              {items?.map((apiKey) => {
                 const { relativeTime, fullDate } = formatDate(apiKey.created_at);
                 return (
                   <div key={apiKey.token} className="p-6">
@@ -284,11 +364,26 @@ const ApiKeyPage = () => {
                           </span>
                         </div>
                         <div className="mt-2 flex items-center gap-2">
-                          <code className="text-sm bg-gray-100 px-2 py-0.5 rounded text-gray-600">
+                          <code className="text-sm bg-gray-100 px-2 py-0.5 rounded-sm text-gray-600">
                             {getTokenDisplay(apiKey.token)}
                           </code>
                           <CopyToClipboardIcon text={apiKey.token} />
                         </div>
+                        {Object.keys(apiKey.meta_data || {}).length > 0 && (
+                          <div className="mt-2">
+                            <div className="flex flex-wrap gap-2">
+                              {Object.entries(apiKey.meta_data).map(([key, value]) => (
+                                <span
+                                  key={key}
+                                  className="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-medium bg-gray-100 text-gray-800"
+                                  title={`${key}: ${JSON.stringify(value)}`}
+                                >
+                                  {key}: {JSON.stringify(value)}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                       <div className="mt-4 sm:mt-0 flex items-center gap-3">
                         <button
@@ -311,7 +406,7 @@ const ApiKeyPage = () => {
                             leaveFrom="transform opacity-100 scale-100"
                             leaveTo="transform opacity-0 scale-95"
                           >
-                            <Menu.Items className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 focus:outline-none">
+                            <Menu.Items className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 focus:outline-hidden">
                               <div className="py-1">
                                 <Menu.Item>
                                   {({ active }) => (
@@ -335,6 +430,44 @@ const ApiKeyPage = () => {
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {isPaginated && data.total > 0 && (
+            <div className="p-4 bg-gray-50">
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-gray-700">
+                  Showing{" "}
+                  <span className="font-medium">
+                    {(data.page - 1) * data.page_size + 1}
+                  </span>{" "}
+                  to{" "}
+                  <span className="font-medium">
+                    {Math.min(data.page * data.page_size, data.total)}
+                  </span>{" "}
+                  of <span className="font-medium">{data.total}</span> results
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                    disabled={data.page <= 1}
+                    className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ChevronLeftIcon className="h-4 w-4 mr-1" />
+                    Previous
+                  </button>
+                  <button
+                    onClick={() =>
+                      setCurrentPage((prev) => Math.min(prev + 1, data.total_pages))
+                    }
+                    disabled={data.page >= data.total_pages}
+                    className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                    <ChevronRightIcon className="h-4 w-4 ml-1" />
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -366,15 +499,73 @@ const ApiKeyPage = () => {
                   placeholder="e.g., Production API Key"
                   maxLength={100}
                   disabled={addMutation.isPending}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:bg-gray-50 disabled:text-gray-500"
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-xs focus:outline-hidden focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:bg-gray-50 disabled:text-gray-500"
                 />
                 <p className="mt-1 text-xs text-gray-500">
                   {description.length}/100 characters
                 </p>
               </div>
 
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Metadata (optional)
+                </label>
+                <div className="mt-1 space-y-2">
+                  {metaDataEntries.map((entry, index) => (
+                    <div key={index} className="flex gap-2">
+                      <input
+                        type="text"
+                        value={entry.key}
+                        onChange={(e) =>
+                          handleMetaDataChange(index, "key", e.target.value)
+                        }
+                        placeholder="Key"
+                        disabled={addMutation.isPending}
+                        className="block w-1/3 px-3 py-2 border border-gray-300 rounded-md shadow-xs focus:outline-hidden focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:bg-gray-50 disabled:text-gray-500"
+                      />
+                      <input
+                        type="text"
+                        value={entry.value}
+                        onChange={(e) =>
+                          handleMetaDataChange(index, "value", e.target.value)
+                        }
+                        placeholder="Value"
+                        disabled={addMutation.isPending}
+                        className="block flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-xs focus:outline-hidden focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:bg-gray-50 disabled:text-gray-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveMetaDataEntry(index)}
+                        disabled={addMutation.isPending}
+                        className="p-2 text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                      >
+                        <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                          <path
+                            fillRule="evenodd"
+                            d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={handleAddMetaDataEntry}
+                    disabled={addMutation.isPending}
+                    className="mt-2 inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    <PlusIcon className="h-4 w-4 mr-1.5" />
+                    Add Metadata Field
+                  </button>
+                </div>
+                <p className="mt-1 text-xs text-gray-500">
+                  Add key/value pairs for additional metadata
+                </p>
+              </div>
+
               {addMutation.isError && (
-                <div className="text-sm text-red-600 bg-red-50 p-3 rounded">
+                <div className="text-sm text-red-600 bg-red-50 p-3 rounded-sm">
                   {addMutation.error.message}
                 </div>
               )}
@@ -440,7 +631,7 @@ const ApiKeyPage = () => {
                 any applications using it will stop working.
               </p>
               {deleteMutation.isError && (
-                <div className="text-sm text-red-600 bg-red-50 p-3 rounded">
+                <div className="text-sm text-red-600 bg-red-50 p-3 rounded-sm">
                   {deleteMutation.error.message}
                 </div>
               )}

@@ -324,7 +324,7 @@ export default function Chat() {
         <select
           value={selectedModel}
           onChange={handleModelChange}
-          className="border border-gray-300 p-1 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 "
+          className="border border-gray-300 p-1 rounded-md focus:outline-hidden focus:ring-2 focus:ring-blue-500 "
         >
           {supportedModelsOptions.map((o) => (
             <option key={o.value} value={o.value}>
@@ -357,7 +357,7 @@ export default function Chat() {
         {!isSending && messages.length ? (
           <div className="max-w-2xl mx-auto flex justify-start px-4 -top-4 relative">
             <button
-              className="text-sm text-gray-400 hover:text-gray-600 underline focus:outline-none"
+              className="text-sm text-gray-400 hover:text-gray-600 underline focus:outline-hidden"
               onClick={sendContinueMessage}
             >
               Continue
@@ -370,7 +370,7 @@ export default function Chat() {
             {isSending ? <Spinner /> : <div>End of messages</div>}
             {!isSending && (
               <button
-                className="text-sm text-blue-400 hover:text-gray-600 underline focus:outline-none"
+                className="text-sm text-blue-400 hover:text-gray-600 underline focus:outline-hidden"
                 onClick={handleClearHistory}
               >
                 Clean History
@@ -382,7 +382,7 @@ export default function Chat() {
       <div className="w-full p-4 bg-white border-t border-gray-300 sticky bottom-0">
         <div className="max-w-2xl mx-auto flex justify-center space-x-2">
           <AutoGrowTextarea
-            className="flex-1 border border-gray-300 p-2 rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            className="flex-1 border border-gray-300 p-2 rounded-l-md focus:outline-hidden focus:ring-2 focus:ring-blue-500 resize-none"
             value={input}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
@@ -390,7 +390,7 @@ export default function Chat() {
             disabled={isSending}
           />
           <button
-            className="bg-blue-500 text-white p-2 rounded-r-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="bg-blue-500 text-white p-2 rounded-r-md hover:bg-blue-600 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
             onClick={() => sendMessage(input)}
             disabled={isSending}
           >
@@ -398,7 +398,7 @@ export default function Chat() {
           </button>
           {isSending && (
             <button
-              className="bg-red-500 text-white p-2 rounded-md hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
+              className="bg-red-500 text-white p-2 rounded-md hover:bg-red-600 focus:outline-hidden focus:ring-2 focus:ring-red-500"
               onClick={handleStop}
             >
               <StopIcon className="h-5 w-5" />
