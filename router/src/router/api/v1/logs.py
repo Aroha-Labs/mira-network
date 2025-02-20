@@ -210,7 +210,9 @@ def list_all_logs(
     if end_date:
         query = query.filter(ApiLogs.created_at <= end_date)
     if machine_id:
-        query = query.filter(ApiLogs.machine_id == machine_id)
+        query = query.filter(
+            ApiLogs.machine_id == machine_id
+        )  # Removed str() conversion
     if model:
         query = query.filter(ApiLogs.model == model)
     if api_key_id:
@@ -322,7 +324,7 @@ def get_logs_metrics(
     user: User = Depends(verify_user),
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
-    machine_id: Optional[str] = None,
+    machine_id: Optional[int] = None,  # Type hint remains int
     model: Optional[str] = None,
     api_key_id: Optional[int] = None,
     user_id: Optional[str] = None,
@@ -399,7 +401,7 @@ def get_logs_metrics(
     if end_date:
         query = query.where(ApiLogs.created_at <= end_date)
     if machine_id:
-        query = query.where(ApiLogs.machine_id == machine_id)
+        query = query.where(ApiLogs.machine_id == str(machine_id))  # Convert to string
     if model:
         query = query.where(ApiLogs.model == model)
     if api_key_id:
@@ -411,8 +413,6 @@ def get_logs_metrics(
     query = query.group_by(time_bucket_fn(ApiLogs.created_at), ApiLogs.model).order_by(
         time_bucket_fn(ApiLogs.created_at)
     )
-
-    print(query)
 
     # Execute the query once
     results = db.execute(query).all()

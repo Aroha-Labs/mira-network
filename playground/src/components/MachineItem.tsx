@@ -3,12 +3,14 @@ import CopyToClipboardIcon from "./CopyToClipboardIcon";
 import MetricsModal from "./MetricsModal";
 
 interface MachineProps {
-  machine_uid: string;
+  id: number; // Added id field
   network_ip: string;
+  name: string | null;
+  description: string | null;
   status: "online" | "offline";
 }
 
-const MachineItem = ({ machine_uid, network_ip, status }: MachineProps) => {
+const MachineItem = ({ id, network_ip, name, description, status }: MachineProps) => {
   const [showMetrics, setShowMetrics] = useState(false);
 
   return (
@@ -19,9 +21,11 @@ const MachineItem = ({ machine_uid, network_ip, status }: MachineProps) => {
       <div className="p-4">
         <div className="flex items-start justify-between">
           <div className="flex-1">
-            <div className="flex items-center space-x-2">
-              <h3 className="font-medium text-gray-900 truncate">{machine_uid}</h3>
-              <CopyToClipboardIcon text={machine_uid} />
+            {/* Machine Name and Status */}
+            <div className="flex items-center gap-2">
+              <h3 className="font-medium text-gray-900 truncate">
+                {name || "Unnamed Machine"}
+              </h3>
               <span
                 className={`px-2 py-0.5 text-xs font-medium rounded-full ${
                   status === "online"
@@ -32,15 +36,30 @@ const MachineItem = ({ machine_uid, network_ip, status }: MachineProps) => {
                 {status}
               </span>
             </div>
-            <p className="text-sm text-gray-500 mt-1">{network_ip}</p>
-            <div className="flex items-center mt-1 space-x-2">
+
+            {/* IP Address with Copy Button */}
+            <div className="flex items-center gap-2 mt-1">
+              <p className="text-sm text-gray-500">{network_ip}</p>
+              <CopyToClipboardIcon
+                text={network_ip}
+                className="w-4 h-4 text-gray-400 hover:text-gray-600"
+              />
+            </div>
+
+            {/* Description */}
+            {description && (
+              <p className="text-sm text-gray-600 mt-1 line-clamp-2">{description}</p>
+            )}
+
+            {/* Status Indicator */}
+            <div className="flex items-center mt-2">
               <div
                 className={`w-2 h-2 rounded-full ${
                   status === "online" ? "bg-green-500 animate-pulse" : "bg-yellow-500"
                 }`}
               />
               <p
-                className={`text-sm ${
+                className={`text-sm ml-2 ${
                   status === "online" ? "text-green-600" : "text-yellow-600"
                 }`}
               >
@@ -57,7 +76,7 @@ const MachineItem = ({ machine_uid, network_ip, status }: MachineProps) => {
               status === "online"
                 ? "border-gray-300 text-gray-700 bg-white hover:bg-gray-50"
                 : "border-gray-200 text-gray-600 bg-white hover:bg-gray-50"
-            } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
+            } focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
           >
             View Metrics {status === "offline" && "(Historical)"}
           </button>
@@ -65,7 +84,11 @@ const MachineItem = ({ machine_uid, network_ip, status }: MachineProps) => {
       </div>
 
       {showMetrics && (
-        <MetricsModal machineId={machine_uid} onClose={() => setShowMetrics(false)} />
+        <MetricsModal
+          machineId={id} // Changed from machineIP={network_ip}
+          onClose={() => setShowMetrics(false)}
+          title={`Metrics for ${name || "Unnamed Machine"} (${network_ip})`}
+        />
       )}
     </div>
   );

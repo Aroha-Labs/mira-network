@@ -180,7 +180,7 @@ export default function Workbench() {
   }, [models, selectedModel]);
 
   // Debug log for flows
-  console.log("Current flows:", flows);
+  // console.log("Current flows:", flows);
 
   // Add state for editable system prompt
   const [editableSystemPrompt, setEditableSystemPrompt] = useState("");
@@ -299,6 +299,7 @@ export default function Workbench() {
           messages,
           model: selectedModel || "claude-3-opus-20240229",
           endpoint: "/v1/chat/completions",
+          systemPrompt: editableSystemPrompt,
           variables,
           tools,
           flowId: Number(selectedFlow.id),
@@ -572,7 +573,7 @@ export default function Workbench() {
                 >
                   <PlusIcon className="w-4 h-4 mr-1.5" />
                   New Flow
-                  <span className="absolute px-2 py-1 mb-2 text-xs font-medium text-white transition-opacity transform -translate-x-1/2 bg-gray-900 rounded opacity-0 bottom-full left-1/2 group-hover:opacity-100 whitespace-nowrap">
+                  <span className="absolute px-2 py-1 mb-2 text-xs font-medium text-white transition-opacity transform -translate-x-1/2 bg-gray-900 rounded-sm opacity-0 bottom-full left-1/2 group-hover:opacity-100 whitespace-nowrap">
                     Create a new flow
                   </span>
                 </button>
@@ -581,7 +582,7 @@ export default function Workbench() {
                   className="relative p-2 text-gray-500 transition-colors rounded-full hover:text-gray-700 hover:bg-gray-100 group"
                 >
                   <ChevronRightIcon className="w-5 h-5" />
-                  <span className="absolute right-0 px-2 py-1 mb-2 text-xs font-medium text-white transition-opacity bg-gray-900 rounded opacity-0 bottom-full group-hover:opacity-100 whitespace-nowrap">
+                  <span className="absolute right-0 px-2 py-1 mb-2 text-xs font-medium text-white transition-opacity bg-gray-900 rounded-sm opacity-0 bottom-full group-hover:opacity-100 whitespace-nowrap">
                     Hide flows panel
                   </span>
                 </button>
@@ -619,8 +620,8 @@ export default function Workbench() {
                     key={i}
                     className="w-full p-4 border border-gray-200 rounded-xl animate-pulse"
                   >
-                    <div className="w-1/3 h-5 mb-3 bg-gray-200 rounded"></div>
-                    <div className="w-2/3 h-4 bg-gray-200 rounded"></div>
+                    <div className="w-1/3 h-5 mb-3 bg-gray-200 rounded-sm"></div>
+                    <div className="w-2/3 h-4 bg-gray-200 rounded-sm"></div>
                   </div>
                 ))}
               </div>
@@ -646,8 +647,8 @@ export default function Workbench() {
                   }}
                   className={`w-full p-4 text-left transition-all rounded-xl border relative group ${
                     selectedFlow?.id === flow.id
-                      ? "bg-gradient-to-br from-indigo-50 to-white border-indigo-200 shadow-sm"
-                      : "border-gray-200 hover:border-indigo-200 hover:bg-gradient-to-br hover:from-gray-50 hover:to-white"
+                      ? "bg-linear-to-br from-indigo-50 to-white border-indigo-200 shadow-xs"
+                      : "border-gray-200 hover:border-indigo-200 hover:bg-linear-to-br hover:from-gray-50 hover:to-white"
                   }`}
                 >
                   {selectedFlow?.id === flow.id && (
@@ -670,7 +671,7 @@ export default function Workbench() {
                               }
                             }}
                             onClick={(e) => e.stopPropagation()}
-                            className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white shadow-sm"
+                            className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white shadow-xs"
                             placeholder="Enter flow name..."
                             autoFocus
                           />
@@ -729,7 +730,7 @@ export default function Workbench() {
         {/* Toggle Slider Button - Update for mobile */}
         <button
           onClick={() => setIsSliderOpen(true)}
-          className={`fixed top-20 left-4 z-20 p-2 bg-white/50 backdrop-blur-sm border border-gray-200/50 rounded-full shadow-sm hover:bg-white hover:border-gray-300 hover:shadow-md transition-all duration-200 ${
+          className={`fixed top-20 left-4 z-20 p-2 bg-white/50 backdrop-blur-xs border border-gray-200/50 rounded-full shadow-sm hover:bg-white hover:border-gray-300 hover:shadow-md transition-all duration-200 ${
             isSliderOpen ? "hidden" : "flex items-center space-x-2"
           }`}
         >
@@ -774,9 +775,9 @@ export default function Workbench() {
           {selectedFlow ? (
             <>
               {/* Tools Editor */}
-              <div className="mb-6 border border-gray-200 rounded-lg bg-gradient-to-b from-gray-50 to-white">
+              <div className="mb-6 border border-gray-200 rounded-lg bg-linear-to-b from-gray-50 to-white">
                 <div
-                  className="flex items-center justify-between px-4 py-3 border-b border-gray-200 cursor-pointer bg-gradient-to-b from-gray-100 to-gray-50 hover:from-gray-200 hover:to-gray-100"
+                  className="flex items-center justify-between px-4 py-3 border-b border-gray-200 cursor-pointer bg-linear-to-b from-gray-100 to-gray-50 hover:from-gray-200 hover:to-gray-100"
                   onClick={() => toggleSection("tools")}
                 >
                   <div className="flex items-center space-x-2">
@@ -920,9 +921,9 @@ export default function Workbench() {
               </div>
 
               {/* System Message */}
-              <div className="mb-6 border border-gray-200 rounded-lg bg-gradient-to-b from-gray-50 to-white">
+              <div className="mb-6 border border-gray-200 rounded-lg bg-linear-to-b from-gray-50 to-white">
                 <div
-                  className="flex items-center justify-between px-4 py-3 border-b border-gray-200 cursor-pointer bg-gradient-to-b from-gray-100 to-gray-50 hover:from-gray-200 hover:to-gray-100"
+                  className="flex items-center justify-between px-4 py-3 border-b border-gray-200 cursor-pointer bg-linear-to-b from-gray-100 to-gray-50 hover:from-gray-200 hover:to-gray-100"
                   onClick={() => toggleSection("system")}
                 >
                   <div className="flex items-center space-x-2">
@@ -953,7 +954,7 @@ export default function Workbench() {
 
                     {/* Variables */}
                     {Object.entries(variables).length > 0 && (
-                      <div className="px-4 py-3 border-t border-gray-200 bg-gradient-to-b from-gray-50 to-white">
+                      <div className="px-4 py-3 border-t border-gray-200 bg-linear-to-b from-gray-50 to-white">
                         <h4 className="mb-3 text-sm font-medium text-gray-700">
                           Variables
                         </h4>
@@ -990,9 +991,9 @@ export default function Workbench() {
               </div>
 
               {/* Conversation Flow */}
-              <div className="flex-1 border border-gray-200 rounded-lg bg-gradient-to-b from-gray-50 to-white">
+              <div className="flex-1 border border-gray-200 rounded-lg bg-linear-to-b from-gray-50 to-white">
                 <div
-                  className="flex items-center justify-between px-4 py-3 border-b border-gray-200 cursor-pointer bg-gradient-to-b from-gray-100 to-gray-50 hover:from-gray-200 hover:to-gray-100"
+                  className="flex items-center justify-between px-4 py-3 border-b border-gray-200 cursor-pointer bg-linear-to-b from-gray-100 to-gray-50 hover:from-gray-200 hover:to-gray-100"
                   onClick={() => toggleSection("conversation")}
                 >
                   <div className="flex items-center space-x-2">
@@ -1081,7 +1082,7 @@ export default function Workbench() {
                     {/* Add Message Button */}
                     <button
                       onClick={handleAddMessage}
-                      className="flex items-center justify-center w-full px-4 py-2.5 text-sm font-medium text-gray-700 bg-gradient-to-b from-white to-gray-50 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors group relative"
+                      className="flex items-center justify-center w-full px-4 py-2.5 text-sm font-medium text-gray-700 bg-linear-to-b from-white to-gray-50 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors group relative"
                     >
                       <PlusIcon className="w-4 h-4 md:mr-1.5" />
                       Add Message
@@ -1131,7 +1132,7 @@ export default function Workbench() {
                   <select
                     value={selectedModel}
                     onChange={(e) => setSelectedModel(e.target.value)}
-                    className="pl-3 pr-10 py-1.5 text-sm border border-gray-300 rounded-md bg-white shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 appearance-none"
+                    className="pl-3 pr-10 py-1.5 text-sm border border-gray-300 rounded-md bg-white shadow-xs focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 appearance-none"
                   >
                     {Array.isArray(models) &&
                       models.map((modelId: string) => (
@@ -1154,7 +1155,7 @@ export default function Workbench() {
                 >
                   <ChartBarIcon className="w-4 h-4 md:mr-1.5" />
 
-                  <span className="absolute px-2 py-1 mb-2 text-xs font-medium text-white transition-opacity bg-gray-900 rounded opacity-0 bottom-full left-1/2 group-hover:opacity-100 whitespace-nowrap">
+                  <span className="absolute px-2 py-1 mb-2 text-xs font-medium text-white transition-opacity bg-gray-900 rounded-sm opacity-0 bottom-full left-1/2 group-hover:opacity-100 whitespace-nowrap">
                     View flow metrics and analytics
                   </span>
                 </button>
@@ -1166,7 +1167,7 @@ export default function Workbench() {
               >
                 <ArrowPathIcon className="w-4 h-4 md:mr-1.5" />
                 {/* <span className="hidden md:inline">Regenerate</span> */}
-                <span className="absolute px-2 py-1 mb-2 text-xs font-medium text-white transition-opacity transform -translate-x-1/2 bg-gray-900 rounded opacity-0 bottom-full left-1/2 group-hover:opacity-100 whitespace-nowrap">
+                <span className="absolute px-2 py-1 mb-2 text-xs font-medium text-white transition-opacity transform -translate-x-1/2 bg-gray-900 rounded-sm opacity-0 bottom-full left-1/2 group-hover:opacity-100 whitespace-nowrap">
                   Generate a new response
                 </span>
               </button>
@@ -1177,7 +1178,7 @@ export default function Workbench() {
                 >
                   <StopIcon className="w-4 h-4 md:mr-1.5" />
                   <span className="hidden md:inline">Stop</span>
-                  <span className="absolute px-2 py-1 mb-2 text-xs font-medium text-white transition-opacity transform -translate-x-1/2 bg-gray-900 rounded opacity-0 bottom-full left-1/2 group-hover:opacity-100 whitespace-nowrap">
+                  <span className="absolute px-2 py-1 mb-2 text-xs font-medium text-white transition-opacity transform -translate-x-1/2 bg-gray-900 rounded-sm opacity-0 bottom-full left-1/2 group-hover:opacity-100 whitespace-nowrap">
                     Stop generation
                   </span>
                 </button>
@@ -1189,7 +1190,7 @@ export default function Workbench() {
                 >
                   <PlayIcon className="w-4 h-4 md:mr-1.5" />
                   {/* <span className="hidden md:inline">Generate</span> */}
-                  <span className="absolute px-2 py-1 mb-2 text-xs font-medium text-white transition-opacity transform -translate-x-1/2 bg-gray-900 rounded opacity-0 bottom-full left-1/2 group-hover:opacity-100 whitespace-nowrap">
+                  <span className="absolute px-2 py-1 mb-2 text-xs font-medium text-white transition-opacity transform -translate-x-1/2 bg-gray-900 rounded-sm opacity-0 bottom-full left-1/2 group-hover:opacity-100 whitespace-nowrap">
                     Generate response
                   </span>
                 </button>
@@ -1244,7 +1245,7 @@ export default function Workbench() {
                                   const preElement = children?.toString() || "";
                                   navigator.clipboard.writeText(preElement);
                                 }}
-                                className="absolute p-1 text-gray-200 transition-opacity bg-gray-700 rounded opacity-0 top-2 right-2 group-hover:opacity-100"
+                                className="absolute p-1 text-gray-200 transition-opacity bg-gray-700 rounded-sm opacity-0 top-2 right-2 group-hover:opacity-100"
                               >
                                 <ClipboardIcon className="w-4 h-4" />
                               </button>
@@ -1306,7 +1307,7 @@ export default function Workbench() {
 
       {/* Full-screen verification panel */}
       <div
-        className={`fixed inset-0 bg-black/50 backdrop-blur-sm z-50 transition-all duration-300 ${
+        className={`fixed inset-0 bg-black/50 backdrop-blur-xs z-50 transition-all duration-300 ${
           showVerification ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
         onClick={() => setShowVerification(false)}

@@ -37,7 +37,11 @@ def extract_variables(system_prompt: str) -> List[str]:
 
 
 @router.post("/flows", **CREATE_FLOW_DOCS)
-def create_flow(flow: FlowRequest, db: Session = Depends(get_session)):
+def create_flow(
+    flow: FlowRequest,
+    db: Session = Depends(get_session),
+    user: User = Depends(verify_user),
+):
     variables = extract_variables(flow.system_prompt)
 
     new_flow = Flows(

@@ -31,9 +31,9 @@ ChartJS.register(
 );
 
 interface MetricsModalProps {
+  machineId?: number; // Changed from machineIP: string
   onClose: () => void;
   title?: string;
-  machineId?: string;
   apiKeyId?: number;
   userId?: string;
   modelFilter?: string;
@@ -44,9 +44,13 @@ interface MetricsModalProps {
   flowId?: string;
 }
 
-const Shimmer = () => <div className="w-full h-full bg-gray-200 rounded animate-pulse" />;
+const Shimmer = () => (
+  <div className="w-full h-full bg-gray-200 rounded-sm animate-pulse" />
+);
 
-const ValueShimmer = () => <div className="w-16 h-6 bg-gray-200 rounded animate-pulse" />;
+const ValueShimmer = () => (
+  <div className="w-16 h-6 bg-gray-200 rounded-sm animate-pulse" />
+);
 
 const ChartShimmer = () => (
   <div className="w-full h-full rounded-lg animate-pulse bg-gray-200/60" />
@@ -78,9 +82,9 @@ interface MetricsResponse {
 }
 
 const MetricsModal = ({
+  machineId, // Changed from machineIP
   onClose,
   title,
-  machineId,
   apiKeyId,
   userId,
   modelFilter,
@@ -136,7 +140,7 @@ const MetricsModal = ({
   const { data, isLoading, error } = useQuery<MetricsResponse>({
     queryKey: [
       "metrics",
-      machineId,
+      machineId, // Changed from machineIP
       apiKeyId,
       userId,
       modelFilter,
@@ -156,7 +160,7 @@ const MetricsModal = ({
       const resp = await api.get("/api-logs/metrics", {
         params: {
           ...(flowId && { flow_id: flowId }),
-          ...(machineId && { machine_id: machineId }),
+          ...(machineId && { machine_id: machineId }), // Changed from machine_ip: machineIP
           ...(apiKeyId && { api_key_id: apiKeyId }),
           ...(userId && { user_id: userId }),
           ...(modelFilter && { model: modelFilter }),
@@ -401,7 +405,7 @@ const MetricsModal = ({
     if (isLoading) {
       return (
         <div className="space-y-4">
-          <div className="bg-white px-2 py-1.5 rounded-lg shadow-sm border border-gray-100 flex justify-end gap-1.5">
+          <div className="bg-white px-2 py-1.5 rounded-lg shadow-xs border border-gray-100 flex justify-end gap-1.5">
             {[...Array(4)].map((_, i) => (
               <div key={i} className="w-12 h-8">
                 <Shimmer />
@@ -416,7 +420,7 @@ const MetricsModal = ({
             {renderMetricBlock("Avg Response Time", null, null, false, true)}
           </div>
 
-          <div className="bg-white border border-gray-100 rounded-lg shadow-sm">
+          <div className="bg-white border border-gray-100 rounded-lg shadow-xs">
             <div className="px-3 py-2 border-b border-gray-100">
               <h3 className="text-sm font-medium text-gray-700">Model Distribution</h3>
             </div>
@@ -443,7 +447,7 @@ const MetricsModal = ({
 
     if (error) {
       return (
-        <div className="px-4 py-3 text-red-700 bg-red-100 border border-red-400 rounded">
+        <div className="px-4 py-3 text-red-700 bg-red-100 border border-red-400 rounded-sm">
           <p className="font-bold">Error loading metrics</p>
           <p>{(error as Error).message}</p>
         </div>
@@ -457,7 +461,7 @@ const MetricsModal = ({
     return (
       <div className="space-y-4">
         {/* Date range buttons */}
-        <div className="bg-white px-2 py-1.5 rounded-lg shadow-sm border border-gray-100 flex justify-between items-center">
+        <div className="bg-white px-2 py-1.5 rounded-lg shadow-xs border border-gray-100 flex justify-between items-center">
           <div className="text-sm text-gray-500">
             {data.time_series.length ? `${data.time_series.length} total logs` : ""}
           </div>
@@ -473,7 +477,7 @@ const MetricsModal = ({
                 onClick={() => setDateRangeState(value)}
                 className={`px-3 py-1 rounded-md text-sm font-medium transition-colors duration-200 ${
                   dateRangeState === value
-                    ? "bg-blue-500 text-white shadow-sm"
+                    ? "bg-blue-500 text-white shadow-xs"
                     : "bg-gray-50 text-gray-600 hover:bg-gray-100"
                 }`}
               >
@@ -513,7 +517,7 @@ const MetricsModal = ({
         </div>
 
         {/* Model Distribution */}
-        <div className="transition-all duration-200 bg-white border border-gray-100 rounded-lg shadow-sm hover:shadow-md">
+        <div className="transition-all duration-200 bg-white border border-gray-100 rounded-lg shadow-xs hover:shadow-md">
           <div className="px-3 py-2 border-b border-gray-100">
             <h3 className="text-sm font-medium text-gray-700">Model Distribution</h3>
           </div>
@@ -523,7 +527,7 @@ const MetricsModal = ({
                 {data.model_distribution.map((entry) => (
                   <div
                     key={entry.model}
-                    className="flex items-center justify-between px-2 py-1 rounded bg-gray-50"
+                    className="flex items-center justify-between px-2 py-1 rounded-sm bg-gray-50"
                   >
                     <span className="mr-2 text-xs text-gray-600 truncate">
                       {entry.model}
@@ -577,7 +581,7 @@ const MetricsModal = ({
         title ||
         `Metrics for ${
           machineId
-            ? `Machine ${machineId}`
+            ? `Machine ${machineId}` // Changed from machineIP
             : apiKeyId
               ? `API Key ${apiKeyId}`
               : userId

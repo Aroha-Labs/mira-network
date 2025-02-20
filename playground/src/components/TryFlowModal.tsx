@@ -160,7 +160,7 @@ export default function TryFlowModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs">
       <div className="flex flex-col w-full h-[90vh] max-w-6xl bg-gray-50 rounded-xl shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-gray-200 rounded-t-xl">
@@ -171,7 +171,7 @@ export default function TryFlowModal({
             <select
               value={selectedModel}
               onChange={(e) => setSelectedModel(e.target.value)}
-              className="px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-xs focus:outline-hidden focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Select Model</option>
               {supportedModelsData?.map((model) => (
@@ -203,7 +203,7 @@ export default function TryFlowModal({
                   <AutoGrowTextarea
                     value={systemPrompt}
                     onChange={handlePromptChange}
-                    className="w-full p-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full p-3 text-sm border border-gray-300 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                     placeholder="Enter system prompt with variables like {{variable_name}}"
                     rows={3}
                   />
@@ -231,7 +231,7 @@ export default function TryFlowModal({
                                 [variable]: e.target.value,
                               }))
                             }
-                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                             placeholder={`Enter ${variable}`}
                           />
                         </div>
@@ -247,7 +247,7 @@ export default function TryFlowModal({
               {!showSaveForm ? (
                 <button
                   onClick={() => setShowSaveForm(true)}
-                  className="w-full px-4 py-2 text-sm font-medium text-white transition-colors duration-200 bg-green-600 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className="w-full px-4 py-2 text-sm font-medium text-white transition-colors duration-200 bg-green-600 rounded-lg hover:bg-green-700 focus:outline-hidden focus:ring-2 focus:ring-green-500"
                 >
                   Save Flow
                 </button>
@@ -257,7 +257,7 @@ export default function TryFlowModal({
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                     placeholder="Enter flow name"
                     disabled={isLoading}
                   />
@@ -265,7 +265,7 @@ export default function TryFlowModal({
                     <button
                       onClick={handleSave}
                       disabled={!name.trim() || !systemPrompt.trim() || isLoading}
-                      className={`flex-1 px-4 py-2 text-sm font-medium text-white transition-colors duration-200 rounded-lg focus:outline-none focus:ring-2 ${
+                      className={`flex-1 px-4 py-2 text-sm font-medium text-white transition-colors duration-200 rounded-lg focus:outline-hidden focus:ring-2 ${
                         !isLoading && saveClicked
                           ? "bg-green-500 hover:bg-green-600 focus:ring-green-400"
                           : "bg-green-600 hover:bg-green-700 focus:ring-green-500"
@@ -287,7 +287,7 @@ export default function TryFlowModal({
                     </button>
                     <button
                       onClick={onClose}
-                      className="px-4 py-2 text-sm font-medium text-gray-700 transition-colors duration-200 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                      className="px-4 py-2 text-sm font-medium text-gray-700 transition-colors duration-200 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-hidden focus:ring-2 focus:ring-gray-500"
                     >
                       Close
                     </button>
@@ -350,21 +350,21 @@ export default function TryFlowModal({
                     }
                   }}
                   placeholder="Type your message... (Shift+Enter for new line)"
-                  className="flex-1 p-3 text-sm border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="flex-1 p-3 text-sm border border-gray-300 rounded-lg resize-none focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                   disabled={isLoading}
                 />
                 <div className="flex space-x-2">
                   <button
                     onClick={handleSendMessage}
                     disabled={isLoading || !selectedModel}
-                    className="px-4 py-2 text-sm font-medium text-white transition-colors duration-200 bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="px-4 py-2 text-sm font-medium text-white transition-colors duration-200 bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                   >
                     {isLoading ? "Sending..." : "Send"}
                   </button>
                   {isLoading && (
                     <button
                       onClick={handleStop}
-                      className="p-2 text-white transition-colors duration-200 bg-red-500 rounded-lg hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
+                      className="p-2 text-white transition-colors duration-200 bg-red-500 rounded-lg hover:bg-red-600 focus:outline-hidden focus:ring-2 focus:ring-red-500"
                     >
                       <StopIcon className="w-5 h-5" />
                     </button>

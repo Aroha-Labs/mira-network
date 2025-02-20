@@ -51,7 +51,7 @@ const AddApiKey = ({
             <p className="text-md leading-[22px] tracking-[-0.013em] p-0 uppercase">
               &lt; Create new key
             </p>
-            <div className="flex-grow border-t w-full border-dashed border-[#9CB9AE] mx-1 flex-1 h-[2px]" />
+            <div className="grow border-t w-full border-dashed border-[#9CB9AE] mx-1 flex-1 h-[2px]" />
           </div>
 
           <form onSubmit={handleSubmit}>
@@ -65,7 +65,7 @@ const AddApiKey = ({
               id="description"
               type="text"
               placeholder={`secret-key-${(data?.length ?? 0) + 1}`}
-              className="mt-1 block w-full px-3 py-2 border border-[#D7E2DE] shadow-sm focus:outline-none focus:border-[#308F6A] focus:border-blue-500 sm:text-sm"
+              className="mt-1 block w-full px-3 py-2 border border-[#D7E2DE] shadow-xs focus:outline-hidden focus:border-[#308F6A] focus:border-blue-500 sm:text-sm"
             />
             {description === "error" && (
               <div className="text-red-600 mb-4 font-light text-sm mt-2">

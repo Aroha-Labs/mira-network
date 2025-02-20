@@ -72,7 +72,7 @@ export const MessageVerification = ({
             <button
               onClick={handleVerify}
               disabled={isVerifying}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 text-sm shadow-sm"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 text-sm shadow-xs"
             >
               {isVerifying ? (
                 <>
@@ -92,7 +92,7 @@ export const MessageVerification = ({
                 onClick={() => toggleModel(model)}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
                   selectedModels.includes(model)
-                    ? "bg-blue-100 text-blue-700 hover:bg-blue-200 shadow-sm"
+                    ? "bg-blue-100 text-blue-700 hover:bg-blue-200 shadow-xs"
                     : "bg-white text-gray-600 hover:bg-gray-100 border border-gray-200"
                 }`}
               >
@@ -108,7 +108,7 @@ export const MessageVerification = ({
             <select
               value={minYes}
               onChange={(e) => setMinYes(Number(e.target.value))}
-              className="px-3 py-1.5 rounded-lg text-sm font-medium border border-gray-200 bg-white text-gray-700 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="px-3 py-1.5 rounded-lg text-sm font-medium border border-gray-200 bg-white text-gray-700 hover:border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               {Array.from({ length: selectedModels.length || 1 }, (_, i) => i + 1).map(
                 (num) => (
@@ -131,7 +131,7 @@ export const MessageVerification = ({
       <div className="flex-1 overflow-y-auto p-6">
         {verificationResult && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 rounded-xl bg-white border border-gray-200 shadow-sm">
+            <div className="flex items-center justify-between p-4 rounded-xl bg-white border border-gray-200 shadow-xs">
               <div className="font-medium text-gray-900">Overall Verification Status</div>
               <div
                 className={`flex items-center px-4 py-2 rounded-lg ${

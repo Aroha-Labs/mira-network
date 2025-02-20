@@ -99,7 +99,7 @@ const AdminSettings = () => {
       </div>
 
       {/* Settings List */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 divide-y divide-gray-200">
+      <div className="bg-white rounded-lg shadow-xs border border-gray-200 divide-y divide-gray-200">
         {settings?.map((setting) => (
           <div key={setting.id} className="p-6 transition-colors hover:bg-gray-50">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
@@ -108,7 +108,7 @@ const AdminSettings = () => {
                   <h3 className="text-base font-semibold text-gray-900">
                     {setting.name}
                   </h3>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-medium bg-blue-50 text-blue-700">
                     System
                   </span>
                 </div>
@@ -142,7 +142,7 @@ const AdminSettings = () => {
                 </div>
                 <button
                   onClick={() => setEditSetting(setting)}
-                  className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-xs text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 >
                   Edit Setting
                 </button>

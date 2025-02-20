@@ -76,7 +76,7 @@ const ManageUserRoles = ({ user, onClose }: ManageUserRolesProps) => {
                 </div>
               </div>
               <div
-                className={`flex-shrink-0 h-6 w-6 rounded-full border-2 flex items-center justify-center ${
+                className={`shrink-0 h-6 w-6 rounded-full border-2 flex items-center justify-center ${
                   selectedRoles.includes(role)
                     ? "border-blue-500 bg-blue-500"
                     : "border-gray-300"
