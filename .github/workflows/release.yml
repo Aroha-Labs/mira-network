@@ -283,14 +283,14 @@ jobs:
                 messages: [
                   {
                     role: "system",
-                    content: "You are a technical writer creating release notes. Only describe changes that are explicitly present in the provided diff - do not add, assume, or infer any additional changes. Use clear, professional language and organize changes into relevant sections: New Features, Improvements, Bug Fixes, or Technical Updates. If a section has no changes, omit it entirely. Each note should directly correspond to a specific change in the diff."
+                    content: "You are a technical writer specializing in concise, clear release notes. Focus on user-facing changes and technical impacts. Format in Markdown with the following rules:\n- Group changes into ### sections: Features, Improvements, Fixes, or Infrastructure\n- Use bullet points for each change\n- Be specific but brief\n- Exclude trivial changes like formatting\n- Mention breaking changes first with a 🚨 prefix\n- Include PR/Issue numbers if present in commits"
                   },
                   {
                     role: "user",
-                    content: `Based on the following changes, generate release notes that strictly describe only the actual changes made:\n\n${diff}`
+                    content: `Generate release notes for these changes:\n\n${diff}`
                   }
                 ],
-                temperature: 0.3,
+                temperature: 0.2,
                 max_tokens: 1000
               });
               
