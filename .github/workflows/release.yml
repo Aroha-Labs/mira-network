@@ -52,15 +52,134 @@ jobs:
             sdk:
               - 'sdk/**'
 
+  sonarqube-router:
+    needs: changes
+    if: needs.changes.outputs.router == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: "adopt"
+          java-version: "11"
+      - uses: sonarsource/sonarqube-scan-action@master
+        with:
+          projectBaseDir: router
+          args: >
+            -Dsonar.organization=aroha-labs
+            -Dsonar.projectKey=mira-client-router
+            -Dsonar.sources=.
+            -Dsonar.exclusions=**/tests/**,**/test/**
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+  sonarqube-service:
+    needs: changes
+    if: needs.changes.outputs.service == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: "adopt"
+          java-version: "11"
+      - uses: sonarsource/sonarqube-scan-action@master
+        with:
+          projectBaseDir: service
+          args: >
+            -Dsonar.organization=aroha-labs
+            -Dsonar.projectKey=mira-client-service
+            -Dsonar.sources=.
+            -Dsonar.exclusions=**/tests/**,**/test/**
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+  sonarqube-cli:
+    needs: changes
+    if: needs.changes.outputs.cli == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: "adopt"
+          java-version: "11"
+      - uses: sonarsource/sonarqube-scan-action@master
+        with:
+          projectBaseDir: cli
+          args: >
+            -Dsonar.organization=aroha-labs
+            -Dsonar.projectKey=mira-client-cli
+            -Dsonar.sources=.
+            -Dsonar.exclusions=**/tests/**,**/test/**
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+  sonarqube-playground:
+    needs: changes
+    if: needs.changes.outputs.playground == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: "adopt"
+          java-version: "11"
+      - uses: sonarsource/sonarqube-scan-action@master
+        with:
+          projectBaseDir: playground
+          args: >
+            -Dsonar.organization=aroha-labs
+            -Dsonar.projectKey=mira-client-playground
+            -Dsonar.sources=.
+            -Dsonar.exclusions=**/tests/**,**/test/**
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+  sonarqube-sdk:
+    needs: changes
+    if: needs.changes.outputs.sdk == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: "adopt"
+          java-version: "11"
+      - uses: sonarsource/sonarqube-scan-action@master
+        with:
+          projectBaseDir: sdk
+          args: >
+            -Dsonar.organization=aroha-labs
+            -Dsonar.projectKey=mira-client-sdk
+            -Dsonar.sources=.
+            -Dsonar.exclusions=**/tests/**,**/test/**
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
   create-tag:
-    needs:
-      [
+    needs: [
         changes,
-        sonarqube-router,
-        sonarqube-service,
-        sonarqube-cli,
-        sonarqube-playground,
-        sonarqube-sdk,
+        # sonarqube-router,
+        # sonarqube-service,
+        # sonarqube-cli,
+        # sonarqube-playground,
+        # sonarqube-sdk,
       ]
     if: |
       (needs.changes.outputs.router == 'true' && needs.sonarqube-router.outputs.quality_gate == 'OK') ||
@@ -214,8 +333,9 @@ jobs:
           body_path: release_notes_${{ steps.tag_version.outputs.new_tag }}.md
           draft: false
           prerelease: ${{ github.ref != 'refs/heads/main' }}
+
   publish-router:
-    needs: [changes, create-tag]
+    needs: [changes, create-tag, sonarqube-router]
     if: needs.changes.outputs.router == 'true'
     timeout-minutes: 15
     runs-on: ubuntu-latest
@@ -255,7 +375,7 @@ jobs:
         run: docker image prune -f
 
   publish-service:
-    needs: [changes, create-tag]
+    needs: [changes, create-tag, sonarqube-service]
     if: needs.changes.outputs.service == 'true'
     runs-on: ubuntu-latest
     env:
@@ -294,7 +414,7 @@ jobs:
         run: docker image prune -f
 
   publish-cli:
-    needs: [changes, create-tag]
+    needs: [changes, create-tag, sonarqube-cli]
     if: needs.changes.outputs.cli == 'true'
     runs-on: ubuntu-latest
     env:
@@ -329,7 +449,7 @@ jobs:
             ${{ runner.os }}-go-
 
   deploy-console-testnet:
-    needs: [changes, create-tag]
+    needs: [changes, create-tag, sonarqube-playground]
     if: needs.changes.outputs.playground == 'true'
     runs-on: ubuntu-latest
     env:
@@ -347,8 +467,8 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://atmocsvasyapsvwsustd.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          NEXT_PUBLIC_API_BASE_URL: https://api.mira.network
-          NEXT_PUBLIC_LLM_BASE_URL: https://api.mira.network/v1
+          NEXT_PUBLIC_API_BASE_URL: https://apis.mira.network
+          NEXT_PUBLIC_LLM_BASE_URL: https://apis.mira.network/v1
           NEXT_PUBLIC_VERSION: ${{ env.VERSION }}
         run: yarn build
       - name: Publish to Cloudflare Pages
@@ -362,7 +482,7 @@ jobs:
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
 
   sdk-test:
-    needs: [changes, create-tag]
+    needs: [changes, create-tag, sonarqube-sdk]
     if: needs.changes.outputs.sdk == 'true'
     runs-on: ubuntu-latest
     strategy:
@@ -389,7 +509,7 @@ jobs:
           pdm run pytest tests/
 
   sdk-lint:
-    needs: [changes, create-tag]
+    needs: [changes, create-tag, sonarqube-sdk]
     if: needs.changes.outputs.sdk == 'true'
     runs-on: ubuntu-latest
     defaults:
@@ -411,137 +531,6 @@ jobs:
         run: pdm format
       - name: Lint with Ruff
         run: pdm lint
-
-  sonarqube-router:
-    needs: changes
-    if: needs.changes.outputs.router == 'true'
-    outputs:
-      quality_gate: ${{ steps.sonarqube-router.outputs.quality_gate || 'OK' }}
-
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-java@v4
-        with:
-          distribution: "adopt"
-          java-version: "11"
-      - uses: sonarsource/sonarqube-scan-action@master
-        with:
-          projectBaseDir: router
-          args: >
-            -Dsonar.organization=aroha-labs
-            -Dsonar.projectKey=mira-client-router
-            -Dsonar.sources=.
-            -Dsonar.exclusions=**/tests/**,**/test/**
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-
-  sonarqube-service:
-    needs: changes
-    if: needs.changes.outputs.service == 'true'
-    outputs:
-      quality_gate: ${{ steps.sonarqube-service.outputs.quality_gate || 'OK' }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-java@v4
-        with:
-          distribution: "adopt"
-          java-version: "11"
-      - uses: sonarsource/sonarqube-scan-action@master
-        with:
-          projectBaseDir: service
-          args: >
-            -Dsonar.organization=aroha-labs
-            -Dsonar.projectKey=mira-client-service
-            -Dsonar.sources=.
-            -Dsonar.exclusions=**/tests/**,**/test/**
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-
-  sonarqube-cli:
-    needs: changes
-    if: needs.changes.outputs.cli == 'true'
-    outputs:
-      quality_gate: ${{ steps.sonarqube-cli.outputs.quality_gate || 'OK' }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-java@v4
-        with:
-          distribution: "adopt"
-          java-version: "11"
-      - uses: sonarsource/sonarqube-scan-action@master
-        with:
-          projectBaseDir: cli
-          args: >
-            -Dsonar.organization=aroha-labs
-            -Dsonar.projectKey=mira-client-cli
-            -Dsonar.sources=.
-            -Dsonar.exclusions=**/tests/**,**/test/**
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-
-  sonarqube-playground:
-    needs: changes
-    if: needs.changes.outputs.playground == 'true'
-    outputs:
-      quality_gate: ${{ steps.sonarqube-playground.outputs.quality_gate || 'OK' }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-java@v4
-        with:
-          distribution: "adopt"
-          java-version: "11"
-      - uses: sonarsource/sonarqube-scan-action@master
-        with:
-          projectBaseDir: playground
-          args: >
-            -Dsonar.organization=aroha-labs
-            -Dsonar.projectKey=mira-client-playground
-            -Dsonar.sources=.
-            -Dsonar.exclusions=**/tests/**,**/test/**
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-
-  sonarqube-sdk:
-    needs: changes
-    if: needs.changes.outputs.sdk == 'true'
-    outputs:
-      quality_gate: ${{ steps.sonarqube-sdk.outputs.quality_gate || 'OK' }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-java@v4
-        with:
-          distribution: "adopt"
-          java-version: "11"
-      - uses: sonarsource/sonarqube-scan-action@master
-        with:
-          projectBaseDir: sdk
-          args: >
-            -Dsonar.organization=aroha-labs
-            -Dsonar.projectKey=mira-client-sdk
-            -Dsonar.sources=.
-            -Dsonar.exclusions=**/tests/**,**/test/**
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
   summary:
     needs:
