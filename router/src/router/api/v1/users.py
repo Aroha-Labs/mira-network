@@ -45,46 +45,40 @@ router = APIRouter()
                                 "email": "user@example.com",
                                 "name": "John Doe",
                                 "created_at": "2024-01-01T00:00:00Z",
-                                "updated_at": "2024-01-01T00:00:00Z"
-                            }
+                                "updated_at": "2024-01-01T00:00:00Z",
+                            },
                         },
-                        "not_found": {
-                            "summary": "User Not Found",
-                            "value": None
-                        }
+                        "not_found": {"summary": "User Not Found", "value": None},
                     }
                 }
-            }
+            },
         },
         401: {
             "description": "Unauthorized - Invalid or missing authentication token",
             "content": {
                 "application/json": {
-                    "example": {
-                        "detail": "Could not validate credentials"
-                    }
+                    "example": {"detail": "Could not validate credentials"}
                 }
-            }
+            },
         },
     },
 )
-def get_current_user(
-    db: Session = Depends(get_session), 
-    user: User = Depends(verify_token)
+async def get_current_user(
+    db: Session = Depends(get_session), user: User = Depends(verify_token)
 ) -> UserModel | None:
     """
     Retrieve the current authenticated user's details from the database.
-    
+
     Args:
         db (Session): Database session dependency
         user (User): Current authenticated user from JWT token
-        
+
     Returns:
         UserModel | None: Complete user profile if found, None if not found
-        
+
     Raises:
         HTTPException: 401 if authentication fails
-        
+
     Notes:
         - This function assumes the user has already been authenticated via JWT
         - The user parameter comes from the verify_token dependency

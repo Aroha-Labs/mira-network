@@ -39,7 +39,7 @@ router = APIRouter()
 
 
 @router.post("/wallets", response_model=WalletResponse)
-def create_wallet(
+async def create_wallet(
     wallet_data: WalletCreate,
     db: Session = Depends(get_session),
     user: User = Depends(verify_user),
@@ -71,7 +71,7 @@ def create_wallet(
 
 
 @router.get("/wallets", response_model=WalletResponse | None)
-def get_wallets(
+async def get_wallets(
     db: Session = Depends(get_session),
     user: User = Depends(verify_user),
 ) -> Wallet | None:
@@ -90,7 +90,7 @@ def get_wallets(
 
 
 @router.get("/wallets/{wallet_id}", response_model=WalletResponse)
-def get_wallet(
+async def get_wallet(
     wallet_id: str,
     db: Session = Depends(get_session),
     user: User = Depends(verify_user),
@@ -106,7 +106,7 @@ def get_wallet(
 
 
 @router.delete("/wallets/{wallet_id}")
-def delete_wallet(
+async def delete_wallet(
     wallet_id: str,
     db: Session = Depends(get_session),
     user: User = Depends(verify_user),
@@ -134,7 +134,7 @@ def get_wallet_password(wallet_address: str) -> str:
 
 
 @router.post("/wallet/login", response_model=WalletLoginResponse)
-def wallet_login(
+async def wallet_login(
     login_data: WalletLoginRequest,
     db: Session = Depends(get_session),
 ) -> WalletLoginResponse:

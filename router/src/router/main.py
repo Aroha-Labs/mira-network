@@ -51,17 +51,17 @@ app.include_router(admin_router, prefix="/admin")
 
 
 @app.get("/")
-def read_root():
+async def read_root():
     return {"message": "Welcome to the FastAPI service"}
 
 
 @app.get("/health")
-def health_check():
+async def health_check():
     return {"status": "ok", "version": os.getenv("VERSION", "0.0.0")}
 
 
 @app.get("/docs", include_in_schema=False)
-def docs():
+async def docs():
     return get_scalar_api_reference(
         openapi_url="/openapi.json",
         title=app.title,

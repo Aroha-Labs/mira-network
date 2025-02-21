@@ -168,7 +168,7 @@ router = APIRouter()
         },
     },
 )
-def list_all_logs(
+async def list_all_logs(
     db: Session = Depends(get_session),
     user: User = Depends(verify_user),
     page: int = 1,
@@ -308,7 +308,7 @@ def list_all_logs(
         },
     },
 )
-def total_inference_calls(
+async def total_inference_calls(
     db: Session = Depends(get_session),
     user: User = Depends(verify_user),
 ):
@@ -319,7 +319,7 @@ def total_inference_calls(
 
 
 @router.get("/api-logs/metrics")
-def get_logs_metrics(
+async def get_logs_metrics(
     db: Session = Depends(get_session),
     user: User = Depends(verify_user),
     start_date: Optional[str] = None,

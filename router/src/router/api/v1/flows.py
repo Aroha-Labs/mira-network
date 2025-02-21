@@ -1,26 +1,19 @@
 import re
-from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Response
+from typing import List
+from fastapi import APIRouter, Depends, HTTPException
 from src.router.models.logs import ApiLogs
-from sqlmodel import Session, select, func, text
+from sqlmodel import Session, select, func
 from src.router.api.v1.network import generate
 from src.router.core.security import verify_user
 from src.router.core.types import User
-from src.router.schemas.ai import AiRequest, Message, Function, Tool
+from src.router.schemas.ai import AiRequest, Message
 from src.router.models.flows import Flows
 from src.router.schemas.flows import (
     FlowRequest,
     FlowChatCompletion,
-    FlowAnalytics,
-    TimeRange,
-    ModelStats,
-    TimeSeriesEntry,
     FlowStats,
 )
 from src.router.db.session import get_session
-from src.router.utils.network import get_random_machines, PROXY_PORT
-import requests
-import json
 from src.router.api.v1.docs.flows import (
     CREATE_FLOW_DOCS,
     LIST_FLOWS_DOCS,
@@ -37,7 +30,7 @@ def extract_variables(system_prompt: str) -> List[str]:
 
 
 @router.post("/flows", **CREATE_FLOW_DOCS)
-def create_flow(
+async def create_flow(
     flow: FlowRequest,
     db: Session = Depends(get_session),
     user: User = Depends(verify_user),
@@ -56,7 +49,7 @@ def create_flow(
 
 
 @router.get("/flows", **LIST_FLOWS_DOCS)
-def list_all_flows(db: Session = Depends(get_session)):
+async def list_all_flows(db: Session = Depends(get_session)):
     flows = db.query(Flows).all()
     return flows
 
@@ -129,7 +122,7 @@ def list_all_flows(db: Session = Depends(get_session)):
         },
     },
 )
-def get_flow(flow_id: str, db: Session = Depends(get_session)):
+async def get_flow(flow_id: str, db: Session = Depends(get_session)):
     flow = db.exec(select(Flows).where(Flows.id == flow_id)).first()
     if not flow:
         raise HTTPException(status_code=404, detail="Flow not found")
@@ -213,7 +206,11 @@ def get_flow(flow_id: str, db: Session = Depends(get_session)):
         },
     },
 )
-def update_flow(flow_id: str, flow: FlowRequest, db: Session = Depends(get_session)):
+async def update_flow(
+    flow_id: str,
+    flow: FlowRequest,
+    db: Session = Depends(get_session),
+):
     existing_flow = db.query(Flows).filter(Flows.id == flow_id).first()
     if not existing_flow:
         raise HTTPException(status_code=404, detail="Flow not found")
@@ -287,7 +284,7 @@ def update_flow(flow_id: str, flow: FlowRequest, db: Session = Depends(get_sessi
         },
     },
 )
-def delete_flow(flow_id: str, db: Session = Depends(get_session)):
+async def delete_flow(flow_id: str, db: Session = Depends(get_session)):
     existing_flow = db.query(Flows).filter(Flows.id == flow_id).first()
     if not existing_flow:
         raise HTTPException(status_code=404, detail="Flow not found")

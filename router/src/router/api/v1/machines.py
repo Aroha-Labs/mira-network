@@ -35,7 +35,7 @@ Checks if a specific machine is currently online and responding.
     response_description="Returns the machine's current status",
     deprecated=True,
 )
-def check_liveness(network_ip: str, session: SessionDep):
+async def check_liveness(network_ip: str, session: SessionDep):
     # Check if machine is in Redis liveness records
     for key in redis_client.scan_iter(match="liveness:*"):
         if redis_client.hget(key, "network_ip") == network_ip:
@@ -61,7 +61,7 @@ def check_liveness(network_ip: str, session: SessionDep):
 ```""",
     response_description="Returns the machine's current status",
 )
-def check_liveness_by_id(machine_id: str):
+async def check_liveness_by_id(machine_id: str):
     # Direct check in Redis using machine_id
     if redis_client.exists(f"liveness:{machine_id}"):
         return {"machine_id": machine_id, "status": "online"}
@@ -119,7 +119,7 @@ def check_liveness_by_id(machine_id: str):
         },
     },
 )
-def set_liveness(
+async def set_liveness(
     network_ip: str,
     session: SessionDep,
     machine_auth: dict = Depends(verify_machine),
@@ -163,7 +163,7 @@ def set_liveness(
     description="""Retrieves a list of all registered machines with their current status.
     By default, disabled machines are excluded. Only admins can request disabled machines.""",
 )
-def list_all_machines(
+async def list_all_machines(
     session: SessionDep,
     include_disabled: bool = False,
     user: User = Depends(verify_user),

@@ -80,7 +80,7 @@ async def create_thread_from_message(
 
 
 @router.post("/v1/threads", response_model=ThreadResponse)
-def create_thread(
+async def create_thread(
     thread: ThreadCreate,
     session: Session = Depends(get_session),
     current_user: User = Depends(verify_token),
@@ -103,7 +103,7 @@ def create_thread(
 
 
 @router.get("/v1/threads", response_model=List[ThreadResponse])
-def list_threads(
+async def list_threads(
     session: Session = Depends(get_session),
     current_user: User = Depends(verify_token),
     skip: int = Query(default=0, ge=0),
@@ -128,7 +128,7 @@ def list_threads(
 
 
 @router.get("/v1/threads/{thread_id}", response_model=ThreadResponse)
-def get_thread(
+async def get_thread(
     thread_id: UUID,
     session: Session = Depends(get_session),
     current_user: User = Depends(verify_token),
@@ -145,7 +145,7 @@ def get_thread(
 
 
 @router.delete("/v1/threads/{thread_id}")
-def archive_thread(
+async def archive_thread(
     thread_id: UUID,
     session: Session = Depends(get_session),
     current_user: User = Depends(verify_token),
@@ -350,7 +350,7 @@ async def create_message(
 
 
 @router.get("/v1/threads/{thread_id}/messages", response_model=List[MessageResponse])
-def list_messages(
+async def list_messages(
     thread_id: UUID,
     session: Session = Depends(get_session),
     current_user: User = Depends(verify_token),
@@ -380,7 +380,7 @@ def list_messages(
 @router.get(
     "/v1/threads/{thread_id}/messages/{message_id}", response_model=MessageResponse
 )
-def get_message(
+async def get_message(
     thread_id: UUID,
     message_id: UUID,
     session: Session = Depends(get_session),

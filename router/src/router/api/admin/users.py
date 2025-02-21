@@ -44,16 +44,18 @@ class SortField(str, Enum):
     EMAIL = "email"
     FULL_NAME = "full_name"
 
+
 class SortOrder(str, Enum):
     ASC = "asc"
     DESC = "desc"
+
 
 @router.get(
     "/users",
     summary="List Users",
     description="Retrieve a paginated list of users with optional search, sort, and filters.",
 )
-def list_users(
+async def list_users(
     page: int = 1,
     per_page: int = 10,
     search: str = "",
@@ -69,7 +71,8 @@ def list_users(
         if search:
             search_pattern = f"%{search}%"
             query = query.where(
-                (UserModel.full_name.ilike(search_pattern)) | (UserModel.email.ilike(search_pattern))
+                (UserModel.full_name.ilike(search_pattern))
+                | (UserModel.email.ilike(search_pattern))
             )
         if min_credits is not None:
             query = query.where(UserModel.credits >= min_credits)
@@ -80,7 +83,7 @@ def list_users(
         return query
 
     offset = (page - 1) * per_page
-    
+
     # Main query for users
     query = apply_filters(select(UserModel))
 
@@ -312,7 +315,7 @@ def add_credit(
     summary="Update Users from Supabase",
     description="Pull user details from Supabase and update the users table.",
 )
-def update_users_from_supabase(
+async def update_users_from_supabase(
     user: User = Depends(verify_admin),
     db: Session = Depends(get_session),
 ):

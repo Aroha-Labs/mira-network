@@ -22,12 +22,12 @@ class SystemSettingUpdate(BaseModel):
 
 
 @router.get("/settings", response_model=List[SystemSettings])
-def get_settings(db: Session = Depends(get_session), user=Depends(verify_admin)):
+async def get_settings(db: Session = Depends(get_session), user=Depends(verify_admin)):
     return db.exec(select(SystemSettings)).all()
 
 
 @router.post("/settings", response_model=SystemSettings)
-def create_setting(
+async def create_setting(
     setting: SystemSettingCreate,
     db: Session = Depends(get_session),
     user=Depends(verify_admin),
@@ -36,7 +36,7 @@ def create_setting(
 
 
 @router.put("/settings/{name}", response_model=SystemSettings)
-def update_setting(
+async def update_setting(
     name: str,
     setting: SystemSettingUpdate,
     db: Session = Depends(get_session),

@@ -99,7 +99,7 @@ router = APIRouter()
         },
     },
 )
-def create_api_token(
+async def create_api_token(
     request: ApiTokenRequest,
     db: Session = Depends(get_session),
     user: User = Depends(verify_user),
@@ -168,7 +168,7 @@ def create_api_token(
 - Default page_size is 100 items""",
     response_description="Returns paginated API token details",
 )
-def list_api_tokens(
+async def list_api_tokens(
     page: int = Query(None, ge=1, description="Page number"),
     page_size: int = Query(None, ge=1, le=100, description="Items per page"),
     db: Session = Depends(get_session),
@@ -285,7 +285,7 @@ def list_api_tokens(
         },
     },
 )
-def delete_api_token(
+async def delete_api_token(
     token: str,
     db: Session = Depends(get_session),
     user: User = Depends(verify_user),
