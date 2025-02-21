@@ -96,8 +96,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 👥 Authors
 
-- Hamid Raza (contact@hamidraza.com)
+- Hamid Raza (hamid@arohalabs.com)
 
 ## 📞 Support
 
-For support, email contact@hamidraza.com or open an issue in the repository.
+For support, email hamid@arohalabs.com or open an issue in the repository.
