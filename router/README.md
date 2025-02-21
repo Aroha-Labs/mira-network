@@ -16,7 +16,6 @@ A robust FastAPI-based dashboard service for the Mira Network client interface.
 - Supabase authentication
 - JWT-based security
 
-
 ## 📋 Prerequisites
 
 - Python 3.11
