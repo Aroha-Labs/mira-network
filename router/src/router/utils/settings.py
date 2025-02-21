@@ -7,18 +7,22 @@ from src.router.core.settings_types import (
     SETTINGS_MODELS,
     ModelConfig,
 )
+from sqlalchemy.ext.asyncio import AsyncSession
 
 T = TypeVar("T", bound=BaseModel)
 
 
-def get_setting(db: Session, name: str) -> Optional[SystemSettings]:
+async def get_setting(db: AsyncSession, name: str) -> Optional[SystemSettings]:
     """Get a system setting by name."""
-    return db.exec(select(SystemSettings).where(SystemSettings.name == name)).first()
+    result = await db.execute(select(SystemSettings).where(SystemSettings.name == name))
+    row = result.first()
+    return row[0] if row else None
 
 
-def get_setting_value(db: Session, name: str, model: Type[T] = None):
+async def get_setting_value(db: AsyncSession, name: str, model: Type[T] = None):
     """Get a system setting value by name with optional model validation."""
-    setting = get_setting(db, name)
+    setting = await get_setting(db, name)
+    print("setting", setting)
     if not setting:
         raise HTTPException(status_code=404, detail=f"Setting {name} not found")
 
@@ -32,13 +36,15 @@ def get_setting_value(db: Session, name: str, model: Type[T] = None):
     return setting.value
 
 
-def get_supported_models(db: Session) -> Dict[str, ModelConfig]:
+async def get_supported_models(db: AsyncSession) -> Dict[str, ModelConfig]:
     """Get the supported models configuration."""
-    return get_setting_value(
+    resp = await get_setting_value(
         db,
         "SUPPORTED_MODELS",
         SETTINGS_MODELS["SUPPORTED_MODELS"],
-    ).root
+    )
+    print("resp", resp)
+    return resp.root
 
 
 def validate_setting_name(name: str) -> None:
