@@ -63,11 +63,11 @@ jobs:
         sonarqube-sdk,
       ]
     if: |
-      needs.changes.outputs.router == 'true' ||
-      needs.changes.outputs.service == 'true' ||
-      needs.changes.outputs.cli == 'true' ||
-      needs.changes.outputs.playground == 'true' ||
-      needs.changes.outputs.sdk == 'true'
+      (needs.changes.outputs.router == 'true' && needs.sonarqube-router.outputs.quality_gate == 'OK') ||
+      (needs.changes.outputs.service == 'true' && needs.sonarqube-service.outputs.quality_gate == 'OK') ||
+      (needs.changes.outputs.cli == 'true' && needs.sonarqube-cli.outputs.quality_gate == 'OK') ||
+      (needs.changes.outputs.playground == 'true' && needs.sonarqube-playground.outputs.quality_gate == 'OK') ||
+      (needs.changes.outputs.sdk == 'true' && needs.sonarqube-sdk.outputs.quality_gate == 'OK')
     timeout-minutes: 10
     runs-on: ubuntu-latest
     outputs:
@@ -116,6 +116,7 @@ jobs:
             echo "Failed to create or push tag"
             exit 1
           fi
+
       - name: Generate Release Notes
         id: release_notes
         env:
@@ -414,6 +415,9 @@ jobs:
   sonarqube-router:
     needs: changes
     if: needs.changes.outputs.router == 'true'
+    outputs:
+      quality_gate: ${{ steps.sonarqube-router.outputs.quality_gate || 'OK' }}
+
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -438,6 +442,8 @@ jobs:
   sonarqube-service:
     needs: changes
     if: needs.changes.outputs.service == 'true'
+    outputs:
+      quality_gate: ${{ steps.sonarqube-service.outputs.quality_gate || 'OK' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -462,6 +468,8 @@ jobs:
   sonarqube-cli:
     needs: changes
     if: needs.changes.outputs.cli == 'true'
+    outputs:
+      quality_gate: ${{ steps.sonarqube-cli.outputs.quality_gate || 'OK' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -486,6 +494,8 @@ jobs:
   sonarqube-playground:
     needs: changes
     if: needs.changes.outputs.playground == 'true'
+    outputs:
+      quality_gate: ${{ steps.sonarqube-playground.outputs.quality_gate || 'OK' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -510,6 +520,8 @@ jobs:
   sonarqube-sdk:
     needs: changes
     if: needs.changes.outputs.sdk == 'true'
+    outputs:
+      quality_gate: ${{ steps.sonarqube-sdk.outputs.quality_gate || 'OK' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
