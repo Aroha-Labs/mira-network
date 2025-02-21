@@ -46,27 +46,19 @@ router = APIRouter()
     responses={
         200: {
             "description": "Successfully retrieved user credits",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "credits": 150.75
-                    }
-                }
-            }
+            "content": {"application/json": {"example": {"credits": 150.75}}},
         },
         401: {
             "description": "Unauthorized - Invalid or missing authentication",
             "content": {
                 "application/json": {
-                    "example": {
-                        "detail": "Could not validate credentials"
-                    }
+                    "example": {"detail": "Could not validate credentials"}
                 }
-            }
-        }
-    }
+            },
+        },
+    },
 )
-def get_user_credits(
+async def get_user_credits(
     db: Session = Depends(get_session), user: User = Depends(verify_user)
 ):
     user_data = db.exec(select(UserModel).where(UserModel.user_id == user.id)).first()
@@ -132,32 +124,30 @@ def get_user_credits(
                             "user_id": "user_123",
                             "amount": 100.0,
                             "description": "Initial credit deposit",
-                            "created_at": "2024-01-15T10:30:00Z"
+                            "created_at": "2024-01-15T10:30:00Z",
                         },
                         {
                             "id": 2,
                             "user_id": "user_123",
                             "amount": -25.5,
                             "description": "API usage charge",
-                            "created_at": "2024-01-15T11:45:00Z"
-                        }
+                            "created_at": "2024-01-15T11:45:00Z",
+                        },
                     ]
                 }
-            }
+            },
         },
         401: {
             "description": "Unauthorized - Invalid or missing authentication",
             "content": {
                 "application/json": {
-                    "example": {
-                        "detail": "Could not validate credentials"
-                    }
+                    "example": {"detail": "Could not validate credentials"}
                 }
-            }
-        }
+            },
+        },
     },
 )
-def get_user_credits_history(
+async def get_user_credits_history(
     db: Session = Depends(get_session), user: User = Depends(verify_user)
 ):
     history = db.exec(

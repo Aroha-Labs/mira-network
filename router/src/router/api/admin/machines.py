@@ -22,7 +22,7 @@ SessionDep = Annotated[Session, Depends(get_session)]
     summary="Register a New Machine",
     description="Admin endpoint to register a new machine in the system.",
 )
-def register_machine(
+async def register_machine(
     request: RegisterMachineRequest,
     session: SessionDep,
     user: User = Depends(verify_admin),
@@ -58,7 +58,7 @@ def register_machine(
     "/machines/{network_ip}",
     summary="Update Machine Details",
 )
-def update_machine(
+async def update_machine(
     network_ip: str,
     request: RegisterMachineRequest,
     session: SessionDep,
@@ -88,7 +88,7 @@ def update_machine(
 
 
 @router.post("/machines/{network_ip}/auth-tokens")
-def create_auth_token(
+async def create_auth_token(
     network_ip: str,
     token: MachineAuthToken,
     session: SessionDep,
@@ -131,7 +131,7 @@ def create_auth_token(
     summary="Delete Auth Token",
     status_code=204,
 )
-def delete_auth_token(
+async def delete_auth_token(
     network_ip: str,
     api_token: str,  # updated parameter name
     session: SessionDep,
@@ -165,7 +165,7 @@ def delete_auth_token(
     "/machines/{network_ip}/auth-tokens",
     summary="List Machine Tokens",
 )
-def list_machine_tokens(
+async def list_machine_tokens(
     network_ip: str,
     session: SessionDep,
     user: User = Depends(verify_admin),
