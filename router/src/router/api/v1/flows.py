@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from src.router.models.logs import ApiLogs
 from sqlmodel import Session, select, func
 from src.router.api.v1.network import generate
-from src.router.core.security import verify_user
+from src.router.core.security import async_verify_user, verify_user
 from src.router.core.types import User
 from src.router.schemas.ai import AiRequest, Message
 from src.router.models.flows import Flows
@@ -13,12 +13,13 @@ from src.router.schemas.flows import (
     FlowChatCompletion,
     FlowStats,
 )
-from src.router.db.session import get_session
+from src.router.db.session import get_session, get_async_session
 from src.router.api.v1.docs.flows import (
     CREATE_FLOW_DOCS,
     LIST_FLOWS_DOCS,
 )
 from datetime import datetime, timedelta
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
 
@@ -503,8 +504,8 @@ Server-sent events with the following data structure:
 async def generate_with_flow_id(
     flow_id: str,
     req: FlowChatCompletion,
-    db: Session = Depends(get_session),
-    user: User = Depends(verify_user),
+    db: AsyncSession = Depends(get_async_session),
+    user: User = Depends(async_verify_user),
 ):
     if any(msg.role == "system" for msg in req.messages):
         raise HTTPException(
@@ -512,7 +513,15 @@ async def generate_with_flow_id(
             detail="System message is not allowed in request",
         )
 
-    flow = db.exec(select(Flows).where(Flows.id == flow_id)).first()
+    # Cast flow_id to integer before querying
+    try:
+        flow_id_int = int(flow_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid flow ID format")
+
+    flow = await db.execute(select(Flows).where(Flows.id == flow_id_int))
+    flow = flow.scalar_one_or_none()
+
     if not flow:
         raise HTTPException(status_code=404, detail="Flow not found")
 

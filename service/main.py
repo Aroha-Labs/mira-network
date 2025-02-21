@@ -122,6 +122,27 @@ def get_model_provider(
     return model_providers[provider_name], model_name
 
 
+async def get_model_provider_async(
+    model: str,
+    model_provider: ModelProvider | None,
+) -> tuple[ModelProvider, str]:
+    if model == "":
+        raise HTTPException(status_code=400, detail="Model is required")
+
+    if model_provider is not None:
+        return model_provider, model
+
+    provider_name, model_name = model.split("/", 1)
+
+    if not model_name or model_name == "":
+        raise HTTPException(status_code=400, detail="Invalid model name")
+
+    if provider_name not in model_providers:
+        raise HTTPException(status_code=400, detail="Invalid model provider")
+
+    return model_providers[provider_name], model_name
+
+
 def get_llm_completion(
     model: str,
     model_provider: ModelProvider,
@@ -226,6 +247,78 @@ def get_llm_completion(
         raise HTTPException(status_code=500, detail=f"Error calling LLM API: {str(e)}")
 
 
+async def get_llm_completion_async(
+    model: str,
+    model_provider: ModelProvider,
+    messages: list[Message],
+    stream: bool = False,
+    tools: list[Tool] = None,
+    tool_choice: str = "auto",
+):
+    """
+    Get completion from LLM with support for function/tool calling across different providers
+    """
+    payload = {
+        "model": model,
+        "messages": [msg.model_dump() for msg in messages],
+        "stream": stream,
+    }
+
+    # Add tools/functions if provided
+    if tools:
+        if model_provider.provider_name == "anthropic":
+            payload["tools"] = [tool.model_dump() for tool in tools]
+        else:
+            payload["tools"] = [tool.model_dump() for tool in tools]
+            if tool_choice != "auto":
+                payload["tool_choice"] = tool_choice
+
+    try:
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {model_provider.api_key}",
+            "Accept-Encoding": "identity",
+        }
+
+        async with httpx.AsyncClient() as client:
+            req = await client.post(
+                url=f"{model_provider.base_url}/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=60.0,
+            )
+            req.raise_for_status()
+
+            if stream:
+                return StreamingResponse(
+                    req.aiter_bytes(chunk_size=1024),
+                    media_type="text/event-stream",
+                )
+
+            # Convert provider-specific response to OpenAI format if needed
+            response_data = req.json()
+            if model_provider.provider_name == "anthropic":
+                # Convert Anthropic response to OpenAI format
+                if "tool_calls" in response_data.get("content", []):
+                    response_data["choices"][0]["message"]["function_call"] = {
+                        "name": response_data["content"][0]["tool_calls"][0][
+                            "function"
+                        ]["name"],
+                        "arguments": response_data["content"][0]["tool_calls"][0][
+                            "function"
+                        ]["arguments"],
+                    }
+
+            return Response(
+                content=json.dumps(response_data),
+                status_code=req.status_code,
+                headers=dict(req.headers),
+            )
+
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=500, detail=f"Error calling LLM API: {str(e)}")
+
+
 @app.get("/health")
 async def health() -> Dict[str, str]:
     return {"status": "ok", "version": os.getenv("VERSION", "0.0.0")}
@@ -275,17 +368,20 @@ async def evaluate(req: EvaluationRequest) -> str:
 
 @app.post("/v1/chat/completions")
 async def generate(req: AiRequest):
+    print("req", req.model_dump())
     if not req.messages or not any(msg.role == "user" for msg in req.messages):
         raise HTTPException(
             status_code=400, detail="At least one user message is required"
         )
 
-    model_provider, model = get_model_provider(req.model, req.model_provider)
+    model_provider, model = await get_model_provider_async(
+        req.model, req.model_provider
+    )
 
     # Convert Message objects to dictionaries
     messages = [{"role": msg.role, "content": msg.content} for msg in req.messages]
 
-    return get_llm_completion(
+    return await get_llm_completion_async(
         model,
         model_provider,
         messages=[Message(**msg) for msg in messages],

@@ -7,9 +7,12 @@ from sqlmodel import Session, select, update
 from src.router.core.settings_types import SETTINGS_MODELS
 from src.router.core.types import ModelPricing, User
 from src.router.models.logs import ApiLogs
-from src.router.db.session import get_session
-from src.router.core.security import verify_user
-from src.router.utils.network import get_random_machines, PROXY_PORT
+from src.router.db.session import get_session, get_async_session
+from src.router.core.security import async_verify_user
+from src.router.utils.network import (
+    get_random_machines,
+    PROXY_PORT,
+)
 from src.router.models.user import User as UserModel, UserCreditsHistory
 from src.router.schemas.ai import AiRequest, VerifyRequest
 import requests
@@ -19,6 +22,7 @@ import json
 from src.router.utils.settings import get_setting_value
 from src.router.utils.settings import get_supported_models
 import asyncio
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
 
@@ -277,8 +281,8 @@ async def list_models(db: Session = Depends(get_session)) -> ModelListRes:
     }
 
 
-def save_log(
-    db: Session,
+async def save_log(
+    db: AsyncSession,
     user: User,
     user_row: UserModel,
     req: AiRequest,
@@ -290,7 +294,7 @@ def save_log(
     machine_id: int,
     flow_id: Optional[str] = None,
 ) -> None:
-    sm = get_setting_value(
+    sm = await get_setting_value(
         db,
         "SUPPORTED_MODELS",
         SETTINGS_MODELS["SUPPORTED_MODELS"],
@@ -341,7 +345,7 @@ def save_log(
 
     cost = prompt_tokens_cost + completion_tokens_cost
 
-    db.exec(
+    await db.execute(
         update(UserModel)
         .where(UserModel.user_id == user.id)
         .values(
@@ -357,8 +361,7 @@ def save_log(
         description=f"Used {total_tokens} tokens. Prompt tokens: {prompt_tokens}, Completion tokens: {completion_tokens}",
     )
     db.add(user_credits_history)
-
-    db.commit()
+    await db.commit()
 
 
 @router.post(
@@ -547,48 +550,57 @@ Server-sent events with the following data structure:
 )
 async def generate(
     req: AiRequest,
-    user: User = Depends(verify_user),
-    db: Session = Depends(get_session),
+    user: User = Depends(async_verify_user),
+    db: AsyncSession = Depends(get_async_session),
     flow_id: Optional[str] = None,
 ) -> Response:
     timeStart = time.time()
 
-    user_row = db.exec(select(UserModel).where(UserModel.user_id == user.id)).first()
+    user_row = await db.execute(select(UserModel).where(UserModel.user_id == user.id))
+    user_row = user_row.scalar_one_or_none()
 
     if not user_row:
         raise HTTPException(status_code=404, detail="User not found")
 
-    if user_row.credits <= 0:
+    if int(user_row.credits) <= 0:
         raise HTTPException(status_code=402, detail="Insufficient credits")
 
-    supported_models = get_supported_models(db)
+    supported_models = await get_supported_models(db)
+    print("supported_models", supported_models)
     if req.model not in supported_models:
         raise HTTPException(status_code=400, detail="Unsupported model")
 
     model_config = supported_models[req.model]
     original_req_model = req.model
     req.model = model_config.id
+    print("req.model", req.model)
 
-    machine = get_random_machines(1)[0]
+    machine = (await get_random_machines(1))[0]
+    print("machine", machine)
     proxy_url = f"http://{machine.network_ip}:{PROXY_PORT}/v1/chat/completions"
-    llmres = requests.post(
-        proxy_url,
-        json=req.model_dump(),
-        stream=req.stream,
-        headers={"Accept-Encoding": "identity"},
-    )
 
-    def generate():
+    print("proxy_url", req.model_dump())
+    async with httpx.AsyncClient(timeout=httpx.Timeout(60.0)) as client:
+        llmres = await client.post(
+            proxy_url,
+            json=req.model_dump(),
+            headers={"Accept-Encoding": "identity"},
+        )
+
+    async def generate():
         usage = {}
         result_text = ""
-        # Track tool calls
         current_tool_calls = {}
-
-        # Time to first token
         ttfs: Optional[float] = None
 
         for line in llmres.iter_lines():
-            l = line.decode("utf-8")
+            print("line", line)
+            # Handle line depending on whether it's bytes or string
+            if isinstance(line, bytes):
+                l = line.decode("utf-8")
+            else:
+                l = line
+
             if l.startswith("data: "):
                 l = l[6:]
             try:
@@ -650,7 +662,7 @@ async def generate(
             if l.strip():
                 yield f"data: {l}\n\n"
 
-        save_log(
+        await save_log(
             db=db,
             user=user,
             user_row=user_row,
@@ -672,7 +684,7 @@ async def generate(
         ttfs = time.time() - timeStart
         usage = response_json.get("usage", {})
 
-        save_log(
+        await save_log(
             db=db,
             user=user,
             user_row=user_row,

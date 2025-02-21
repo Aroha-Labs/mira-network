@@ -3,7 +3,7 @@ from typing import List
 
 from fastapi import HTTPException
 from src.router.schemas.machine import MachineInfo
-from src.router.utils.redis import get_online_machines, redis_client
+from src.router.utils.redis import get_online_machines_async, redis_client
 from sqlmodel import col, select
 from src.router.models.machines import Machine
 from src.router.db.session import get_session
@@ -11,14 +11,14 @@ from src.router.db.session import get_session
 PROXY_PORT = 34523
 
 
-def get_random_machines(number_of_machines: int = 1) -> List[MachineInfo]:
+async def get_random_machines(number_of_machines: int = 1) -> List[MachineInfo]:
     if number_of_machines < 1:
         raise HTTPException(
             status_code=422,  # Changed from 400 to 422 (Unprocessable Entity) for invalid input
             detail="Number of machines must be greater than 0",
         )
 
-    machine_ids = get_online_machines()
+    machine_ids = await get_online_machines_async()
     if not machine_ids:
         raise HTTPException(
             status_code=503,  # Changed from 404 to 503 (Service Unavailable) as this is a capacity issue

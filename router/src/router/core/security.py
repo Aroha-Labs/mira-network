@@ -1,15 +1,21 @@
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi import HTTPException, Depends
 from sqlmodel import select
-from supabase import create_client, Client
+from supabase import create_client, Client, create_async_client
 from src.router.core.types import User
 from src.router.models.user import User as UserModel
 from src.router.models.tokens import ApiToken
-from src.router.db.session import get_session
+from src.router.db.session import get_session, get_session_context
+from sqlmodel.ext.asyncio.session import AsyncSession
+from src.router.db.base import async_engine
 from src.router.core.config import SUPABASE_URL, SUPABASE_KEY
 import jwt
 from src.router.models.machine_tokens import MachineToken
 from src.router.models.machines import Machine
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 DEFAULT_JWT_API_KEY_ID = -1  # Using -1 to indicate JWT authentication
 
@@ -37,6 +43,7 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
             )
 
         user_response = supabase.auth.admin.get_user_by_id(api_token.user_id)
+
         if user_response.user is None:
             raise HTTPException(
                 status_code=401, detail="Unauthorized access - user not found"
@@ -134,7 +141,68 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     )
 
 
+async def async_verify_token(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    token = credentials.credentials
+
+    # check if token starts with `sk-mira-` (API token)
+    if token.startswith("sk-mira-"):
+        async with get_session_context() as db:
+            try:
+                api_token = await db.exec(
+                    select(ApiToken).where(
+                        ApiToken.token == token,
+                        ApiToken.deleted_at == None,  # noqa
+                    )
+                )
+                api_token = api_token.first()
+
+                if api_token is None:
+                    raise HTTPException(
+                        status_code=401,
+                        detail="Unauthorized access - API token not found",
+                    )
+
+                async_supabase = await create_async_client(SUPABASE_URL, SUPABASE_KEY)
+                user_response = await async_supabase.auth.admin.get_user_by_id(
+                    api_token.user_id
+                )
+
+                if user_response.user is None:
+                    raise HTTPException(
+                        status_code=401, detail="Unauthorized access - user not found"
+                    )
+
+                user = await db.exec(
+                    select(UserModel).where(UserModel.user_id == user_response.user.id)
+                )
+                user = user.first()
+
+                if user is None:
+                    user_roles = []
+                else:
+                    user_roles = user.custom_claim.get("roles", [])
+
+                return User(
+                    **user_response.user.model_dump(),
+                    roles=user_roles,
+                    api_key_id=api_token.id,
+                )
+            except Exception as e:
+                logger.error(f"Error verifying token in async_verify_token: {e}")
+                raise HTTPException(status_code=401, detail=str(e))
+
+    raise HTTPException(status_code=401, detail="Invalid token")
+
+
 def verify_user(user: User = Depends(verify_token)):
+    if "user" not in user.roles:
+        raise HTTPException(status_code=401, detail="Unauthorized user access")
+    return user
+
+
+async def async_verify_user(user: User = Depends(async_verify_token)):
     if "user" not in user.roles:
         raise HTTPException(status_code=401, detail="Unauthorized user access")
     return user
