@@ -2,12 +2,11 @@ from typing import Any, List, Dict, Optional
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import func
-from sqlmodel import Session, select
+from sqlmodel import select, func
 from src.router.schemas.credits import AddCreditRequest
-from src.router.core.security import supabase, verify_admin
+from src.router.core.security import verify_admin, SupabaseClient
 from src.router.models.user import UserCreditsHistory
-from src.router.db.session import get_session
+from src.router.db.session import DBSession
 from enum import Enum
 from gotrue.types import User
 from datetime import datetime, timezone
@@ -56,6 +55,7 @@ class SortOrder(str, Enum):
     description="Retrieve a paginated list of users with optional search, sort, and filters.",
 )
 async def list_users(
+    db: DBSession,
     page: int = 1,
     per_page: int = 10,
     search: str = "",
@@ -65,7 +65,6 @@ async def list_users(
     max_credits: Optional[float] = None,
     provider: Optional[str] = None,
     user: User = Depends(verify_admin),
-    db: Session = Depends(get_session),
 ):
     def apply_filters(query):
         if search:
@@ -98,9 +97,10 @@ async def list_users(
 
     # Count query
     count_query = apply_filters(select(func.count()).select_from(UserModel))
-    total_users = db.exec(count_query).first()
+    total_users = await db.exec(count_query)
+    total_users = total_users.one()
 
-    users = db.exec(query.offset(offset).limit(per_page))
+    users = await db.exec(query.offset(offset).limit(per_page))
 
     return {
         "users": users.all(),
@@ -176,7 +176,7 @@ def process_user_claims(claims: dict) -> dict:
 )
 async def add_or_update_user_claim(
     req: UserClaimWebhook,
-    db: Session = Depends(get_session),
+    db: DBSession,
 ):
     # Process user information
     user_data = process_user_claims(req.claims)
@@ -233,7 +233,7 @@ class UserClaim(BaseModel):
 def user_claim_webhook(
     user_id: str,
     claim: UserClaim,
-    db: Session = Depends(get_session),
+    db: DBSession,
     user=Depends(verify_admin),
 ) -> Dict[str, Any]:
     user = db.exec(select(UserModel).where(UserModel.user_id == user_id)).first()
@@ -253,7 +253,7 @@ def user_claim_webhook(
 )
 def get_user_claim(
     user_id: str,
-    db: Session = Depends(get_session),
+    db: DBSession,
     user=Depends(verify_admin),
 ) -> dict:
     user = db.exec(select(UserModel).where(UserModel.user_id == user_id)).first()
@@ -274,7 +274,7 @@ def get_user_claim(
 )
 def get_user_credits_by_id(
     user_id: str,
-    db: Session = Depends(get_session),
+    db: DBSession,
     user=Depends(verify_admin),
 ):
     user_data = db.exec(select(UserModel).where(UserModel.user_id == user_id)).first()
@@ -286,7 +286,7 @@ def get_user_credits_by_id(
 @router.post("/add-credit")
 def add_credit(
     request: AddCreditRequest,
-    db: Session = Depends(get_session),
+    db: DBSession,
     user=Depends(verify_admin),
 ):
     user_data = db.exec(
@@ -316,14 +316,15 @@ def add_credit(
     description="Pull user details from Supabase and update the users table.",
 )
 async def update_users_from_supabase(
+    db: DBSession,
+    supabase: SupabaseClient,
     user: User = Depends(verify_admin),
-    db: Session = Depends(get_session),
 ):
     # get all users from supabase and update the users table
     users = []
     page = 1
     while True:
-        page_users = supabase.auth.admin.list_users(page=page, per_page=100)
+        page_users = await supabase.auth.admin.list_users(page=page, per_page=100)
         users.extend(page_users)
         if len(page_users) < 100:
             break

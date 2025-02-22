@@ -2,9 +2,9 @@ import re
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from src.router.models.logs import ApiLogs
-from sqlmodel import Session, select, func
+from sqlmodel import select, func
 from src.router.api.v1.network import generate
-from src.router.core.security import async_verify_user, verify_user
+from src.router.core.security import verify_user
 from src.router.core.types import User
 from src.router.schemas.ai import AiRequest, Message
 from src.router.models.flows import Flows
@@ -13,13 +13,12 @@ from src.router.schemas.flows import (
     FlowChatCompletion,
     FlowStats,
 )
-from src.router.db.session import get_session, get_async_session
+from src.router.db.session import DBSession
 from src.router.api.v1.docs.flows import (
     CREATE_FLOW_DOCS,
     LIST_FLOWS_DOCS,
 )
 from datetime import datetime, timedelta
-from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
 
@@ -33,7 +32,7 @@ def extract_variables(system_prompt: str) -> List[str]:
 @router.post("/flows", **CREATE_FLOW_DOCS)
 async def create_flow(
     flow: FlowRequest,
-    db: Session = Depends(get_session),
+    db: DBSession,
     user: User = Depends(verify_user),
 ):
     variables = extract_variables(flow.system_prompt)
@@ -50,9 +49,9 @@ async def create_flow(
 
 
 @router.get("/flows", **LIST_FLOWS_DOCS)
-async def list_all_flows(db: Session = Depends(get_session)):
-    flows = db.query(Flows).all()
-    return flows
+async def list_all_flows(db: DBSession):
+    flows = await db.exec(select(Flows))
+    return flows.all()
 
 
 @router.get(
@@ -123,8 +122,9 @@ async def list_all_flows(db: Session = Depends(get_session)):
         },
     },
 )
-async def get_flow(flow_id: str, db: Session = Depends(get_session)):
-    flow = db.exec(select(Flows).where(Flows.id == flow_id)).first()
+async def get_flow(flow_id: str, db: DBSession):
+    flow = await db.exec(select(Flows).where(Flows.id == flow_id))
+    flow = flow.first()
     if not flow:
         raise HTTPException(status_code=404, detail="Flow not found")
     return flow
@@ -207,12 +207,11 @@ async def get_flow(flow_id: str, db: Session = Depends(get_session)):
         },
     },
 )
-async def update_flow(
-    flow_id: str,
-    flow: FlowRequest,
-    db: Session = Depends(get_session),
-):
-    existing_flow = db.query(Flows).filter(Flows.id == flow_id).first()
+async def update_flow(flow_id: str, flow: FlowRequest, db: DBSession):
+    # existing_flow = db.query(Flows).filter(Flows.id == flow_id).first()
+    existing_flow = await db.exec(select(Flows).where(Flows.id == flow_id))
+    existing_flow = existing_flow.first()
+
     if not existing_flow:
         raise HTTPException(status_code=404, detail="Flow not found")
 
@@ -285,8 +284,10 @@ async def update_flow(
         },
     },
 )
-async def delete_flow(flow_id: str, db: Session = Depends(get_session)):
-    existing_flow = db.query(Flows).filter(Flows.id == flow_id).first()
+async def delete_flow(flow_id: str, db: DBSession):
+    existing_flow = await db.exec(select(Flows).where(Flows.id == flow_id))
+    existing_flow = existing_flow.first()
+
     if not existing_flow:
         raise HTTPException(status_code=404, detail="Flow not found")
 
@@ -504,8 +505,8 @@ Server-sent events with the following data structure:
 async def generate_with_flow_id(
     flow_id: str,
     req: FlowChatCompletion,
-    db: AsyncSession = Depends(get_async_session),
-    user: User = Depends(async_verify_user),
+    db: DBSession,
+    user: User = Depends(verify_user),
 ):
     if any(msg.role == "system" for msg in req.messages):
         raise HTTPException(
@@ -519,8 +520,8 @@ async def generate_with_flow_id(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid flow ID format")
 
-    flow = await db.execute(select(Flows).where(Flows.id == flow_id_int))
-    flow = flow.scalar_one_or_none()
+    flow = await db.exec(select(Flows).where(Flows.id == flow_id_int))
+    flow = flow.one_or_none()
 
     if not flow:
         raise HTTPException(status_code=404, detail="Flow not found")
@@ -572,21 +573,24 @@ async def generate_with_flow_id(
 )
 async def get_flow_stats(
     flow_id: str,
-    db: Session = Depends(get_session),
+    db: DBSession,
     user: User = Depends(verify_user),
 ) -> FlowStats:
     # Verify flow exists
-    flow = db.exec(select(Flows).where(Flows.id == flow_id)).first()
+    flow = await db.exec(select(Flows).where(Flows.id == flow_id))
+    flow = flow.first()
+
     if not flow:
         raise HTTPException(status_code=404, detail="Flow not found")
 
     # Get the latest log entry for this flow
-    log = db.exec(
+    log = await db.exec(
         select(ApiLogs)
         .where(ApiLogs.flow_id == flow_id)
         .order_by(ApiLogs.created_at.desc())
         .limit(1)
-    ).first()
+    )
+    log = log.first()
 
     if not log:
         raise HTTPException(status_code=404, detail="No stats available for this flow")
@@ -595,7 +599,7 @@ async def get_flow_stats(
     end_date = datetime.utcnow()
     start_date = end_date - timedelta(hours=24)
 
-    time_series = db.exec(
+    time_series = await db.exec(
         select(
             func.date_trunc("hour", ApiLogs.created_at).label("timestamp"),
             func.sum(ApiLogs.total_tokens).label("tokens"),
@@ -613,7 +617,9 @@ async def get_flow_stats(
             ApiLogs.model_pricing,
         )
         .order_by(func.date_trunc("hour", ApiLogs.created_at))
-    ).all()
+    )
+
+    time_series = time_series.all()
 
     # Process time series data
     time_series_data = []
