@@ -10,7 +10,7 @@ from src.router.utils.redis import cleanup
 from fastapi.responses import JSONResponse
 from fastapi.middleware import Middleware
 from contextlib import asynccontextmanager
-from src.router.db.base import engine, async_engine
+from src.router.db.session import async_engine
 
 
 @asynccontextmanager
@@ -21,9 +21,7 @@ async def lifespan(app: FastAPI):
     # Shutdown
     finally:
         await cleanup()
-        # Properly dispose of database engines
         await async_engine.dispose()
-        engine.dispose()
 
 
 app = FastAPI(

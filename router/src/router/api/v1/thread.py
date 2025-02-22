@@ -1,7 +1,6 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import MetaData
-from sqlmodel import Session, select
+from sqlmodel import select
 from uuid import UUID
 from uuid import uuid4
 from datetime import datetime
@@ -9,7 +8,7 @@ from datetime import datetime
 from src.router.schemas.ai import AiRequest
 from src.router.models.thread import Thread, Message
 from src.router.models.user import User
-from src.router.db.session import get_session
+from src.router.db.session import DBSession
 from src.router.core.security import verify_token
 from pydantic import BaseModel, Field
 
@@ -57,7 +56,7 @@ class MessageResponse(BaseModel):
 async def create_thread_from_message(
     message: MessageCreate,
     user: User,
-    session: Session,
+    db: DBSession,
 ) -> Thread:
     """Create a new thread from the first message"""
     # Generate title from first message if not provided
@@ -73,16 +72,16 @@ async def create_thread_from_message(
         updated_at=datetime.utcnow(),
         id=uuid4(),
     )
-    session.add(db_thread)
-    session.commit()
-    session.refresh(db_thread)
+    db.add(db_thread)
+    db.commit()
+    db.refresh(db_thread)
     return db_thread
 
 
 @router.post("/v1/threads", response_model=ThreadResponse)
 async def create_thread(
     thread: ThreadCreate,
-    session: Session = Depends(get_session),
+    db: DBSession,
     current_user: User = Depends(verify_token),
 ):
     """Create a new thread explicitly"""
@@ -96,15 +95,15 @@ async def create_thread(
         user_id=current_user.id,
         thread_metadata=thread.metadata if thread.metadata else {},
     )
-    session.add(db_thread)
-    session.commit()
-    session.refresh(db_thread)
+    db.add(db_thread)
+    db.commit()
+    db.refresh(db_thread)
     return db_thread
 
 
 @router.get("/v1/threads", response_model=List[ThreadResponse])
 async def list_threads(
-    session: Session = Depends(get_session),
+    db: DBSession,
     current_user: User = Depends(verify_token),
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=10, le=100),
@@ -117,7 +116,9 @@ async def list_threads(
         .limit(limit)
         .order_by(Thread.updated_at.desc())
     )
-    threads = session.exec(query).all()
+    threads = await db.exec(query)
+    threads = threads.all()
+
     # Convert thread_metadata to dict before returning
     for thread in threads:
         # Handle both MetaData and dict cases
@@ -130,11 +131,11 @@ async def list_threads(
 @router.get("/v1/threads/{thread_id}", response_model=ThreadResponse)
 async def get_thread(
     thread_id: UUID,
-    session: Session = Depends(get_session),
+    db: DBSession,
     current_user: User = Depends(verify_token),
 ):
     """Get a specific thread"""
-    thread = session.get(Thread, thread_id)
+    thread = await db.get(Thread, thread_id)
     if not thread:
         raise HTTPException(status_code=404, detail="Thread not found")
     if str(thread.user_id) != str(current_user.id):
@@ -147,11 +148,11 @@ async def get_thread(
 @router.delete("/v1/threads/{thread_id}")
 async def archive_thread(
     thread_id: UUID,
-    session: Session = Depends(get_session),
+    db: DBSession,
     current_user: User = Depends(verify_token),
 ):
     """Archive a thread"""
-    thread = session.get(Thread, thread_id)
+    thread = await db.get(Thread, thread_id)
     if not thread:
         raise HTTPException(status_code=404, detail="Thread not found")
     if str(thread.user_id) != str(current_user.id):
@@ -160,16 +161,16 @@ async def archive_thread(
         )
 
     thread.is_archived = True
-    session.add(thread)
-    session.commit()
+    db.add(thread)
+    db.commit()
     return {"status": "success"}
 
 
 @router.post("/v1/messages")
 async def create_message(
     message: MessageCreate,
+    db: DBSession,
     current_user: User = Depends(verify_token),
-    session: Session = Depends(get_session),
 ):
     # If no thread_id, create a new thread
     if not message.thread_id:
@@ -185,12 +186,12 @@ async def create_message(
             updated_at=datetime.utcnow(),
             id=uuid4(),
         )
-        session.add(thread)
-        session.commit()
-        session.refresh(thread)
+        db.add(thread)
+        db.commit()
+        db.refresh(thread)
     else:
         # Get existing thread
-        thread = session.get(Thread, message.thread_id)
+        thread = await db.get(Thread, message.thread_id)
         if not thread:
             raise HTTPException(status_code=404, detail="Thread not found")
         if str(thread.user_id) != str(current_user.id):
@@ -212,15 +213,15 @@ async def create_message(
 
     # Update thread's updated_at timestamp
     thread.updated_at = datetime.utcnow()
-    session.add(db_message)
-    session.add(thread)
-    session.commit()
-    session.refresh(db_message)
+    db.add(db_message)
+    db.add(thread)
+    db.commit()
+    db.refresh(db_message)
 
     # If model is specified, generate AI response
     if message.model:
         from src.router.api.v1.network import generate
-        from fastapi.responses import StreamingResponse, Response
+        from fastapi.responses import StreamingResponse
         import json
         from typing import AsyncGenerator
 
@@ -232,9 +233,10 @@ async def create_message(
                 .where(Message.thread_id == db_message.thread_id)
                 .order_by(Message.created_at)
             )
-            thread_messages = session.exec(query).all()
+            thread_messages = await db.exec(query)
             thread_messages = [
-                {"role": msg.role, "content": msg.content} for msg in thread_messages
+                {"role": msg.role, "content": msg.content}
+                for msg in thread_messages.all()
             ]
 
         # Add the current message
@@ -257,17 +259,15 @@ async def create_message(
             created_at=datetime.utcnow(),
             id=uuid4(),
         )
-        session.add(ai_message)
-        session.commit()
+        db.add(ai_message)
+        db.commit()
 
         if message.stream:
 
             async def content_stream() -> AsyncGenerator[bytes, None]:
                 accumulated_content = []
                 try:
-                    response = await generate(
-                        req=ai_request, db=session, user=current_user
-                    )
+                    response = await generate(req=ai_request, db=db, user=current_user)
 
                     async for chunk in response.body_iterator:
                         if chunk:
@@ -292,8 +292,8 @@ async def create_message(
 
                     # After streaming is done, update the AI message
                     ai_message.content = "".join(accumulated_content)
-                    session.add(ai_message)
-                    session.commit()
+                    db.add(ai_message)
+                    db.commit()
 
                     # Send final message with thread_id
                     yield f"data: {json.dumps({'thread_id': str(thread.id)})}\n".encode()
@@ -316,15 +316,15 @@ async def create_message(
             )
         else:
             # For non-streaming responses
-            response = await generate(req=ai_request, db=session, user=current_user)
+            response = await generate(req=ai_request, db=db, user=current_user)
             ai_response = await response.json()
 
             # Update AI message with response
             if "choices" in ai_response and len(ai_response["choices"]) > 0:
                 ai_message.content = ai_response["choices"][0]["message"]["content"]
-                session.add(ai_message)
-                session.commit()
-                session.refresh(ai_message)
+                db.add(ai_message)
+                db.commit()
+                db.refresh(ai_message)
 
             return MessageResponse(
                 id=ai_message.id,
@@ -352,13 +352,13 @@ async def create_message(
 @router.get("/v1/threads/{thread_id}/messages", response_model=List[MessageResponse])
 async def list_messages(
     thread_id: UUID,
-    session: Session = Depends(get_session),
+    db: DBSession,
     current_user: User = Depends(verify_token),
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=50, le=100),
 ):
     """Get messages in a thread"""
-    thread = session.get(Thread, thread_id)
+    thread = await db.get(Thread, thread_id)
     if not thread:
         raise HTTPException(status_code=404, detail="Thread not found")
     if str(thread.user_id) != str(current_user.id):
@@ -373,21 +373,22 @@ async def list_messages(
         .limit(limit)
         .order_by(Message.created_at)
     )
-    messages = session.exec(query).all()
-    return messages
+    messages = await db.exec(query)
+    return messages.all()
 
 
 @router.get(
-    "/v1/threads/{thread_id}/messages/{message_id}", response_model=MessageResponse
+    "/v1/threads/{thread_id}/messages/{message_id}",
+    response_model=MessageResponse,
 )
 async def get_message(
     thread_id: UUID,
     message_id: UUID,
-    session: Session = Depends(get_session),
+    db: DBSession,
     current_user: User = Depends(verify_token),
 ):
     """Get a specific message"""
-    thread = session.get(Thread, thread_id)
+    thread = await db.get(Thread, thread_id)
     if not thread:
         raise HTTPException(status_code=404, detail="Thread not found")
     if str(thread.user_id) != str(current_user.id):
@@ -395,7 +396,7 @@ async def get_message(
             status_code=403, detail="Not authorized to access this thread"
         )
 
-    message = session.get(Message, message_id)
+    message = await db.get(Message, message_id)
     if not message or message.thread_id != thread_id:
         raise HTTPException(status_code=404, detail="Message not found")
 

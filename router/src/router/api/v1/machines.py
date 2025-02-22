@@ -1,16 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session, select
+from sqlmodel import select
+from src.router.db.session import DBSession
 from src.router.core.security import verify_user, verify_machine
 from src.router.core.types import User
-from src.router.db.session import get_session
 import time
 from src.router.models.machines import Machine
-from typing import Annotated
 from src.router.utils.redis import redis_client, get_online_machines
 
 router = APIRouter()
-
-SessionDep = Annotated[Session, Depends(get_session)]
 
 
 @router.get(
@@ -35,10 +32,12 @@ Checks if a specific machine is currently online and responding.
     response_description="Returns the machine's current status",
     deprecated=True,
 )
-async def check_liveness(network_ip: str, session: SessionDep):
+async def check_liveness(network_ip: str):
     # Check if machine is in Redis liveness records
-    for key in redis_client.scan_iter(match="liveness:*"):
-        if redis_client.hget(key, "network_ip") == network_ip:
+    keys = await redis_client.scan_iter(match="liveness:*")
+    for key in keys:
+        nip = await redis_client.hget(key, "network_ip")
+        if nip == network_ip:
             return {"network_ip": network_ip, "status": "online"}
 
     return {"network_ip": network_ip, "status": "offline"}
@@ -63,7 +62,8 @@ async def check_liveness(network_ip: str, session: SessionDep):
 )
 async def check_liveness_by_id(machine_id: str):
     # Direct check in Redis using machine_id
-    if redis_client.exists(f"liveness:{machine_id}"):
+    exists = await redis_client.exists(f"liveness:{machine_id}")
+    if exists:
         return {"machine_id": machine_id, "status": "online"}
 
     return {"machine_id": machine_id, "status": "offline"}
@@ -121,7 +121,7 @@ async def check_liveness_by_id(machine_id: str):
 )
 async def set_liveness(
     network_ip: str,
-    session: SessionDep,
+    db: DBSession,
     machine_auth: dict = Depends(verify_machine),
 ):
     # Verify the token is authorized for this machine
@@ -132,19 +132,19 @@ async def set_liveness(
         )
 
     now = time.time()
-    redis_client.setnx(f"liveness-start:{network_ip}", now)
-    created_at = float(redis_client.get(f"liveness-start:{network_ip}"))
+    await redis_client.setnx(f"liveness-start:{network_ip}", now)
+    ls_nip = await redis_client.get(f"liveness-start:{network_ip}")
+    created_at = float(ls_nip)
     ttl = int((now - created_at) + 12)
-    redis_client.expire(f"liveness-start:{network_ip}", ttl)
+    await redis_client.expire(f"liveness-start:{network_ip}", ttl)
 
-    machine = session.exec(
-        select(Machine).where(Machine.network_ip == network_ip)
-    ).first()
+    machine = await db.exec(select(Machine).where(Machine.network_ip == network_ip))
+    machine = machine.first()
 
     if not machine:
         raise HTTPException(status_code=404, detail="Machine not found")
 
-    redis_client.hset(
+    await redis_client.hset(
         f"liveness:{machine.id}",
         mapping={
             "network_ip": network_ip,
@@ -152,7 +152,7 @@ async def set_liveness(
         },
     )
 
-    redis_client.expire(f"liveness:{machine.id}", 6)
+    await redis_client.expire(f"liveness:{machine.id}", 6)
 
     return {"network_ip": network_ip, "status": "online"}
 
@@ -164,7 +164,7 @@ async def set_liveness(
     By default, disabled machines are excluded. Only admins can request disabled machines.""",
 )
 async def list_all_machines(
-    session: SessionDep,
+    db: DBSession,
     include_disabled: bool = False,
     user: User = Depends(verify_user),
 ):
@@ -177,8 +177,10 @@ async def list_all_machines(
     if not include_disabled:
         query = query.where(Machine.disabled == False)  # noqa: E712
 
-    machines = session.exec(query).all()
-    online_machines = get_online_machines()
+    machines = await db.exec(query)
+    machines = machines.all()
+
+    online_machines = await get_online_machines()
 
     return [
         {
