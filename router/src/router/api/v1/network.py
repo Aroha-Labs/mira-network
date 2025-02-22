@@ -359,6 +359,7 @@ async def save_log(
         user_id=user.id,
         amount=-cost,
         description=f"Used {total_tokens} tokens. Prompt tokens: {prompt_tokens}, Completion tokens: {completion_tokens}",
+        created_at=datetime.now(timezone.utc),
     )
     db.add(user_credits_history)
     await db.commit()
