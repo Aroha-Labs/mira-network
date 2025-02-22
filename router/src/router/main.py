@@ -6,6 +6,21 @@ import uvicorn
 from prometheus_fastapi_instrumentator import Instrumentator
 from scalar_fastapi import get_scalar_api_reference
 import os
+from src.router.utils.redis import cleanup
+from fastapi.responses import JSONResponse
+from fastapi.middleware import Middleware
+from contextlib import asynccontextmanager
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    try:
+        yield
+    # Shutdown
+    finally:
+        await cleanup()
+
 
 app = FastAPI(
     title="Mira Client Dashboard",
@@ -30,18 +45,20 @@ app = FastAPI(
         "scopeSeparator": " ",
         "scopes": {"read": "Read access", "write": "Write access"},
     },
+    lifespan=lifespan,
+    default_response_class=JSONResponse,
+    middleware=[
+        Middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+    ],
 )
 
 Instrumentator().instrument(app).expose(app)
-
-# CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # Include routers
 app.include_router(v1_router)
