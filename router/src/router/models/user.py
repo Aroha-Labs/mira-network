@@ -1,20 +1,18 @@
 from sqlmodel import SQLModel, Field, Column, Index
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any
 from datetime import datetime
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy import DateTime, func, text, Float
 import uuid
-from sqlalchemy.orm import Relationship
-from .wallet import Wallet
 from sqlmodel import Boolean
 
 
 class UserCreditsHistory(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
-    user_id: str
+    user_id: str = Field(index=True)  # Adding index for faster lookups
     amount: float
     description: Optional[str] = None
-    created_at: datetime = Field(default=func.now(), nullable=False)
+    created_at: datetime = Field(default_factory=lambda: func.now(), nullable=False)
 
 
 class User(SQLModel, table=True):
