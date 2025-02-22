@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends
-from sqlmodel import Session, select
+from sqlmodel import select
 from src.router.core.types import User
 from src.router.models.user import User as UserModel, UserCreditsHistory
-from src.router.db.session import get_session
+from src.router.db.session import DBSession
 from src.router.core.security import verify_user
 
 router = APIRouter()
@@ -58,9 +58,7 @@ router = APIRouter()
         },
     },
 )
-async def get_user_credits(
-    db: Session = Depends(get_session), user: User = Depends(verify_user)
-):
+async def get_user_credits(db: DBSession, user: User = Depends(verify_user)):
     user_data = db.exec(select(UserModel).where(UserModel.user_id == user.id)).first()
     return {"credits": user_data.credits if user_data else 0}
 
@@ -147,12 +145,10 @@ async def get_user_credits(
         },
     },
 )
-async def get_user_credits_history(
-    db: Session = Depends(get_session), user: User = Depends(verify_user)
-):
-    history = db.exec(
+async def get_user_credits_history(db: DBSession, user: User = Depends(verify_user)):
+    history = await db.exec(
         select(UserCreditsHistory)
         .where(UserCreditsHistory.user_id == user.id)
         .order_by(UserCreditsHistory.created_at.desc())
-    ).all()
-    return history
+    )
+    return history.all()

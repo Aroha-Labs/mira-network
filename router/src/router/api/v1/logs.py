@@ -1,9 +1,9 @@
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session, select
+from sqlmodel import select
 from src.router.core.types import User
 from src.router.models.logs import ApiLogs
-from src.router.db.session import get_session
+from src.router.db.session import DBSession
 from src.router.core.security import verify_user
 from sqlalchemy import func
 from sqlalchemy.types import Float
@@ -169,7 +169,7 @@ router = APIRouter()
     },
 )
 async def list_all_logs(
-    db: Session = Depends(get_session),
+    db: DBSession,
     user: User = Depends(verify_user),
     page: int = 1,
     page_size: int = 10,
@@ -192,34 +192,42 @@ async def list_all_logs(
 
     offset = (page - 1) * page_size
 
-    query = db.query(ApiLogs)
+    # query = db.query(ApiLogs)
+    query = select(ApiLogs)
+    queryCount = select(func.count()).select_from(ApiLogs)
 
     # Handle user_id filtering and admin access
     if "admin" in user.roles:
         # Start with all logs for admin
         if user_id:
             # Admin filtering for specific user
-            query = query.filter(ApiLogs.user_id == user_id)
+            query = query.where(ApiLogs.user_id == user_id)
+            queryCount = queryCount.where(ApiLogs.user_id == user_id)
     else:
         # Non-admin only sees their own logs
-        query = query.filter(ApiLogs.user_id == user.id)
+        query = query.where(ApiLogs.user_id == user.id)
+        queryCount = queryCount.where(ApiLogs.user_id == user.id)
 
     # Apply other filters
     if start_date:
-        query = query.filter(ApiLogs.created_at >= start_date)
+        query = query.where(ApiLogs.created_at >= start_date)
+        queryCount = queryCount.where(ApiLogs.created_at >= start_date)
     if end_date:
-        query = query.filter(ApiLogs.created_at <= end_date)
+        query = query.where(ApiLogs.created_at <= end_date)
+        queryCount = queryCount.where(ApiLogs.created_at <= end_date)
     if machine_id:
-        query = query.filter(
-            ApiLogs.machine_id == machine_id
-        )  # Removed str() conversion
+        query = query.where(ApiLogs.machine_id == machine_id)
+        queryCount = queryCount.where(ApiLogs.machine_id == machine_id)
     if model:
-        query = query.filter(ApiLogs.model == model)
+        query = query.where(ApiLogs.model == model)
+        queryCount = queryCount.where(ApiLogs.model == model)
     if api_key_id:
-        query = query.filter(ApiLogs.api_key_id == api_key_id)
+        query = query.where(ApiLogs.api_key_id == api_key_id)
+        queryCount = queryCount.where(ApiLogs.api_key_id == api_key_id)
     if flow_id:
         # For flow_id, we don't need to check user ownership if admin
-        query = query.filter(ApiLogs.flow_id == flow_id)
+        query = query.where(ApiLogs.flow_id == flow_id)
+        queryCount = queryCount.where(ApiLogs.flow_id == flow_id)
 
     if order_by not in [
         "created_at",
@@ -238,8 +246,12 @@ async def list_all_logs(
         query = query.order_by(getattr(ApiLogs, order_by).asc())
     else:
         raise HTTPException(status_code=400, detail="Invalid order direction")
-    logs = query.offset(offset).limit(page_size).all()
-    total_logs = query.count()
+    logs = await db.exec(query.offset(offset).limit(page_size))
+    logs = logs.all()
+
+    # total_logs = query.count()
+    total_logs = await db.exec(queryCount)
+    total_logs = total_logs.one()
 
     def exclude_model_from_pricing(log):
         l = log.dict()
@@ -308,19 +320,16 @@ async def list_all_logs(
         },
     },
 )
-async def total_inference_calls(
-    db: Session = Depends(get_session),
-    user: User = Depends(verify_user),
-):
-    total = db.exec(
+async def total_inference_calls(db: DBSession, user: User = Depends(verify_user)):
+    total = await db.exec(
         select(func.count()).select_from(ApiLogs).where(ApiLogs.user_id == user.id)
-    ).first()
-    return {"total": total}
+    )
+    return {"total": total.first()}
 
 
 @router.get("/api-logs/metrics")
 async def get_logs_metrics(
-    db: Session = Depends(get_session),
+    db: DBSession,
     user: User = Depends(verify_user),
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
@@ -415,7 +424,8 @@ async def get_logs_metrics(
     )
 
     # Execute the query once
-    results = db.execute(query).all()
+    results = await db.exec(query)
+    results = results.all()
 
     # Process results safely
     time_series = {}

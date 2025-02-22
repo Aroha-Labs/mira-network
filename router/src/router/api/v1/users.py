@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends
-from sqlmodel import Session, select
+from sqlmodel import select
 from src.router.core.types import User
 from src.router.models.user import User as UserModel
-from src.router.db.session import get_session
+from src.router.db.session import DBSession
 from src.router.core.security import verify_token
 
 router = APIRouter()
@@ -64,7 +64,8 @@ router = APIRouter()
     },
 )
 async def get_current_user(
-    db: Session = Depends(get_session), user: User = Depends(verify_token)
+    db: DBSession,
+    user: User = Depends(verify_token),
 ) -> UserModel | None:
     """
     Retrieve the current authenticated user's details from the database.
@@ -84,7 +85,8 @@ async def get_current_user(
         - The user parameter comes from the verify_token dependency
         - Returns None instead of raising an error if the user is not found
     """
-    user_data = db.exec(select(UserModel).where(UserModel.user_id == user.id)).first()
+    user_data = await db.exec(select(UserModel).where(UserModel.user_id == user.id))
+    user_data = user_data.first()
     if not user_data:
         return None
     return user_data
