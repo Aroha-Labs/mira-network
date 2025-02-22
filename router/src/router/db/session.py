@@ -6,19 +6,13 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 
 def get_session() -> Generator[Session, None, None]:
-    session = Session(engine)
-    try:
-        yield session  # Provide session to FastAPI endpoint
-    finally:
-        session.close()  # ✅ Ensures session is closed after request
+    with Session(engine) as session:
+        yield session  # Use "with" to ensure proper closing
 
 
 async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
-    session = AsyncSession(async_engine)
-    try:
-        yield session  # Provide session to FastAPI endpoint
-    finally:
-        await session.close()  # ✅ Ensures session is closed after request
+    async with AsyncSession(async_engine) as session:
+        yield session
 
 
 @asynccontextmanager
