@@ -344,21 +344,17 @@ async def save_log(
 
     cost = prompt_tokens_cost + completion_tokens_cost
 
-    await db.execute(
-        update(UserModel)
-        .where(UserModel.user_id == user.id)
-        .values(
-            credits=user_row.credits - cost,
-            updated_at=datetime.now(timezone.utc),
-        )
-    )
+    user_row.credits -= cost
+    user_row.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    db.add(user_row)
 
     # Update user credit history
     user_credits_history = UserCreditsHistory(
         user_id=user.id,
         amount=-cost,
         description=f"Used {total_tokens} tokens. Prompt tokens: {prompt_tokens}, Completion tokens: {completion_tokens}",
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(timezone.utc).replace(tzinfo=None),
     )
     db.add(user_credits_history)
     await db.commit()
