@@ -4,7 +4,6 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 engine = create_engine(
     os.getenv("DB_CONNECTION_STRING"),
-    connect_args={"sslmode": os.getenv("DB_SSL_MODE", "require")},
     pool_size=2,  # Reduce pool size per Fargate container (RDS Proxy manages pooling)
     max_overflow=4,  # Lower than before to prevent too many connections
     pool_recycle=600,  # Prevent stale connections (RDS Proxy recommended)
@@ -13,7 +12,6 @@ engine = create_engine(
 
 async_engine = create_async_engine(
     os.getenv("ASYNC_DB_CONNECTION_STRING"),
-    connect_args={"sslmode": os.getenv("DB_SSL_MODE", "require")},
     pool_size=2,  # Reduce pool size per Fargate container (RDS Proxy manages pooling)
     max_overflow=4,  # Lower than before to prevent too many connections
     pool_recycle=600,  # Prevent stale connections (RDS Proxy recommended)
