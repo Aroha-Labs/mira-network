@@ -193,6 +193,55 @@ async def async_verify_token(
                 logger.error(f"Error verifying token in async_verify_token: {e}")
                 raise HTTPException(status_code=401, detail=str(e))
 
+    # Verify if token is a JWT token (supabase token)
+    decodedToken: dict = None
+    try:
+        decodedToken = jwt.decode(token, options={"verify_signature": False})
+    except jwt.exceptions.DecodeError:
+        raise HTTPException(
+            status_code=401, detail="Unauthorized access - invalid token"
+        )
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token has expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    except jwt.InvalidIssuerError:
+        raise HTTPException(status_code=401, detail="Invalid issuer")
+    except jwt.InvalidAudienceError:
+        raise HTTPException(status_code=401, detail="Invalid audience")
+    except jwt.InvalidAlgorithmError:
+        raise HTTPException(status_code=401, detail="Invalid algorithm")
+    except jwt.InvalidIssuedAtError:
+        raise HTTPException(status_code=401, detail="Invalid issued at")
+    except jwt.InvalidKeyError:
+        raise HTTPException(status_code=401, detail="Invalid key")
+    except jwt.InvalidSignatureError:
+        raise HTTPException(status_code=401, detail="Invalid signature")
+    except jwt.MissingRequiredClaimError:
+        raise HTTPException(status_code=401, detail="Missing required claim")
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="PyJWTError")
+    except:
+        raise HTTPException(status_code=401, detail="Unknown error")
+
+    try:
+        async_supabase = await create_async_client(SUPABASE_URL, SUPABASE_KEY)
+        userRes = await async_supabase.auth.get_user(token)
+
+        if userRes is None:
+            raise HTTPException(
+                status_code=401, detail="Unauthorized access - user not found"
+            )
+
+        user_roles = decodedToken.get("user_roles", [])
+        return User(
+            **userRes.user.model_dump(),
+            roles=user_roles,
+            api_key_id=DEFAULT_JWT_API_KEY_ID,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=str(e))
+
     raise HTTPException(status_code=401, detail="Invalid token")
 
 
