@@ -1,20 +1,17 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session, select
+from sqlmodel import select
+from src.router.db.session import DBSession
 from src.router.core.security import verify_admin
 from src.router.core.types import User
-from src.router.db.session import get_session
 from src.router.schemas.machine import RegisterMachineRequest, MachineAuthToken
 from src.router.models.machines import Machine
 from src.router.models.machine_tokens import MachineToken
-from typing import Annotated
 import secrets
 from datetime import datetime
 from src.router.utils.redis import redis_client
 
 router = APIRouter()
-
-SessionDep = Annotated[Session, Depends(get_session)]
 
 
 @router.post(
@@ -24,7 +21,7 @@ SessionDep = Annotated[Session, Depends(get_session)]
 )
 async def register_machine(
     request: RegisterMachineRequest,
-    session: SessionDep,
+    session: DBSession,
     user: User = Depends(verify_admin),
 ):
     existing_machine = session.exec(
@@ -42,7 +39,7 @@ async def register_machine(
     session.commit()
     session.refresh(new_machine)
 
-    redis_client.set(f"network_ip:{new_machine.id}", new_machine.network_ip)
+    await redis_client.set(f"network_ip:{new_machine.id}", new_machine.network_ip)
 
     return {
         "network_ip": request.network_ip,
@@ -61,18 +58,18 @@ async def register_machine(
 async def update_machine(
     network_ip: str,
     request: RegisterMachineRequest,
-    session: SessionDep,
+    db: DBSession,
     user: User = Depends(verify_admin),
 ):
-    machine = session.exec(
-        select(Machine).where(Machine.network_ip == network_ip)
-    ).first()
+    machine_res = await db.exec(select(Machine).where(Machine.network_ip == network_ip))
+    machine = machine_res.first()
+
     if not machine:
         raise HTTPException(status_code=404, detail="Machine not found")
 
     # If network IP changed, update Redis cache
     if machine.network_ip != request.network_ip:
-        redis_client.set(f"network_ip:{machine.id}", request.network_ip)
+        await redis_client.set(f"network_ip:{machine.id}", request.network_ip)
 
     machine.network_ip = request.network_ip
     machine.name = request.name
@@ -80,9 +77,9 @@ async def update_machine(
     machine.disabled = request.disabled
     machine.updated_at = datetime.utcnow()  # Add this line to update timestamp
 
-    session.add(machine)
-    session.commit()
-    session.refresh(machine)
+    db.add(machine)
+    db.commit()
+    db.refresh(machine)
 
     return machine
 
@@ -91,7 +88,7 @@ async def update_machine(
 async def create_auth_token(
     network_ip: str,
     token: MachineAuthToken,
-    session: SessionDep,
+    session: DBSession,
     user: User = Depends(verify_admin),
 ):
     machine = session.exec(
@@ -134,7 +131,7 @@ async def create_auth_token(
 async def delete_auth_token(
     network_ip: str,
     api_token: str,  # updated parameter name
-    session: SessionDep,
+    session: DBSession,
     user: User = Depends(verify_admin),
 ):
     machine = session.exec(
@@ -167,7 +164,7 @@ async def delete_auth_token(
 )
 async def list_machine_tokens(
     network_ip: str,
-    session: SessionDep,
+    session: DBSession,
     user: User = Depends(verify_admin),
 ):
     machine = session.exec(

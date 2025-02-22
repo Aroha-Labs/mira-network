@@ -3,26 +3,25 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Response, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from sqlmodel import Session, select, update
+from sqlmodel import select, update
 from src.router.core.settings_types import SETTINGS_MODELS
 from src.router.core.types import ModelPricing, User
 from src.router.models.logs import ApiLogs
-from src.router.db.session import get_session, get_async_session
-from src.router.core.security import async_verify_user
+from src.router.db.session import DBSession
+from src.router.core.security import verify_user
 from src.router.utils.network import (
     get_random_machines,
     PROXY_PORT,
 )
 from src.router.models.user import User as UserModel, UserCreditsHistory
 from src.router.schemas.ai import AiRequest, VerifyRequest
-import requests
 import time
 import httpx
 import json
 from src.router.utils.settings import get_setting_value
 from src.router.utils.settings import get_supported_models
 import asyncio
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 router = APIRouter()
 
@@ -146,7 +145,7 @@ router = APIRouter()
         },
     },
 )
-async def verify(req: VerifyRequest, db: Session = Depends(get_session)):
+async def verify(req: VerifyRequest, db: DBSession):
     if len(req.models) < 1:
         raise HTTPException(status_code=400, detail="At least one model is required")
 
@@ -159,7 +158,7 @@ async def verify(req: VerifyRequest, db: Session = Depends(get_session)):
             detail="Minimum yes must be less than or equal to the number of models",
         )
 
-    supported_models = get_supported_models(db)
+    supported_models = await get_supported_models(db)
 
     # Validate and transform all models
     transformed_models = []
@@ -270,9 +269,8 @@ class ModelListRes(BaseModel):
         }
     },
 )
-async def list_models(db: AsyncSession = Depends(get_async_session)) -> ModelListRes:
+async def list_models(db: DBSession) -> ModelListRes:
     supported_models = await get_supported_models(db)
-    print("supported_models", supported_models)
     return {
         "object": "list",
         "data": [
@@ -548,14 +546,14 @@ Server-sent events with the following data structure:
 )
 async def generate(
     req: AiRequest,
-    user: User = Depends(async_verify_user),
-    db: AsyncSession = Depends(get_async_session),
+    db: DBSession,
+    user: User = Depends(verify_user),
     flow_id: Optional[str] = None,
 ) -> Response:
     timeStart = time.time()
 
-    user_row = await db.execute(select(UserModel).where(UserModel.user_id == user.id))
-    user_row = user_row.scalar_one_or_none()
+    user_row = await db.exec(select(UserModel).where(UserModel.user_id == user.id))
+    user_row = user_row.one_or_none()
 
     if not user_row:
         raise HTTPException(status_code=404, detail="User not found")
@@ -564,20 +562,20 @@ async def generate(
         raise HTTPException(status_code=402, detail="Insufficient credits")
 
     supported_models = await get_supported_models(db)
-    print("supported_models", supported_models)
+    # print("supported_models", supported_models)
     if req.model not in supported_models:
         raise HTTPException(status_code=400, detail="Unsupported model")
 
     model_config = supported_models[req.model]
     original_req_model = req.model
     req.model = model_config.id
-    print("req.model", req.model)
+    # print("req.model", req.model)
 
     machine = (await get_random_machines(1))[0]
-    print("machine", machine)
+    # print("machine", machine)
     proxy_url = f"http://{machine.network_ip}:{PROXY_PORT}/v1/chat/completions"
 
-    print("proxy_url", req.model_dump())
+    # print("proxy_url", req.model_dump())
     async with httpx.AsyncClient(timeout=httpx.Timeout(60.0)) as client:
         llmres = await client.post(
             proxy_url,
@@ -592,7 +590,7 @@ async def generate(
         ttfs: Optional[float] = None
 
         for line in llmres.iter_lines():
-            print("line", line)
+            # print("line", line)
             # Handle line depending on whether it's bytes or string
             if isinstance(line, bytes):
                 l = line.decode("utf-8")
