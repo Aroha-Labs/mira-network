@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 import os
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from sqlalchemy.pool import NullPool
 from typing import Annotated, AsyncGenerator
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -14,11 +15,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 # )
 
 async_engine = create_async_engine(
-    os.getenv("ASYNC_DB_CONNECTION_STRING"),
-    pool_size=2,  # Reduce pool size per Fargate container (RDS Proxy manages pooling)
-    max_overflow=4,  # Lower than before to prevent too many connections
-    pool_recycle=600,  # Prevent stale connections (RDS Proxy recommended)
-    pool_timeout=30,  # Wait time before raising TimeoutError
+    os.getenv("ASYNC_DB_CONNECTION_STRING"), poolclass=NullPool
 )
 
 # Create Async Session Factory
