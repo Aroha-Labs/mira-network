@@ -124,3 +124,25 @@ async def test_error_handling(client, monkeypatch):
         await client.chat_completions_create(
             model="test-model", messages=[Message(role="user", content="Hello")]
         )
+
+
+async def test_list_models(client, monkeypatch):
+    mock_models = {
+        "object": "list",
+        "data": [
+            {"id": "gpt-4o", "object": "model"},
+            {"id": "deepseek-r1", "object": "model"},
+            {"id": "gpt-4o-mini", "object": "model"},
+            {"id": "claude-3.5-sonnet", "object": "model"},
+            {"id": "llama-3.3-70b-instruct", "object": "model"}
+        ]
+    }
+
+    async def mock_get(*args, **kwargs):
+        request = httpx.Request("GET", "https://apis.mira.network/v1/models")
+        return httpx.Response(status_code=200, json=mock_models, request=request)
+
+    monkeypatch.setattr(httpx.AsyncClient, "get", mock_get)
+
+    response = await client.list_models()
+    assert response == mock_models
