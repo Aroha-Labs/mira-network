@@ -299,20 +299,25 @@ async def delete_flow(flow_id: str, db: DBSession):
     await db.delete(existing_flow)
     await db.commit()
     await redis_client.delete(f"flow:{flow_id}")
-    await get_cached_flow.cache_clear()
+    get_cached_flow.cache_clear()
     return {"message": "Flow deleted successfully"}
 
 
-@alru_cache(maxsize=100)
+@alru_cache(maxsize=100, ttl=3600)  # 1 hour TTL
 async def get_cached_flow(flow_id: int) -> Optional[Flows]:
-    logger.debug(f"Cache miss for flow_id: {flow_id}")
+    """Get flow from cache with TTL, using async_lru package"""
+    logger.info(f"Cache miss for flow_id: {flow_id}")
+
+    # Try to get from Redis first
     flow_key = f"flow:{flow_id}"
     cached_flow = await redis_client.get(flow_key)
+
     if cached_flow:
-        logger.debug(f"Redis cache hit for flow_id: {flow_id}")
+        logger.info(f"Redis cache hit for flow_id: {flow_id}")
         flow_dict = json.loads(cached_flow)
         return Flows(**flow_dict)
-    logger.debug(f"Complete cache miss for flow_id: {flow_id}")
+
+    logger.info(f"Complete cache miss for flow_id: {flow_id}")
     return None
 
 
