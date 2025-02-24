@@ -23,6 +23,7 @@ from src.router.utils.redis import redis_client
 import json
 from src.router.utils.logger import logger
 from async_lru import alru_cache
+import traceback
 
 router = APIRouter()
 
@@ -583,18 +584,29 @@ async def generate_with_flow_id(
 
     req.messages.insert(0, Message(role="system", content=system_prompt))
 
-    response = await generate(
-        req=AiRequest(
-            model=req.model,
-            messages=req.messages,
-            stream=req.stream,
-            model_provider=None,
-            tools=req.tools,
-            tool_choice=req.tool_choice,
-        ),
-        flow_id=flow_id,
-        user=user,
-        db=db,
-    )
+    try:
+        response = await generate(
+            req=AiRequest(
+                model=req.model,
+                messages=req.messages,
+                stream=req.stream,
+                model_provider=None,
+                tools=req.tools,
+                tool_choice=req.tool_choice,
+            ),
+            flow_id=flow_id,
+            user=user,
+            db=db,
+        )
+    except Exception as e:
+        # Get full traceback
+        error_trace = traceback.format_exc()
+        logger.error(
+            f"Error generating with flow ID {flow_id}:\n"
+            f"Error: {str(e)}\n"
+            f"Traceback:\n{error_trace}"
+        )
+
+        raise HTTPException(status_code=500, detail=str(e))
 
     return response
