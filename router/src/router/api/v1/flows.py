@@ -22,7 +22,7 @@ from datetime import datetime, timedelta
 from src.router.utils.redis import redis_client
 import json
 from src.router.utils.logger import logger
-from functools import lru_cache
+from async_lru import alru_cache
 
 router = APIRouter()
 
@@ -297,12 +297,14 @@ async def delete_flow(flow_id: str, db: DBSession):
 
     await db.delete(existing_flow)
     await db.commit()
+    await redis_client.delete(f"flow:{flow_id}")
+    await get_cached_flow.cache_clear()
     return {"message": "Flow deleted successfully"}
 
 
-@lru_cache(maxsize=100)
+@alru_cache(maxsize=100)
 async def get_cached_flow(flow_id: int) -> Optional[Flows]:
-    logger.debug(f"LRU Cache miss for flow_id: {flow_id}")  # Only called on cache miss
+    logger.debug(f"Cache miss for flow_id: {flow_id}")
     flow_key = f"flow:{flow_id}"
     cached_flow = await redis_client.get(flow_key)
     if cached_flow:
@@ -539,7 +541,9 @@ async def generate_with_flow_id(
         raise HTTPException(status_code=400, detail="Invalid flow ID format")
 
     # Try LRU cache first, then Redis, then database
+
     flow = await get_cached_flow(flow_id_int)
+    logger.info(f"Flow lru cache: {get_cached_flow.cache_info()}")
     if not flow:
         flow = await db.exec(select(Flows).where(Flows.id == flow_id_int))
         flow = flow.one_or_none()
