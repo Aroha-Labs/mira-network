@@ -47,17 +47,18 @@ async def get_random_machines(
             missing_ids.append(machine_id)
             continue
 
-        machines.append(MachineInfo(id=machine_id, network_ip=ip))
-
+        machines.append(MachineInfo(id=int(machine_id), network_ip=ip))
     # Handle missing IPs if any
     if missing_ids:
+        # Convert string IDs to integers before the database query
+        missing_ids_int = [int(mid) for mid in missing_ids]
         db_machines = await db.exec(
-            select(Machine).where(col(Machine.id).in_(missing_ids))
+            select(Machine).where(col(Machine.id).in_(missing_ids_int))
         )
 
         db_machines = db_machines.all()
 
-        if db_machines.count() != missing_ids.count():
+        if len(db_machines) != len(missing_ids):
             raise HTTPException(
                 status_code=404,
                 detail="Some machines exist in Redis but not in database",
@@ -67,7 +68,9 @@ async def get_random_machines(
             for machine in db_machines:
                 str_id = str(machine.id)
                 await pipe.set(f"network_ip:{str_id}", machine.network_ip)
-                machines.append(MachineInfo(id=str_id, network_ip=machine.network_ip))
+                machines.append(
+                    MachineInfo(id=int(str_id), network_ip=machine.network_ip)
+                )
             await pipe.execute()
 
     return machines
