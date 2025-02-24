@@ -73,8 +73,8 @@ async def create_thread_from_message(
         id=uuid4(),
     )
     db.add(db_thread)
-    db.commit()
-    db.refresh(db_thread)
+    await db.commit()
+    await db.refresh(db_thread)
     return db_thread
 
 
@@ -96,8 +96,8 @@ async def create_thread(
         thread_metadata=thread.metadata if thread.metadata else {},
     )
     db.add(db_thread)
-    db.commit()
-    db.refresh(db_thread)
+    await db.commit()
+    await db.refresh(db_thread)
     return db_thread
 
 
@@ -162,7 +162,7 @@ async def archive_thread(
 
     thread.is_archived = True
     db.add(thread)
-    db.commit()
+    await db.commit()
     return {"status": "success"}
 
 
@@ -187,8 +187,8 @@ async def create_message(
             id=uuid4(),
         )
         db.add(thread)
-        db.commit()
-        db.refresh(thread)
+        await db.commit()
+        await db.refresh(thread)
     else:
         # Get existing thread
         thread = await db.get(Thread, message.thread_id)
@@ -215,8 +215,8 @@ async def create_message(
     thread.updated_at = datetime.utcnow()
     db.add(db_message)
     db.add(thread)
-    db.commit()
-    db.refresh(db_message)
+    await db.commit()
+    await db.refresh(db_message)
 
     # If model is specified, generate AI response
     if message.model:
@@ -260,7 +260,7 @@ async def create_message(
             id=uuid4(),
         )
         db.add(ai_message)
-        db.commit()
+        await db.commit()
 
         if message.stream:
 
@@ -293,7 +293,7 @@ async def create_message(
                     # After streaming is done, update the AI message
                     ai_message.content = "".join(accumulated_content)
                     db.add(ai_message)
-                    db.commit()
+                    await db.commit()
 
                     # Send final message with thread_id
                     yield f"data: {json.dumps({'thread_id': str(thread.id)})}\n".encode()
@@ -323,8 +323,8 @@ async def create_message(
             if "choices" in ai_response and len(ai_response["choices"]) > 0:
                 ai_message.content = ai_response["choices"][0]["message"]["content"]
                 db.add(ai_message)
-                db.commit()
-                db.refresh(ai_message)
+                await db.commit()
+                await db.refresh(ai_message)
 
             return MessageResponse(
                 id=ai_message.id,

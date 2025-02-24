@@ -81,6 +81,6 @@ async def update_setting_value(
         setting = SystemSettings(name=name, value=value, description=description)
 
     db.add(setting)
-    db.commit()
-    db.refresh(setting)
+    await db.commit()
+    await db.refresh(setting)
     return setting

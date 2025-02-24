@@ -66,8 +66,8 @@ async def create_wallet(
     )
 
     db.add(new_wallet)
-    db.commit()
-    db.refresh(new_wallet)
+    await db.commit()
+    await db.refresh(new_wallet)
 
     return new_wallet
 
@@ -118,8 +118,8 @@ async def delete_wallet(
             status_code=status.HTTP_404_NOT_FOUND, detail="Wallet not found"
         )
 
-    db.delete(wallet)
-    db.commit()
+    await db.delete(wallet)
+    await db.commit()
 
     return {"message": "Wallet deleted successfully"}
 
@@ -168,8 +168,8 @@ async def wallet_login(
                 created_at=datetime.utcnow(),
                 updated_at=datetime.utcnow(),
             )
-            db.add(new_wallet)
-            db.commit()
+            await db.add(new_wallet)
+            await db.commit()
 
         except Exception as e:
             raise HTTPException(
@@ -188,7 +188,7 @@ async def wallet_login(
 
             # Update wallet last login
             wallet.updated_at = datetime.utcnow()
-            db.commit()
+            await db.commit()
 
         except Exception as e:
             raise HTTPException(

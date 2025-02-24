@@ -21,12 +21,14 @@ router = APIRouter()
 )
 async def register_machine(
     request: RegisterMachineRequest,
-    session: DBSession,
+    db: DBSession,
     user: User = Depends(verify_admin),
 ):
-    existing_machine = session.exec(
+    existing_machine_res = await db.exec(
         select(Machine).where(Machine.network_ip == request.network_ip)
-    ).first()
+    )
+    existing_machine = existing_machine_res.first()
+
     if existing_machine:
         raise HTTPException(status_code=400, detail="Machine already registered")
 
@@ -35,9 +37,9 @@ async def register_machine(
         name=request.name,
         description=request.description,
     )
-    session.add(new_machine)
-    session.commit()
-    session.refresh(new_machine)
+    db.add(new_machine)
+    await db.commit()
+    await db.refresh(new_machine)
 
     await redis_client.set(f"network_ip:{new_machine.id}", new_machine.network_ip)
 
@@ -78,8 +80,8 @@ async def update_machine(
     machine.updated_at = datetime.utcnow()  # Add this line to update timestamp
 
     db.add(machine)
-    db.commit()
-    db.refresh(machine)
+    await db.commit()
+    await db.refresh(machine)
 
     return machine
 
@@ -88,12 +90,12 @@ async def update_machine(
 async def create_auth_token(
     network_ip: str,
     token: MachineAuthToken,
-    session: DBSession,
+    db: DBSession,
     user: User = Depends(verify_admin),
 ):
-    machine = session.exec(
-        select(Machine).where(Machine.network_ip == network_ip)
-    ).first()
+    machine_res = await db.exec(select(Machine).where(Machine.network_ip == network_ip))
+    machine = machine_res.first()
+
     if not machine:
         raise HTTPException(status_code=404, detail="Machine not found")
 
@@ -107,11 +109,11 @@ async def create_auth_token(
     )
 
     try:
-        session.add(new_token)
-        session.commit()
-        session.refresh(new_token)
+        db.add(new_token)
+        await db.commit()
+        await db.refresh(new_token)
     except Exception as e:
-        session.rollback()
+        await db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to save token: {str(e)}")
 
     return {
@@ -131,29 +133,31 @@ async def create_auth_token(
 async def delete_auth_token(
     network_ip: str,
     api_token: str,  # updated parameter name
-    session: DBSession,
+    db: DBSession,
     user: User = Depends(verify_admin),
 ):
-    machine = session.exec(
-        select(Machine).where(Machine.network_ip == network_ip)
-    ).first()
+    machine_res = await db.exec(select(Machine).where(Machine.network_ip == network_ip))
+    machine = machine_res.first()
+
     if not machine:
         raise HTTPException(status_code=404, detail="Machine not found")
 
-    token = session.exec(
+    token_res = await db.exec(
         select(MachineToken).where(
             MachineToken.machine_id == machine.id,
             MachineToken.api_token == api_token,  # updated field name
             MachineToken.deleted_at == None,  # noqa: E711
         )
-    ).first()
+    )
+    token = token_res.first()
+
     if not token:
         raise HTTPException(status_code=404, detail="Token not found")
 
     # Soft delete the token
     token.deleted_at = datetime.utcnow()
-    session.add(token)
-    session.commit()
+    db.add(token)
+    await db.commit()
 
     return None
 
@@ -164,21 +168,22 @@ async def delete_auth_token(
 )
 async def list_machine_tokens(
     network_ip: str,
-    session: DBSession,
+    db: DBSession,
     user: User = Depends(verify_admin),
 ):
-    machine = session.exec(
-        select(Machine).where(Machine.network_ip == network_ip)
-    ).first()
+    machine_res = await db.exec(select(Machine).where(Machine.network_ip == network_ip))
+    machine = machine_res.first()
+
     if not machine:
         raise HTTPException(status_code=404, detail="Machine not found")
 
-    tokens = session.exec(
+    tokens_res = await db.exec(
         select(MachineToken).where(
             MachineToken.machine_id == machine.id,
             MachineToken.deleted_at == None,  # noqa: E711
         )
-    ).all()
+    )
+    tokens = tokens_res.all()
 
     return [
         {
