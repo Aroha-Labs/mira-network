@@ -22,6 +22,7 @@ from src.router.utils.settings import get_setting_value
 from src.router.utils.settings import get_supported_models
 import asyncio
 from sqlmodel.ext.asyncio.session import AsyncSession
+from src.router.utils.redis import redis_client  # new import for redis
 
 router = APIRouter()
 
@@ -344,10 +345,17 @@ async def save_log(
 
     cost = prompt_tokens_cost + completion_tokens_cost
 
-    user_row.credits -= cost
-    user_row.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
-
-    db.add(user_row)
+    # NEW: Use redis to manage user's credits instead of updating the db
+    redis_key = f"user_credit:{user.id}"
+    current_credit = await redis_client.get(redis_key)
+    if current_credit is None:
+        current_credit = user_row.credits
+        await redis_client.set(redis_key, current_credit)
+    else:
+        current_credit = float(current_credit)
+    new_credit = current_credit - cost
+    await redis_client.set(redis_key, new_credit)
+    # Removed user_row credit update and db.add(user_row)
 
     # Update user credit history
     user_credits_history = UserCreditsHistory(
@@ -558,7 +566,15 @@ async def generate(
     if not user_row:
         raise HTTPException(status_code=404, detail="User not found")
 
-    if user_row.credits <= 0:
+    # Check user's credit using Redis: initialize if missing, then verify
+    redis_key = f"user_credit:{user.id}"
+    current_credit = await redis_client.get(redis_key)
+    if current_credit is None:
+        current_credit = user_row.credits
+        await redis_client.set(redis_key, current_credit)
+    else:
+        current_credit = float(current_credit)
+    if current_credit <= 0:
         raise HTTPException(status_code=402, detail="Insufficient credits")
 
     supported_models = await get_supported_models(db)
