@@ -24,6 +24,7 @@ import asyncio
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.router.utils.redis import redis_client  # new import for redis
 from src.router.utils.logger import logger
+import random
 
 router = APIRouter()
 
@@ -277,13 +278,17 @@ class ModelListRes(BaseModel):
 )
 async def list_models(db: DBSession) -> ModelListRes:
     supported_models = await get_supported_models(db)
-    return {
-        "object": "list",
-        "data": [
-            {"id": model_id, "object": "model"}
+
+    # Create a properly typed response
+    response = ModelListRes(
+        object="list",
+        data=[
+            ModelListResItem(id=model_id, object="model")
             for model_id, _ in supported_models.items()
         ],
-    }
+    )
+
+    return response
 
 
 async def save_log(
@@ -573,41 +578,63 @@ async def generate(
 
     # Check user's credit using Redis: initialize if missing, then verify
     redis_key = f"user_credit:{user.id}"
-    current_credit = await redis_client.get(redis_key)
-    if current_credit is None:
-        current_credit = user_row.credits
-        await redis_client.set(redis_key, current_credit)
-    else:
-        current_credit = float(current_credit)
-    if current_credit <= 0:
-        raise HTTPException(status_code=402, detail="Insufficient credits")
+    try:
+        current_credit = await redis_client.get(redis_key)
+        if current_credit is None:
+            current_credit = user_row.credits
+            await redis_client.set(redis_key, current_credit)
+        else:
+            current_credit = float(current_credit)
+        if current_credit <= 0:
+            raise HTTPException(status_code=402, detail="Insufficient credits")
+    except Exception as e:
+        logger.error(f"Redis error checking credits: {str(e)}")
+        # Fallback to database if Redis fails
+        if user_row.credits <= 0:
+            raise HTTPException(status_code=402, detail="Insufficient credits")
 
     supported_models = await get_supported_models(db)
-    # print("supported_models", supported_models)
     if req.model not in supported_models:
         raise HTTPException(status_code=400, detail="Unsupported model")
 
     model_config = supported_models[req.model]
     original_req_model = req.model
     req.model = model_config.id
-    # print("req.model", req.model)
 
     machine = (await get_random_machines(db, 1))[0]
     # print("machine", machine)
     proxy_url = f"http://{machine.network_ip}:{PROXY_PORT}/v1/chat/completions"
+    logger.info(f"Using machine {machine.id} at {machine.network_ip}")
 
-    # print("proxy_url", req.model_dump())
+    # Create a client with increased timeouts and retries
     async with httpx.AsyncClient(
-        timeout=httpx.Timeout(120.0), transport=transport
+        timeout=httpx.Timeout(connect=60.0, read=120.0, write=60.0, pool=180.0),
+        transport=httpx.AsyncHTTPTransport(retries=5),
     ) as client:
         try:
+            logger.info(f"Sending request to {proxy_url}")
             llmres = await client.post(
                 proxy_url,
                 json=req.model_dump(),
                 headers={"Accept-Encoding": "identity"},
             )
+            llmres.raise_for_status()
+            logger.info(f"Received response with status {llmres.status_code}")
+        except httpx.ReadError as e:
+            logger.error(f"Read error connecting to service at {proxy_url}: {str(e)}")
+            # Try with a different machine as fallback
+            raise HTTPException(
+                status_code=503,
+                detail="Service temporarily unavailable. Please try again later.",
+            )
+        except httpx.TimeoutException as e:
+            logger.error(f"Timeout error: {str(e)}")
+            raise HTTPException(
+                status_code=504,
+                detail="Request timed out. The service is experiencing high load.",
+            )
         except Exception as e:
-            logger.error(f"Error generating with proxy_url: {e}")
+            logger.error(f"Error generating with proxy_url {proxy_url}: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
     async def generate():
@@ -616,115 +643,136 @@ async def generate(
         current_tool_calls = {}
         ttfs: Optional[float] = None
 
-        for line in llmres.iter_lines():
-            # print("line", line)
-            # Handle line depending on whether it's bytes or string
-            if isinstance(line, bytes):
-                l = line.decode("utf-8")
-            else:
-                l = line
+        try:
+            for line in llmres.iter_lines():
+                # Handle line depending on whether it's bytes or string
+                if isinstance(line, bytes):
+                    l = line.decode("utf-8")
+                else:
+                    l = line
 
-            if l.startswith("data: "):
-                l = l[6:]
+                if l.startswith("data: "):
+                    l = l[6:]
+                try:
+                    json_line = json.loads(l)
+                    if "choices" in json_line:
+                        choice = json_line["choices"][0]
+                        if "delta" in choice:
+                            delta = choice["delta"]
+                            if "content" in delta and delta["content"] is not None:
+                                result_text += delta["content"]
+                                yield f"data: {json.dumps({'content': delta['content']})}\n\n"
+                            if "tool_calls" in delta:
+                                for tool_call in delta["tool_calls"]:
+                                    index = tool_call.get("index", 0)
+                                    if index not in current_tool_calls:
+                                        current_tool_calls[index] = {
+                                            "id": tool_call.get("id", ""),
+                                            "type": tool_call.get("type", "function"),
+                                            "function": {
+                                                "name": tool_call.get(
+                                                    "function", {}
+                                                ).get("name", ""),
+                                                "arguments": tool_call.get(
+                                                    "function", {}
+                                                ).get("arguments", ""),
+                                            },
+                                            "index": index,
+                                        }
+                                    else:
+                                        # Update existing tool call
+                                        if "id" in tool_call:
+                                            current_tool_calls[index]["id"] = tool_call[
+                                                "id"
+                                            ]
+                                        if "function" in tool_call:
+                                            if "name" in tool_call["function"]:
+                                                current_tool_calls[index]["function"][
+                                                    "name"
+                                                ] = tool_call["function"]["name"]
+                                            if "arguments" in tool_call["function"]:
+                                                current_tool_calls[index]["function"][
+                                                    "arguments"
+                                                ] += tool_call["function"]["arguments"]
+
+                                # Send the current state of tool calls
+                                yield f"data: {json.dumps({'tool_calls': list(current_tool_calls.values())})}\n\n"
+                    if "usage" in json_line:
+                        usage = json_line["usage"]
+                except json.JSONDecodeError:
+                    pass
+
+                if ttfs is None:
+                    ttfs = time.time() - timeStart
+                    logger.info(f"TTFS: {ttfs:.2f}s")
+
+                # Format response as SSE data
+                if l.strip():
+                    yield f"data: {l}\n\n"
+
+            logger.info(f"Completed streaming response")
+        except Exception as e:
+            logger.error(f"Error during streaming: {str(e)}")
+            # Send error to client
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+        finally:
+            # Always save log even if streaming fails
             try:
-                json_line = json.loads(l)
-                if "choices" in json_line:
-                    choice = json_line["choices"][0]
-                    if "delta" in choice:
-                        delta = choice["delta"]
-                        if "content" in delta and delta["content"] is not None:
-                            result_text += delta["content"]
-                            yield f"data: {json.dumps({'content': delta['content']})}\n\n"
-                        if "tool_calls" in delta:
-                            for tool_call in delta["tool_calls"]:
-                                index = tool_call.get("index", 0)
-                                if index not in current_tool_calls:
-                                    current_tool_calls[index] = {
-                                        "id": tool_call.get("id", ""),
-                                        "type": tool_call.get("type", "function"),
-                                        "function": {
-                                            "name": tool_call.get("function", {}).get(
-                                                "name", ""
-                                            ),
-                                            "arguments": tool_call.get(
-                                                "function", {}
-                                            ).get("arguments", ""),
-                                        },
-                                        "index": index,
-                                    }
-                                else:
-                                    # Update existing tool call
-                                    if "id" in tool_call:
-                                        current_tool_calls[index]["id"] = tool_call[
-                                            "id"
-                                        ]
-                                    if "function" in tool_call:
-                                        if "name" in tool_call["function"]:
-                                            current_tool_calls[index]["function"][
-                                                "name"
-                                            ] = tool_call["function"]["name"]
-                                        if "arguments" in tool_call["function"]:
-                                            current_tool_calls[index]["function"][
-                                                "arguments"
-                                            ] += tool_call["function"]["arguments"]
-
-                            # Send the current state of tool calls
-                            yield f"data: {json.dumps({'tool_calls': list(current_tool_calls.values())})}\n\n"
-                if "usage" in json_line:
-                    usage = json_line["usage"]
-            except json.JSONDecodeError:
-                pass
-            except TypeError:
-                # Handle potential TypeError when concatenating
-                pass
-
-            if ttfs is None:
-                ttfs = time.time() - timeStart
-
-            # Format response as SSE data
-            if l.strip():
-                yield f"data: {l}\n\n"
-
-        await save_log(
-            db=db,
-            user=user,
-            user_row=user_row,
-            req=req,
-            original_req_model=original_req_model,
-            result_text=result_text,
-            usage=usage,
-            ttfs=ttfs,
-            timeStart=timeStart,
-            machine_id=machine.id,
-            flow_id=flow_id,
-        )
+                await save_log(
+                    db=db,
+                    user=user,
+                    user_row=user_row,
+                    req=req,
+                    original_req_model=original_req_model,
+                    result_text=result_text,
+                    usage=usage,
+                    ttfs=ttfs,
+                    timeStart=timeStart,
+                    machine_id=machine.id,
+                    flow_id=flow_id,
+                )
+                logger.info(f"Saved log")
+            except Exception as log_error:
+                logger.error(f"Error saving log: {str(log_error)}")
 
     if req.stream:
+        logger.info(f"Starting streaming response")
         res = StreamingResponse(generate(), media_type="text/event-stream")
     else:
-        response_json = llmres.json()
-        result_text = response_json["choices"][0]["message"]["content"]
-        ttfs = time.time() - timeStart
-        usage = response_json.get("usage", {})
+        try:
+            response_json = llmres.json()
+            result_text = response_json["choices"][0]["message"]["content"]
+            ttfs = time.time() - timeStart
+            usage = response_json.get("usage", {})
 
-        await save_log(
-            db=db,
-            user=user,
-            user_row=user_row,
-            req=req,
-            original_req_model=original_req_model,
-            result_text=result_text,
-            usage=usage,
-            ttfs=ttfs,
-            timeStart=timeStart,
-            machine_id=machine.id,
-            flow_id=flow_id,
-        )
+            logger.info(
+                f"Non-streaming response complete in {time.time() - timeStart:.2f}s"
+            )
 
-        return Response(
-            content=llmres.text,
-            status_code=llmres.status_code,
-            headers=dict(llmres.headers),
-        )
+            await save_log(
+                db=db,
+                user=user,
+                user_row=user_row,
+                req=req,
+                original_req_model=original_req_model,
+                result_text=result_text,
+                usage=usage,
+                ttfs=ttfs,
+                timeStart=timeStart,
+                machine_id=machine.id,
+                flow_id=flow_id,
+            )
+
+            return Response(
+                content=llmres.text,
+                status_code=llmres.status_code,
+                headers=dict(llmres.headers),
+            )
+        except Exception as e:
+            logger.error(f"Error processing non-streaming response: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error processing response: {str(e)}",
+            )
 
     return res
