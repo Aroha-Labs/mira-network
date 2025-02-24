@@ -5,7 +5,7 @@
 groups = ["default"]
 strategy = []
 lock_version = "4.5.0"
-content_hash = "sha256:73ca62751685b817af1d375c1a1106a599d3532da99107ef240f51a904016de3"
+content_hash = "sha256:7fb1630b8687caf7226d3edca63e898b4fb9793ecfa6028e463cd9afaf0cdaea"
 
 [[metadata.targets]]
 requires_python = "==3.11.*"
@@ -698,15 +698,15 @@ files = [
 
 [[package]]
 name = "newrelic"
-version = "10.4.0"
+version = "10.6.0"
 requires_python = ">=3.7"
 summary = "New Relic Python Agent"
 files = [
-    {file = "newrelic-10.4.0-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:40a3359672e99c64226b33599daa0d210128a1c7540e26e86400e5710741bf17"},
-    {file = "newrelic-10.4.0-cp311-cp311-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:12572fc2f487dbdb6d2ebec6b1edbe3c3955af7638acf0bda6eff93072d45230"},
-    {file = "newrelic-10.4.0-cp311-cp311-musllinux_1_2_aarch64.whl", hash = "sha256:844a38c3ddeb3d2e2d6e568ab8a7f38e12ceaefd77261c66d2c4c9a20c2596ae"},
-    {file = "newrelic-10.4.0-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:64da7c1155066d115e63523edfd4b9f39361b4c19a46fdde4b710b00342fb31d"},
-    {file = "newrelic-10.4.0.tar.gz", hash = "sha256:4115eb9e5c97ad14e8cbae23dd5275dc162beb2b140c58ac4ba786c020f51aff"},
+    {file = "newrelic-10.6.0-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:5682142c7f94ca1294b51e3c49cb3ef64580ce36ff223efa23fbc2f34e7fb392"},
+    {file = "newrelic-10.6.0-cp311-cp311-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:6cc7d1df935239613582d592253fbe3a961f372c9f2568e4e8b0937caf8f072b"},
+    {file = "newrelic-10.6.0-cp311-cp311-musllinux_1_2_aarch64.whl", hash = "sha256:659991fc2f5149b4f7711e7f51c0a76ac1bdef7ca0b5f1b4806c21ed05553963"},
+    {file = "newrelic-10.6.0-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:c657a50cc831d80bff310022106e1086c224b50a114241cb61194921498bcd5c"},
+    {file = "newrelic-10.6.0.tar.gz", hash = "sha256:46d6f39a9cb89cca2440211e272e6a13bb89802865a4c2b2cd9d613c1488c3ba"},
 ]
 
 [[package]]
