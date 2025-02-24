@@ -2,6 +2,7 @@ import random
 from typing import List, Dict, Optional
 import time
 import asyncio
+import itertools
 
 from fastapi import HTTPException
 from src.router.schemas.machine import MachineInfo
@@ -14,6 +15,9 @@ from src.router.utils.logger import logger
 from async_lru import alru_cache
 
 PROXY_PORT = 34523
+
+# Create a global counter for round-robin selection
+_machine_counter = itertools.cycle(range(1000000))  # Large enough cycle
 
 
 # Cache for machines that doesn't depend on db session
@@ -92,11 +96,11 @@ async def get_cached_machines(db: AsyncSession) -> List[MachineInfo]:
     return machines
 
 
-async def get_random_machines(
+async def get_round_robin_machines(
     db: AsyncSession,
     number_of_machines: int = 1,
 ):
-    """Get random machines using async_lru caching"""
+    """Get machines using round-robin selection for better load balancing"""
     if number_of_machines < 1:
         raise HTTPException(
             status_code=422,
@@ -127,5 +131,29 @@ async def get_random_machines(
             detail=f"Not enough online machines. Requested: {number_of_machines}, Available: {len(machines)}",
         )
 
-    # Return random selection
-    return random.sample(machines, number_of_machines)
+    # Sort machines by ID for consistent ordering
+    machines.sort(key=lambda m: m.id)
+
+    # Use round-robin selection
+    start_idx = next(_machine_counter) % len(machines)
+    selected_machines = []
+
+    # Select machines in round-robin fashion
+    for i in range(number_of_machines):
+        idx = (start_idx + i) % len(machines)
+        selected_machines.append(machines[idx])
+        logger.info(
+            f"Round-robin selected machine {machines[idx].id} at {machines[idx].network_ip}"
+        )
+
+    return selected_machines
+
+
+# Keep the random selection function for backward compatibility
+async def get_random_machines(
+    db: AsyncSession,
+    number_of_machines: int = 1,
+):
+    """Get random machines using async_lru caching (legacy function)"""
+    # For backward compatibility, now just calls the round-robin function
+    return await get_round_robin_machines(db, number_of_machines)
