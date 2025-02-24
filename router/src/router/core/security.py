@@ -75,23 +75,15 @@ async def verify_token(
         except Exception as e:
             logger.warning(f"Cache parse error for token {token[:10]}...: {str(e)}")
 
-    # Handle different token types with consistent parameters
-    handlers = {
-        "sk-mira-": lambda: handle_api_token(token, db, supabase),
-        "mk-mira-": lambda: handle_machine_token(token, db),
-    }
+    if token.startswith("sk-mira-"):
+        result = await handle_api_token(token, db, supabase)
+        await cache_token_data(cache_key, result.model_dump_json(), CACHE_TTL)
+        return result
 
-    for prefix, handler in handlers.items():
-        if token.startswith(prefix):
-            result = await handler()
-
-            if isinstance(result, dict):
-                result = json.dumps(result)
-            else:
-                result = result.model_dump_json()  # `User` object
-
-            await cache_token_data(cache_key, result, CACHE_TTL)
-            return result
+    if token.startswith("mk-mira-"):
+        result = await handle_machine_token(token, db)
+        await cache_token_data(cache_key, json.dumps(result), CACHE_TTL)
+        return result
 
     # Handle JWT token
     result = await handle_jwt_token(token, supabase)
