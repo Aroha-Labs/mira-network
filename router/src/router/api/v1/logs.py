@@ -365,8 +365,10 @@ async def get_logs_metrics(
         start_dt = datetime.fromisoformat(start_date)
 
     # Build query with time bucket and date filtering
+    time_bucket_col = time_bucket_fn(ApiLogs.created_at).label("timestamp")
+
     query = select(
-        time_bucket_fn(ApiLogs.created_at).label("timestamp"),
+        time_bucket_col,
         ApiLogs.model,
         func.count().label("calls"),
         func.coalesce(func.sum(ApiLogs.prompt_tokens), 0).label("prompt_tokens"),
@@ -418,12 +420,10 @@ async def get_logs_metrics(
     if flow_id:
         query = query.where(ApiLogs.flow_id == flow_id)
 
-    # Add grouping and ordering
-    query = query.group_by(time_bucket_fn(ApiLogs.created_at), ApiLogs.model).order_by(
-        time_bucket_fn(ApiLogs.created_at)
-    )
+    # Group by timestamp and model, use the time_bucket_col directly
+    query = query.group_by(time_bucket_col, ApiLogs.model).order_by(time_bucket_col)
 
-    # Execute the query once
+    # Rest of the function remains the same
     results = await db.exec(query)
     results = results.all()
 
