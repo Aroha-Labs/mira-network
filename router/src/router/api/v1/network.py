@@ -170,7 +170,7 @@ async def verify(req: VerifyRequest, db: DBSession):
         transformed_models.append({"original": model, "id": model_config.id})
 
     async def process_model(model, idx):
-        machine = get_random_machines(1)
+        machine = await get_random_machines(db, 1)
         proxy_url = f"http://{machine[0].network_ip}:{PROXY_PORT}/v1/verify"
         async with httpx.AsyncClient(timeout=httpx.Timeout(60.0)) as client:
             response = await client.post(
@@ -587,7 +587,7 @@ async def generate(
     req.model = model_config.id
     # print("req.model", req.model)
 
-    machine = (await get_random_machines(1))[0]
+    machine = (await get_random_machines(db, 1))[0]
     # print("machine", machine)
     proxy_url = f"http://{machine.network_ip}:{PROXY_PORT}/v1/chat/completions"
 
