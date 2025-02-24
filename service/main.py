@@ -368,7 +368,6 @@ async def evaluate(req: EvaluationRequest) -> str:
 
 @app.post("/v1/chat/completions")
 async def generate(req: AiRequest):
-    print("req", req.model_dump())
     if not req.messages or not any(msg.role == "user" for msg in req.messages):
         raise HTTPException(
             status_code=400, detail="At least one user message is required"
@@ -508,7 +507,6 @@ def get_local_ip():
     """Returns the local IP address of the container running on AWS Fargate"""
     try:
         hostname = socket.gethostname()
-        print("hostname", hostname)
         local_ip = socket.gethostbyname(hostname)
         return local_ip
     except Exception as e:
