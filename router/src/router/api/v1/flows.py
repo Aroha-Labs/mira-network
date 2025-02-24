@@ -1,5 +1,5 @@
 import re
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from src.router.models.logs import ApiLogs
 from sqlmodel import select, func
@@ -22,6 +22,7 @@ from datetime import datetime, timedelta
 from src.router.utils.redis import redis_client
 import json
 from src.router.utils.logger import logger
+from functools import lru_cache
 
 router = APIRouter()
 
@@ -299,6 +300,19 @@ async def delete_flow(flow_id: str, db: DBSession):
     return {"message": "Flow deleted successfully"}
 
 
+@lru_cache(maxsize=100)
+async def get_cached_flow(flow_id: int) -> Optional[Flows]:
+    logger.debug(f"LRU Cache miss for flow_id: {flow_id}")  # Only called on cache miss
+    flow_key = f"flow:{flow_id}"
+    cached_flow = await redis_client.get(flow_key)
+    if cached_flow:
+        logger.debug(f"Redis cache hit for flow_id: {flow_id}")
+        flow_dict = json.loads(cached_flow)
+        return Flows(**flow_dict)
+    logger.debug(f"Complete cache miss for flow_id: {flow_id}")
+    return None
+
+
 @router.post(
     "/v1/flow/{flow_id}/chat/completions",
     summary="Generate Chat Completion with Flow",
@@ -524,23 +538,20 @@ async def generate_with_flow_id(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid flow ID format")
 
-    flow_key = f"flow:{flow_id_int}"
-    cached_flow = await redis_client.get(flow_key)
-    if cached_flow:
-        flow_dict = json.loads(cached_flow)
-        flow = Flows(**flow_dict)
-    else:
+    # Try LRU cache first, then Redis, then database
+    flow = await get_cached_flow(flow_id_int)
+    if not flow:
         flow = await db.exec(select(Flows).where(Flows.id == flow_id_int))
         flow = flow.one_or_none()
         if flow:
-            # Serialize flow object to JSON before storing
             flow_dict = {
                 "id": flow.id,
                 "name": flow.name,
                 "system_prompt": flow.system_prompt,
                 "variables": flow.variables,
             }
-            await redis_client.set(flow_key, json.dumps(flow_dict))
+            await redis_client.set(f"flow:{flow_id_int}", json.dumps(flow_dict))
+            get_cached_flow.cache_clear()  # Clear LRU cache to update with new value
 
     if not flow:
         raise HTTPException(status_code=404, detail="Flow not found")
