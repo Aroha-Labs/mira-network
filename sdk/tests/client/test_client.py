@@ -34,7 +34,8 @@ async def test_chat_completions_create(client):
     try:
         response = await client.chat_completions_create(
             model="gpt-4o",
-            messages=[Message(role="user", content="Hello")]
+            messages=[Message(role="user", content="Hello")],
+            timeout=120.0  # 2 minutes timeout
         )
         
         assert "choices" in response
@@ -51,6 +52,7 @@ async def test_chat_completions_create_streaming(client):
             model="gpt-4o",
             messages=[Message(role="user", content="Hello")],
             stream=True,
+            timeout=120.0  # 2 minutes timeout
         )
 
         chunks = []
@@ -70,7 +72,8 @@ async def test_chat_completions_create_streaming(client):
 async def test_create_api_token(client):
     try:
         response = await client.create_api_token(
-            ApiTokenRequest(description="Test token")
+            ApiTokenRequest(description="Test token"),
+            timeout=30.0  # 30 seconds timeout
         )
         assert "token" in response
         assert isinstance(response["token"], str)
@@ -80,7 +83,9 @@ async def test_create_api_token(client):
 
 async def test_list_api_tokens(client):
     try:
-        response = await client.list_api_tokens()
+        response = await client.list_api_tokens(
+            timeout=30.0  # 30 seconds timeout
+        )
         assert isinstance(response, list)
         for token in response:
             assert isinstance(token, dict)
