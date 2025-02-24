@@ -5,7 +5,7 @@
 groups = ["default"]
 strategy = []
 lock_version = "4.5.0"
-content_hash = "sha256:cf7d0c13753348a5925298d97b89c532f5b51c6fb8b4ca764e9ac7efbf57e5a9"
+content_hash = "sha256:73ca62751685b817af1d375c1a1106a599d3532da99107ef240f51a904016de3"
 
 [[metadata.targets]]
 requires_python = "==3.11.*"
@@ -111,6 +111,19 @@ dependencies = [
 files = [
     {file = "anyio-4.6.2.post1-py3-none-any.whl", hash = "sha256:6d170c36fba3bdd840c73d3868c1e777e33676a69c3a72cf0a0d5d6d8009b61d"},
     {file = "anyio-4.6.2.post1.tar.gz", hash = "sha256:4c8bc31ccdb51c7f7bd251f51c609e038d63e34219b44aa86e47576389880b4c"},
+]
+
+[[package]]
+name = "async-lru"
+version = "2.0.4"
+requires_python = ">=3.8"
+summary = "Simple LRU cache for asyncio"
+dependencies = [
+    "typing-extensions>=4.0.0; python_version < \"3.11\"",
+]
+files = [
+    {file = "async-lru-2.0.4.tar.gz", hash = "sha256:b8a59a5df60805ff63220b2a0c5b5393da5521b113cd5465a44eb037d81a5627"},
+    {file = "async_lru-2.0.4-py3-none-any.whl", hash = "sha256:ff02944ce3c288c5be660c42dbcca0742b32c3b279d6dceda655190240b99224"},
 ]
 
 [[package]]
