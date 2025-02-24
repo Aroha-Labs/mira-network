@@ -9,8 +9,9 @@ from src.router.models.user import UserCreditsHistory
 from src.router.db.session import DBSession
 from enum import Enum
 from gotrue.types import User
-from datetime import datetime, timezone
+from datetime import datetime
 from src.router.models.user import User as UserModel  # rename to avoid conflict
+from src.router.utils.redis import redis_client  # new import for redis
 
 router = APIRouter()
 
@@ -275,19 +276,27 @@ async def get_user_claim(
 @router.get(
     "/user-credits/{user_id}",
     summary="Get User Credits",
-    description="Retrieve the credits for a user.",
+    description="Retrieve the credits for a user. Redis is treated as the source of truth.",
 )
 async def get_user_credits_by_id(
     user_id: str,
     db: DBSession,
     user=Depends(verify_admin),
 ):
-    user_data_res = await db.exec(select(UserModel).where(UserModel.user_id == user_id))
-    user_data = user_data_res.first()
-
-    if not user_data:
-        return {"credits": 0}
-    return {"credits": user_data.credits}
+    redis_key = f"user_credit:{user_id}"
+    current_credit = await redis_client.get(redis_key)
+    if current_credit is None:
+        user_data_res = await db.exec(
+            select(UserModel).where(UserModel.user_id == user_id)
+        )
+        user_data = user_data_res.first()
+        if not user_data:
+            return {"credits": 0}
+        current_credit = user_data.credits
+        await redis_client.set(redis_key, current_credit)
+    else:
+        current_credit = float(current_credit)
+    return {"credits": current_credit}
 
 
 @router.post("/add-credit")
@@ -304,7 +313,18 @@ async def add_credit(
     if not user_data:
         raise HTTPException(status_code=404, detail="User not found")
 
-    user_data.credits += request.amount
+    redis_key = f"user_credit:{request.user_id}"
+    current_credit = await redis_client.get(redis_key)
+    if current_credit is None:
+        current_credit = user_data.credits
+    else:
+        current_credit = float(current_credit)
+
+    new_credit = current_credit + request.amount
+    await redis_client.set(redis_key, new_credit)
+
+    # Update DB using value from redis
+    user_data.credits = new_credit
     user_data.updated_at = datetime.utcnow()
 
     credit_history = UserCreditsHistory(
@@ -314,9 +334,9 @@ async def add_credit(
         created_at=datetime.utcnow(),
     )
     db.add(credit_history)
-    await db.commit()  # Single commit for both operations
+    await db.commit()
 
-    return {"credits": user_data.credits}
+    return {"credits": new_credit}
 
 
 @router.post(
