@@ -511,188 +511,75 @@ async def generate_with_flow_id(
     db: DBSession,
     user: User = Depends(verify_user),
 ):
-    try:
-        logger.info(f"Generating with flow ID: {flow_id}")
-        if any(msg.role == "system" for msg in req.messages):
-            raise HTTPException(
-                status_code=400,
-                detail="System message is not allowed in request",
-            )
-
-        # Cast flow_id to integer before querying
-        try:
-            flow_id_int = int(flow_id)
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid flow ID format")
-
-        flow_key = f"flow:{flow_id_int}"
-        cached_flow = await redis_client.get(flow_key)
-        if cached_flow:
-            flow_dict = json.loads(cached_flow)
-            flow = Flows(**flow_dict)
-        else:
-            flow = await db.exec(select(Flows).where(Flows.id == flow_id_int))
-            flow = flow.one_or_none()
-            if flow:
-                # Serialize flow object to JSON before storing
-                flow_dict = {
-                    "id": flow.id,
-                    "name": flow.name,
-                    "system_prompt": flow.system_prompt,
-                    "variables": flow.variables,
-                }
-                await redis_client.set(flow_key, json.dumps(flow_dict))
-
-        if not flow:
-            raise HTTPException(status_code=404, detail="Flow not found")
-
-        system_prompt = flow.system_prompt
-        required_vars = flow.variables
-
-        if required_vars:
-            if req.variables is None:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Variables are required but none were provided",
-                )
-            missing_vars = [var for var in required_vars if var not in req.variables]
-            if missing_vars:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Missing required variables: {', '.join(missing_vars)}",
-                )
-
-            for var in required_vars:
-                system_prompt = system_prompt.replace(
-                    f"{{{{{var}}}}}", str(req.variables[var])
-                )
-
-        req.messages.insert(0, Message(role="system", content=system_prompt))
-
-        response = await generate(
-            req=AiRequest(
-                model=req.model,
-                messages=req.messages,
-                stream=req.stream,
-                model_provider=None,
-                tools=req.tools,
-                tool_choice=req.tool_choice,
-            ),
-            flow_id=flow_id,
-            user=user,
-            db=db,
+    logger.info(f"Generating with flow ID: {flow_id}")
+    if any(msg.role == "system" for msg in req.messages):
+        raise HTTPException(
+            status_code=400,
+            detail="System message is not allowed in request",
         )
 
-        return response
-    except Exception as e:
-        logger.error(f"Error generating with flow ID: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    # Cast flow_id to integer before querying
+    try:
+        flow_id_int = int(flow_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid flow ID format")
 
-
-@router.get(
-    "/flows/{flow_id}/stats",
-    response_model=FlowStats,
-    summary="Get Flow Stats",
-    description="Get basic usage statistics and time series data for a specific flow",
-)
-async def get_flow_stats(
-    flow_id: str,
-    db: DBSession,
-    user: User = Depends(verify_user),
-) -> FlowStats:
-    # Verify flow exists
-    flow = await db.exec(select(Flows).where(Flows.id == flow_id))
-    flow = flow.first()
+    flow_key = f"flow:{flow_id_int}"
+    cached_flow = await redis_client.get(flow_key)
+    if cached_flow:
+        flow_dict = json.loads(cached_flow)
+        flow = Flows(**flow_dict)
+    else:
+        flow = await db.exec(select(Flows).where(Flows.id == flow_id_int))
+        flow = flow.one_or_none()
+        if flow:
+            # Serialize flow object to JSON before storing
+            flow_dict = {
+                "id": flow.id,
+                "name": flow.name,
+                "system_prompt": flow.system_prompt,
+                "variables": flow.variables,
+            }
+            await redis_client.set(flow_key, json.dumps(flow_dict))
 
     if not flow:
         raise HTTPException(status_code=404, detail="Flow not found")
 
-    # Get the latest log entry for this flow
-    log = await db.exec(
-        select(ApiLogs)
-        .where(ApiLogs.flow_id == flow_id)
-        .order_by(ApiLogs.created_at.desc())
-        .limit(1)
+    system_prompt = flow.system_prompt
+    required_vars = flow.variables
+
+    if required_vars:
+        if req.variables is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Variables are required but none were provided",
+            )
+        missing_vars = [var for var in required_vars if var not in req.variables]
+        if missing_vars:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Missing required variables: {', '.join(missing_vars)}",
+            )
+
+        for var in required_vars:
+            system_prompt = system_prompt.replace(
+                f"{{{{{var}}}}}", str(req.variables[var])
+            )
+
+    req.messages.insert(0, Message(role="system", content=system_prompt))
+
+    response = await generate(
+        req=AiRequest(
+            model=req.model,
+            messages=req.messages,
+            stream=req.stream,
+            model_provider=None,
+            tools=req.tools,
+            tool_choice=req.tool_choice,
+        ),
+        flow_id=flow_id,
+        user=user,
+        db=db,
     )
-    log = log.first()
 
-    if not log:
-        raise HTTPException(status_code=404, detail="No stats available for this flow")
-
-    # Get time series data for the last 24 hours
-    end_date = datetime.utcnow()
-    start_date = end_date - timedelta(hours=24)
-
-    time_series = await db.exec(
-        select(
-            func.date_trunc("hour", ApiLogs.created_at).label("timestamp"),
-            func.sum(ApiLogs.total_tokens).label("tokens"),
-            func.sum(ApiLogs.prompt_tokens).label("prompt_tokens"),
-            func.sum(ApiLogs.completion_tokens).label("completion_tokens"),
-            ApiLogs.model_pricing,
-        )
-        .where(
-            ApiLogs.flow_id == flow_id,
-            ApiLogs.created_at >= start_date,
-            ApiLogs.created_at <= end_date,
-        )
-        .group_by(
-            func.date_trunc("hour", ApiLogs.created_at),
-            ApiLogs.model_pricing,
-        )
-        .order_by(func.date_trunc("hour", ApiLogs.created_at))
-    )
-
-    time_series = time_series.all()
-
-    # Process time series data
-    time_series_data = []
-    for entry in time_series:
-        try:
-            model_pricing = entry.model_pricing
-            if (
-                model_pricing
-                and hasattr(model_pricing, "prompt_token")
-                and hasattr(model_pricing, "completion_token")
-            ):
-                cost = entry.prompt_tokens * float(
-                    model_pricing.prompt_token
-                ) + entry.completion_tokens * float(model_pricing.completion_token)
-            else:
-                cost = 0.0
-        except (AttributeError, ValueError):
-            cost = 0.0
-
-        time_series_data.append(
-            {"timestamp": entry.timestamp, "tokens": entry.tokens, "cost": cost}
-        )
-
-    # Get current stats from the latest log
-    current_pricing = {}
-    if (
-        log.model_pricing
-        and hasattr(log.model_pricing, "prompt_token")
-        and hasattr(log.model_pricing, "completion_token")
-    ):
-        current_pricing = {
-            "prompt_token": float(log.model_pricing.prompt_token),
-            "completion_token": float(log.model_pricing.completion_token),
-        }
-        total_cost = (
-            log.prompt_tokens * current_pricing["prompt_token"]
-            + log.completion_tokens * current_pricing["completion_token"]
-        )
-    else:
-        total_cost = 0.0
-
-    return FlowStats(
-        total_tokens=log.total_tokens,
-        prompt_tokens=log.prompt_tokens,
-        completion_tokens=log.completion_tokens,
-        total_cost=total_cost,
-        model=log.model,
-        model_pricing=current_pricing,
-        total_response_time=log.total_response_time,
-        ttft=log.ttft,
-        time_series=time_series_data,
-    )
+    return response
