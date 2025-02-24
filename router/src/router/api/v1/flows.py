@@ -19,6 +19,9 @@ from src.router.api.v1.docs.flows import (
     LIST_FLOWS_DOCS,
 )
 from datetime import datetime, timedelta
+from src.router.utils.redis import redis_client
+import json
+from src.router.utils.logger import logger
 
 router = APIRouter()
 
@@ -508,61 +511,82 @@ async def generate_with_flow_id(
     db: DBSession,
     user: User = Depends(verify_user),
 ):
-    if any(msg.role == "system" for msg in req.messages):
-        raise HTTPException(
-            status_code=400,
-            detail="System message is not allowed in request",
-        )
-
-    # Cast flow_id to integer before querying
     try:
-        flow_id_int = int(flow_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid flow ID format")
-
-    flow = await db.exec(select(Flows).where(Flows.id == flow_id_int))
-    flow = flow.one_or_none()
-
-    if not flow:
-        raise HTTPException(status_code=404, detail="Flow not found")
-
-    system_prompt = flow.system_prompt
-    required_vars = flow.variables
-
-    if required_vars:
-        if req.variables is None:
-            raise HTTPException(
-                status_code=400, detail="Variables are required but none were provided"
-            )
-        missing_vars = [var for var in required_vars if var not in req.variables]
-        if missing_vars:
+        logger.info(f"Generating with flow ID: {flow_id}")
+        if any(msg.role == "system" for msg in req.messages):
             raise HTTPException(
                 status_code=400,
-                detail=f"Missing required variables: {', '.join(missing_vars)}",
+                detail="System message is not allowed in request",
             )
 
-        for var in required_vars:
-            system_prompt = system_prompt.replace(
-                f"{{{{{var}}}}}", str(req.variables[var])
-            )
+        # Cast flow_id to integer before querying
+        try:
+            flow_id_int = int(flow_id)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid flow ID format")
 
-    req.messages.insert(0, Message(role="system", content=system_prompt))
+        flow_key = f"flow:{flow_id_int}"
+        cached_flow = await redis_client.get(flow_key)
+        if cached_flow:
+            flow_dict = json.loads(cached_flow)
+            flow = Flows(**flow_dict)
+        else:
+            flow = await db.exec(select(Flows).where(Flows.id == flow_id_int))
+            flow = flow.one_or_none()
+            if flow:
+                # Serialize flow object to JSON before storing
+                flow_dict = {
+                    "id": flow.id,
+                    "name": flow.name,
+                    "system_prompt": flow.system_prompt,
+                    "variables": flow.variables,
+                }
+                await redis_client.set(flow_key, json.dumps(flow_dict))
 
-    response = await generate(
-        req=AiRequest(
-            model=req.model,
-            messages=req.messages,
-            stream=req.stream,
-            model_provider=None,
-            tools=req.tools,
-            tool_choice=req.tool_choice,
-        ),
-        flow_id=flow_id,
-        user=user,
-        db=db,
-    )
+        if not flow:
+            raise HTTPException(status_code=404, detail="Flow not found")
 
-    return response
+        system_prompt = flow.system_prompt
+        required_vars = flow.variables
+
+        if required_vars:
+            if req.variables is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Variables are required but none were provided",
+                )
+            missing_vars = [var for var in required_vars if var not in req.variables]
+            if missing_vars:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Missing required variables: {', '.join(missing_vars)}",
+                )
+
+            for var in required_vars:
+                system_prompt = system_prompt.replace(
+                    f"{{{{{var}}}}}", str(req.variables[var])
+                )
+
+        req.messages.insert(0, Message(role="system", content=system_prompt))
+
+        response = await generate(
+            req=AiRequest(
+                model=req.model,
+                messages=req.messages,
+                stream=req.stream,
+                model_provider=None,
+                tools=req.tools,
+                tool_choice=req.tool_choice,
+            ),
+            flow_id=flow_id,
+            user=user,
+            db=db,
+        )
+
+        return response
+    except Exception as e:
+        logger.error(f"Error generating with flow ID: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get(
