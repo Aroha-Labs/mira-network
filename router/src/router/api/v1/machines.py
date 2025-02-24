@@ -144,6 +144,12 @@ async def set_liveness(
     if not machine:
         raise HTTPException(status_code=404, detail="Machine not found")
 
+    # check if machine liveness has not expired
+    liveness_key = f"liveness:{machine.id}"
+    liveness_ttl = await redis_client.ttl(liveness_key)
+    if liveness_ttl > 0:
+        return {"network_ip": network_ip, "status": "online"}
+
     await redis_client.hset(
         f"liveness:{machine.id}",
         mapping={
@@ -152,7 +158,7 @@ async def set_liveness(
         },
     )
 
-    await redis_client.expire(f"liveness:{machine.id}", 6)
+    await redis_client.expire(f"liveness:{machine.id}", 86400)
 
     return {"network_ip": network_ip, "status": "online"}
 
