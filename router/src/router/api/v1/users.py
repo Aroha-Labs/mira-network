@@ -4,6 +4,7 @@ from src.router.core.types import User
 from src.router.models.user import User as UserModel
 from src.router.db.session import DBSession
 from src.router.core.security import verify_token
+from src.router.utils.redis import redis_client  # new import for redis
 
 router = APIRouter()
 
@@ -11,27 +12,8 @@ router = APIRouter()
 @router.get(
     "/me",
     summary="Get Current User",
-    description="""
-    Retrieves details of the currently authenticated user based on their JWT token.
-    
-    This endpoint:
-    - Validates the user's JWT token
-    - Queries the database for the user's full profile
-    - Returns complete user information if found
-    - Returns null if the user exists in JWT but not in database
-    
-    Authentication:
-    - Requires a valid JWT token in the Authorization header
-    - Format: Bearer <token>
-    
-    Rate Limits:
-    - Standard API rate limits apply
-    
-    Notes:
-    - Use this endpoint to get the current user's profile after login
-    - Can be used to verify if a token is still valid
-    """,
-    response_description="Returns the complete user profile object or null if not found",
+    description="Retrieves the authenticated user's profile along with the updated credits.",
+    response_description="Returns the complete user profile object including credits",
     responses={
         200: {
             "description": "Successfully retrieved user details",
@@ -44,6 +26,7 @@ router = APIRouter()
                                 "user_id": "123e4567-e89b-12d3-a456-426614174000",
                                 "email": "user@example.com",
                                 "name": "John Doe",
+                                "credits": 50,
                                 "created_at": "2024-01-01T00:00:00Z",
                                 "updated_at": "2024-01-01T00:00:00Z",
                             },
@@ -66,27 +49,21 @@ router = APIRouter()
 async def get_current_user(
     db: DBSession,
     user: User = Depends(verify_token),
-) -> UserModel | None:
-    """
-    Retrieve the current authenticated user's details from the database.
-
-    Args:
-        db (Session): Database session dependency
-        user (User): Current authenticated user from JWT token
-
-    Returns:
-        UserModel | None: Complete user profile if found, None if not found
-
-    Raises:
-        HTTPException: 401 if authentication fails
-
-    Notes:
-        - This function assumes the user has already been authenticated via JWT
-        - The user parameter comes from the verify_token dependency
-        - Returns None instead of raising an error if the user is not found
-    """
+) -> dict | None:
+    # Retrieve user data from the DB
     user_data = await db.exec(select(UserModel).where(UserModel.user_id == user.id))
     user_data = user_data.first()
     if not user_data:
         return None
-    return user_data
+
+    # Get updated credits from Redis; fallback to DB value if missing
+    redis_key = f"user_credit:{user.id}"
+    credit = await redis_client.get(redis_key)
+    if credit is None:
+        credit = user_data.credits
+    else:
+        credit = float(credit)
+
+    data = user_data.model_dump()
+    data["credits"] = credit
+    return data
