@@ -180,7 +180,8 @@ async def add_or_update_user_claim(
 ):
     # Process user information
     user_data = process_user_claims(req.claims)
-    user = db.exec(select(UserModel).where(UserModel.user_id == req.user_id)).first()
+    user_res = await db.exec(select(UserModel).where(UserModel.user_id == req.user_id))
+    user = user_res.first()
 
     if user:
         user.email = user_data["email"]
@@ -210,7 +211,7 @@ async def add_or_update_user_claim(
     if user.custom_claim:
         req.claims.update({"user_roles": user.custom_claim.get("roles", [])})
 
-    db.commit()
+    await db.commit()
 
     data = {"user_id": req.user_id, "claims": req.claims}
     return data
@@ -230,19 +231,21 @@ class UserClaim(BaseModel):
     summary="Add or Update User Claim",
     description="Add or update a custom claim for a user.",
 )
-def user_claim_webhook(
+async def user_claim_webhook(
     user_id: str,
     claim: UserClaim,
     db: DBSession,
     user=Depends(verify_admin),
 ) -> Dict[str, Any]:
-    user = db.exec(select(UserModel).where(UserModel.user_id == user_id)).first()
+    user_res = await db.exec(select(UserModel).where(UserModel.user_id == user_id))
+    user = user_res.first()
+
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
     user.custom_claim = claim.model_dump()
-    db.commit()
-    db.refresh(user)
+    await db.commit()
+    await db.refresh(user)
     return {"user_id": user.user_id, "custom_claim": user.custom_claim}
 
 
@@ -251,12 +254,14 @@ def user_claim_webhook(
     summary="Get User Claim",
     description="Retrieve the custom claim for a user.",
 )
-def get_user_claim(
+async def get_user_claim(
     user_id: str,
     db: DBSession,
     user=Depends(verify_admin),
 ) -> dict:
-    user = db.exec(select(UserModel).where(UserModel.user_id == user_id)).first()
+    user_res = await db.exec(select(UserModel).where(UserModel.user_id == user_id))
+    user = user_res.first()
+
     if not user:
         return {}
     return {
@@ -272,26 +277,29 @@ def get_user_claim(
     summary="Get User Credits",
     description="Retrieve the credits for a user.",
 )
-def get_user_credits_by_id(
+async def get_user_credits_by_id(
     user_id: str,
     db: DBSession,
     user=Depends(verify_admin),
 ):
-    user_data = db.exec(select(UserModel).where(UserModel.user_id == user_id)).first()
+    user_data_res = await db.exec(select(UserModel).where(UserModel.user_id == user_id))
+    user_data = user_data_res.first()
+
     if not user_data:
         return {"credits": 0}
     return {"credits": user_data.credits}
 
 
 @router.post("/add-credit")
-def add_credit(
+async def add_credit(
     request: AddCreditRequest,
     db: DBSession,
     user=Depends(verify_admin),
 ):
-    user_data = db.exec(
+    user_data_res = await db.exec(
         select(UserModel).where(UserModel.user_id == request.user_id)
-    ).first()
+    )
+    user_data = user_data_res.first()
 
     if not user_data:
         raise HTTPException(status_code=404, detail="User not found")
@@ -303,9 +311,10 @@ def add_credit(
         user_id=request.user_id,
         amount=request.amount,
         description=request.description,
+        created_at=datetime.utcnow(),
     )
     db.add(credit_history)
-    db.commit()
+    await db.commit()  # Single commit for both operations
 
     return {"credits": user_data.credits}
 
@@ -346,9 +355,10 @@ async def update_users_from_supabase(
             "updated_at": datetime.utcnow(),
         }
 
-        user = db.exec(
+        user_res = await db.exec(
             select(UserModel).where(UserModel.user_id == supabase_user.id)
-        ).first()
+        )
+        user = user_res.first()
 
         if user:
             for key, value in user_data.items():
@@ -357,5 +367,5 @@ async def update_users_from_supabase(
             user = UserModel(user_id=supabase_user.id, **user_data)
             db.add(user)
 
-    db.commit()
+    await db.commit()
     return {"status": "success"}

@@ -23,7 +23,8 @@ class SystemSettingUpdate(BaseModel):
 
 @router.get("/settings", response_model=List[SystemSettings])
 async def get_settings(db: DBSession, user=Depends(verify_admin)):
-    return db.exec(select(SystemSettings)).all()
+    res = await db.exec(select(SystemSettings))
+    return res.all()
 
 
 @router.post("/settings", response_model=SystemSettings)

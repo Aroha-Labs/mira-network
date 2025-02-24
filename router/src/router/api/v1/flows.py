@@ -43,8 +43,8 @@ async def create_flow(
         variables=variables,
     )
     db.add(new_flow)
-    db.commit()
-    db.refresh(new_flow)
+    await db.commit()
+    await db.refresh(new_flow)
     return new_flow
 
 
@@ -219,8 +219,8 @@ async def update_flow(flow_id: str, flow: FlowRequest, db: DBSession):
     existing_flow.name = flow.name
     existing_flow.variables = extract_variables(flow.system_prompt)
 
-    db.commit()
-    db.refresh(existing_flow)
+    await db.commit()
+    await db.refresh(existing_flow)
     return existing_flow
 
 
@@ -291,8 +291,8 @@ async def delete_flow(flow_id: str, db: DBSession):
     if not existing_flow:
         raise HTTPException(status_code=404, detail="Flow not found")
 
-    db.delete(existing_flow)
-    db.commit()
+    await db.delete(existing_flow)
+    await db.commit()
     return {"message": "Flow deleted successfully"}
 
 

@@ -3,7 +3,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Response, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from sqlmodel import select, update
+from sqlmodel import select
 from src.router.core.settings_types import SETTINGS_MODELS
 from src.router.core.types import ModelPricing, User
 from src.router.models.logs import ApiLogs
@@ -558,7 +558,7 @@ async def generate(
     if not user_row:
         raise HTTPException(status_code=404, detail="User not found")
 
-    if int(user_row.credits) <= 0:
+    if user_row.credits <= 0:
         raise HTTPException(status_code=402, detail="Insufficient credits")
 
     supported_models = await get_supported_models(db)
