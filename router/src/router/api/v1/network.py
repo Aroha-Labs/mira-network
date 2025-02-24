@@ -23,8 +23,13 @@ from src.router.utils.settings import get_supported_models
 import asyncio
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.router.utils.redis import redis_client  # new import for redis
+from src.router.utils.logger import logger
 
 router = APIRouter()
+
+transport = httpx.AsyncHTTPTransport(
+    retries=3,
+)
 
 
 @router.post(
@@ -592,12 +597,18 @@ async def generate(
     proxy_url = f"http://{machine.network_ip}:{PROXY_PORT}/v1/chat/completions"
 
     # print("proxy_url", req.model_dump())
-    async with httpx.AsyncClient(timeout=httpx.Timeout(60.0)) as client:
-        llmres = await client.post(
-            proxy_url,
-            json=req.model_dump(),
-            headers={"Accept-Encoding": "identity"},
-        )
+    async with httpx.AsyncClient(
+        timeout=httpx.Timeout(120.0), transport=transport
+    ) as client:
+        try:
+            llmres = await client.post(
+                proxy_url,
+                json=req.model_dump(),
+                headers={"Accept-Encoding": "identity"},
+            )
+        except Exception as e:
+            logger.error(f"Error generating with proxy_url: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
 
     async def generate():
         usage = {}
