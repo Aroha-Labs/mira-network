@@ -189,8 +189,8 @@ async def add_or_update_user_claim(
         user.avatar_url = user_data["avatar_url"]
         user.provider = user_data["provider"]
         user.meta = user_data["meta"]
-        user.updated_at = datetime.now(timezone.utc)
-        user.last_login_at = datetime.now(timezone.utc)
+        user.updated_at = datetime.utcnow()
+        user.last_login_at = datetime.utcnow()
     else:
         # Create new user with all required fields
         user = UserModel(
@@ -202,9 +202,9 @@ async def add_or_update_user_claim(
             provider=user_data.get("provider", ""),
             meta=user_data.get("meta", {}),
             credits=user_data.get("credits", 0),
-            last_login_at=datetime.now(timezone.utc),
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            last_login_at=datetime.utcnow(),
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
         )
         db.add(user)
 
