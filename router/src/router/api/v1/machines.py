@@ -34,8 +34,7 @@ Checks if a specific machine is currently online and responding.
 )
 async def check_liveness(network_ip: str):
     # Check if machine is in Redis liveness records
-    keys = await redis_client.scan_iter(match="liveness:*")
-    for key in keys:
+    async for key in redis_client.scan_iter(match="liveness:*"):
         nip = await redis_client.hget(key, "network_ip")
         if nip == network_ip:
             return {"network_ip": network_ip, "status": "online"}
