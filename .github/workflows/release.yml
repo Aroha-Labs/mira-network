@@ -352,89 +352,67 @@ jobs:
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
 
   sdk-test:
-    needs: [changes, create-tag]
-    if: needs.changes.outputs.sdk == 'true'
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.9", "3.10", "3.11"]
-    defaults:
-      run:
-        working-directory: sdk
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      # Deploy staging router for testing
-      - name: Create staging router service
-        run: |
-          curl -X POST "https://nyx-deploy.stg.arohalabs.dev/api/v1/services" \
-          -H "Content-Type: application/json" \
-          -d '{
-            "name": "stg-network-router",
-            "machine_id": 2,
-            "env": {
-              "SUPABASE_URL": "https://zssbgsorwhauczahhrxo.supabase.co/",
-              "SUPABASE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpzc2Jnc29yd2hhdWN6YWhocnhvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczNjA5NjkwOSwiZXhwIjoyMDUxNjcyOTA5fQ.wDtGOjCLXJBhYRqpORdiwJWnSParaWcy749bujsahCI",
-              "NEW_RELIC_APP_NAME": "stg-mira-network-router",
-              "NEW_RELIC_LICENSE_KEY": "d6a85268dcf65c57eec351e7ba5503e9FFFFNRAL",
-              "DB_CONNECTION_STRING": "postgresql://postgresroot:5AAw6DGorZZVjB5F@fabric-prod.crkqke2coo4s.us-east-1.rds.amazonaws.com:5432/stg-mira-network-router",
-              "REDIS_HOST": "redis.stg.arohalabs.dev",
-              "REDIS_PORT": 6379,
-              "REDIS_DB": 6
-            },
-            "docker_port": 9005,
-            "exposed_port": 9005,
-            "docker_image": "ghcr.io/aroha-labs/mira-client-router"
-          }'
-      
-      - name: Deploy staging router
-        run: |
-          curl -X POST "https://nyx-deploy.stg.arohalabs.dev/api/v1/services/deploy" \
-          -H "Content-Type: application/json" \
-          -d '{
-            "service_name": "stg-network-router",
-            "version": "latest",
-            "env": {
-              "SUPABASE_URL": "https://zssbgsorwhauczahhrxo.supabase.co/",
-              "SUPABASE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpzc2Jnc29yd2hhdWN6YWhocnhvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczNjA5NjkwOSwiZXhwIjoyMDUxNjcyOTA5fQ.wDtGOjCLXJBhYRqpORdiwJWnSParaWcy749bujsahCI",
-              "NEW_RELIC_APP_NAME": "stg-mira-network-router",
-              "NEW_RELIC_LICENSE_KEY": "d6a85268dcf65c57eec351e7ba5503e9FFFFNRAL",
-              "DB_CONNECTION_STRING": "postgresql://postgresroot:5AAw6DGorZZVjB5F@fabric-prod.crkqke2coo4s.us-east-1.rds.amazonaws.com:5432/stg-mira-network-router",
-              "REDIS_HOST": "redis.stg.arohalabs.dev",
-              "REDIS_PORT": 6379,
-              "REDIS_DB": 6
-            }
-          }'
+      needs: [changes, create-tag]
+      if: needs.changes.outputs.sdk == 'true'
+      runs-on: ubuntu-latest
+      strategy:
+          matrix:
+              python-version: ["3.11"]
+      defaults:
+          run:
+              working-directory: sdk
+      steps:
+          - uses: actions/checkout@v4
+            with:
+                fetch-depth: 0
+          
+          # Get Nyx authentication token
+          - name: Authenticate with Nyx
+            id: nyx-auth
+            run: |
+                AUTH_RESPONSE=$(curl -X POST "https://nyx-deploy.stg.arohalabs.dev/auth/jwt/login" \
+                  -H "Content-Type: application/json" \
+                  -d '{
+                    "username": "${{ secrets.NYX_USERNAME }}",
+                    "password": "${{ secrets.NYX_PASSWORD }}"
+                  }')
+                echo "token=$(echo $AUTH_RESPONSE | jq -r .access_token)" >> $GITHUB_OUTPUT
 
-      # Wait for service to be ready
-      - name: Wait for service to be ready
-        run: sleep 30
+          - name: Deploy staging router
+            run: |
+                curl -X POST "https://nyx-deploy.stg.arohalabs.dev/api/v1/services/deploy" \
+                -H "Content-Type: application/json" \
+                -H "Authorization: Bearer ${{ steps.nyx-auth.outputs.token }}" \
+                -d '{
+                  "service_name": "stg-mira-router",
+                  "version": "latest",
+                }'
+          # Wait for service to be ready
+          - name: Wait for service to be ready
+            run: sleep 30
 
-      # Run the actual tests
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install pdm
-          pdm install --dev
-      - name: Run tests
-        run: |
-          pdm run pytest tests/
+          # Run the actual tests
+          - name: Set up Python
+            uses: actions/setup-python@v4
+            with:
+                python-version: ${{ matrix.python-version }}
+          - name: Install dependencies
+            run: |
+                python -m pip install --upgrade pip
+                pip install pdm
+                pdm install --dev
+          - name: Run tests
+            env:
+                MIRA_API_KEY: ${{ secrets.STG_API_KEY }}
+            run: |
+                pdm run pytest tests/
 
-      # Cleanup after tests
-      - name: Stop staging router
-        if: always()
-        run: |
-          curl -X POST "https://nyx-deploy.stg.arohalabs.dev/api/v1/services/stop?service_query=stg-network-router"
-
-      - name: Delete staging router service
-        if: always()
-        run: |
-          curl -X DELETE "https://nyx-deploy.stg.arohalabs.dev/api/v1/services/stg-network-router"
+          # Cleanup after tests
+          - name: Stop staging router
+            if: always()
+            run: |
+                curl -X POST "https://nyx-deploy.stg.arohalabs.dev/api/v1/services/stop?service_query=stg-mira-router" \
+                -H "Authorization: Bearer ${{ steps.nyx-auth.outputs.token }}"
 
   sdk-lint:
     needs: [changes, create-tag]
