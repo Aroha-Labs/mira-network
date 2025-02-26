@@ -25,6 +25,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from src.router.utils.redis import redis_client  # new import for redis
 from src.router.utils.logger import logger
 import random
+import redis
 
 router = APIRouter()
 
@@ -364,6 +365,7 @@ async def save_log(
     else:
         current_credit = float(current_credit)
     new_credit = current_credit - cost
+
     await redis_client.set(redis_key, new_credit)
     # Removed user_row credit update and db.add(user_row)
 
@@ -582,15 +584,20 @@ async def generate(
         current_credit = await redis_client.get(redis_key)
         if current_credit is None:
             current_credit = user_row.credits
-            await redis_client.set(redis_key, current_credit)
+            await redis_client.set(redis_key, str(current_credit))
         else:
             current_credit = float(current_credit)
-        if current_credit <= 0:
+
+        logger.info(f"Current credit: {current_credit} (type: {type(current_credit)})")
+
+        if float(current_credit) <= 0:
+            logger.info("Credit check failed, raising 402")
             raise HTTPException(status_code=402, detail="Insufficient credits")
-    except Exception as e:
+
+    except (redis.RedisError, ValueError) as e:  # Only catch Redis-related errors
         logger.error(f"Redis error checking credits: {str(e)}")
         # Fallback to database if Redis fails
-        if user_row.credits <= 0:
+        if float(user_row.credits) <= 0:
             raise HTTPException(status_code=402, detail="Insufficient credits")
 
     supported_models = await get_supported_models(db)

@@ -533,6 +533,13 @@ async def generate_with_flow_id(
     db: DBSession,
     user: User = Depends(verify_user),
 ):
+    # get user credits
+    user_credits = await redis_client.get(f"user_credit:{user.id}")
+    logger.info(f"User credits: {user_credits}")
+
+    if float(user_credits) <= 0:
+        raise HTTPException(status_code=402, detail="Insufficient credits")
+
     logger.info(f"Generating with flow ID: {flow_id}")
     if any(msg.role == "system" for msg in req.messages):
         raise HTTPException(
