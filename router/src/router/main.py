@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from src.router.api.v1 import router as v1_router
 from src.router.api.admin import router as admin_router
+from src.router.api.v1.web3_auth import router as web3_auth_router
 import uvicorn
 from prometheus_fastapi_instrumentator import Instrumentator
 from scalar_fastapi import get_scalar_api_reference
@@ -34,6 +35,7 @@ app = FastAPI(
         {"name": "logs", "description": "API logs"},
         {"name": "credits", "description": "User credits management"},
         {"name": "flows", "description": "Flow management"},
+        {"name": "web3-auth", "description": "Web3 wallet authentication"},
     ],
     openapi_url="/openapi.json",
     docs_url=None,
@@ -64,6 +66,7 @@ Instrumentator().instrument(app).expose(app)
 
 # Include routers
 app.include_router(v1_router)
+app.include_router(web3_auth_router, prefix="/v1")
 
 # Include admin routers
 app.include_router(admin_router, prefix="/admin")
