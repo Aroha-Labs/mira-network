@@ -214,7 +214,7 @@ async def get_flow(flow_id: str, db: DBSession):
 )
 async def update_flow(flow_id: str, flow: FlowRequest, db: DBSession):
     # existing_flow = db.query(Flows).filter(Flows.id == flow_id).first()
-    existing_flow = await db.exec(select(Flows).where(Flows.id == flow_id))
+    existing_flow = await db.exec(select(Flows).where(Flows.id == int(flow_id)))
     existing_flow = existing_flow.first()
 
     if not existing_flow:
@@ -290,7 +290,7 @@ async def update_flow(flow_id: str, flow: FlowRequest, db: DBSession):
     },
 )
 async def delete_flow(flow_id: str, db: DBSession):
-    existing_flow = await db.exec(select(Flows).where(Flows.id == flow_id))
+    existing_flow = await db.exec(select(Flows).where(Flows.id == int(flow_id)))
     existing_flow = existing_flow.first()
 
     if not existing_flow:
