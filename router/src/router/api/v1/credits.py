@@ -59,7 +59,8 @@ router = APIRouter()
     },
 )
 async def get_user_credits(db: DBSession, user: User = Depends(verify_user)):
-    user_data = db.exec(select(UserModel).where(UserModel.user_id == user.id)).first()
+    user_data = await db.exec(select(UserModel).where(UserModel.user_id == user.id))
+    user_data = user_data.one()
     return {"credits": user_data.credits if user_data else 0}
 
 

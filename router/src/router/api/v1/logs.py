@@ -1,11 +1,12 @@
-from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException
+import logging
+from typing import Optional, Literal
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import select
 from src.router.core.types import User
 from src.router.models.logs import ApiLogs
 from src.router.db.session import DBSession
 from src.router.core.security import verify_user
-from sqlalchemy import func
+from sqlalchemy import func, desc, asc
 from sqlalchemy.types import Float
 from datetime import datetime, timedelta
 
@@ -171,109 +172,91 @@ router = APIRouter()
 async def list_all_logs(
     db: DBSession,
     user: User = Depends(verify_user),
-    page: int = 1,
-    page_size: int = 10,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
-    machine_id: Optional[str] = None,
-    model: Optional[str] = None,
-    api_key_id: Optional[int] = None,
-    user_id: Optional[str] = None,
-    order_by: Optional[str] = "created_at",
-    order: Optional[str] = "desc",
-    flow_id: Optional[str] = None,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=10, ge=1, le=100),
+    start_date: Optional[datetime] = Query(default=None),
+    end_date: Optional[datetime] = Query(default=None),
+    machine_id: Optional[str] = Query(default=None),
+    model: Optional[str] = Query(default=None),
+    api_key_id: Optional[int] = Query(default=None),
+    user_id: Optional[str] = Query(default=None),
+    order_by: Literal["created_at", "model", "machine_id"] = Query(
+        default="created_at"
+    ),
+    order: Literal["asc", "desc"] = Query(default="desc"),
+    flow_id: Optional[str] = Query(default=None),
 ):
-    # Check admin access
-    if user_id:
-        if "admin" not in user.roles:
-            raise HTTPException(
-                status_code=403, detail="Only admins can query other users' logs"
-            )
+    """
+    List all logs with proper type validation
 
-    offset = (page - 1) * page_size
+    Args:
+        page: Page number (starts at 1)
+        page_size: Number of items per page (1-100)
+        start_date: Filter logs after this date (ISO format)
+        end_date: Filter logs before this date (ISO format)
+        machine_id: Filter by machine ID
+        model: Filter by model name
+        api_key_id: Filter by API key ID
+        user_id: Filter by user ID
+        order_by: Field to sort by
+        order: Sort order (asc/desc)
+        flow_id: Filter by flow ID
+    """
+    try:
+        # Validate dates if provided
+        if isinstance(start_date, str):
+            start_date = datetime.fromisoformat(start_date.replace("Z", "+00:00"))
+        if isinstance(end_date, str):
+            end_date = datetime.fromisoformat(end_date.replace("Z", "+00:00"))
 
-    # query = db.query(ApiLogs)
-    query = select(ApiLogs)
-    queryCount = select(func.count()).select_from(ApiLogs)
+        # Ensure api_key_id is integer
+        if api_key_id is not None:
+            api_key_id = int(api_key_id)
 
-    # Handle user_id filtering and admin access
-    if "admin" in user.roles:
-        # Start with all logs for admin
+        # Build query with proper types
+        query = select(ApiLogs)
+
+        if start_date:
+            query = query.where(ApiLogs.created_at >= start_date)
+        if end_date:
+            query = query.where(ApiLogs.created_at <= end_date)
+        if machine_id:
+            query = query.where(ApiLogs.machine_id == str(machine_id))
+        if model:
+            query = query.where(ApiLogs.model == str(model))
+        if api_key_id:
+            query = query.where(ApiLogs.api_key_id == int(api_key_id))
         if user_id:
-            # Admin filtering for specific user
-            query = query.where(ApiLogs.user_id == user_id)
-            queryCount = queryCount.where(ApiLogs.user_id == user_id)
-    else:
-        # Non-admin only sees their own logs
-        query = query.where(ApiLogs.user_id == user.id)
-        queryCount = queryCount.where(ApiLogs.user_id == user.id)
+            query = query.where(ApiLogs.user_id == str(user_id))
+        if flow_id:
+            query = query.where(ApiLogs.flow_id == str(flow_id))
 
-    # Apply other filters
-    if start_date:
-        query = query.where(ApiLogs.created_at >= start_date)
-        queryCount = queryCount.where(ApiLogs.created_at >= start_date)
-    if end_date:
-        query = query.where(ApiLogs.created_at <= end_date)
-        queryCount = queryCount.where(ApiLogs.created_at <= end_date)
-    if machine_id:
-        query = query.where(ApiLogs.machine_id == machine_id)
-        queryCount = queryCount.where(ApiLogs.machine_id == machine_id)
-    if model:
-        query = query.where(ApiLogs.model == model)
-        queryCount = queryCount.where(ApiLogs.model == model)
-    if api_key_id:
-        query = query.where(ApiLogs.api_key_id == api_key_id)
-        queryCount = queryCount.where(ApiLogs.api_key_id == api_key_id)
-    if flow_id:
-        # For flow_id, we don't need to check user ownership if admin
-        query = query.where(ApiLogs.flow_id == flow_id)
-        queryCount = queryCount.where(ApiLogs.flow_id == flow_id)
+        # Validate order_by field
+        valid_order_fields = ["created_at", "model", "machine_id"]
+        if order_by not in valid_order_fields:
+            order_by = "created_at"
 
-    if order_by not in [
-        "created_at",
-        "total_response_time",
-        "total_tokens",
-        "prompt_tokens",
-        "completion_tokens",
-        "ttft",
-        "model",
-        "machine_id",
-    ]:
-        raise HTTPException(status_code=400, detail="Invalid order_by field")
-    if order == "desc":
-        query = query.order_by(getattr(ApiLogs, order_by).desc())
-    elif order == "asc":
-        query = query.order_by(getattr(ApiLogs, order_by).asc())
-    else:
-        raise HTTPException(status_code=400, detail="Invalid order direction")
-    logs = await db.exec(query.offset(offset).limit(page_size))
-    logs = logs.all()
+        # Apply ordering
+        order_column = getattr(ApiLogs, order_by)
+        query = query.order_by(
+            desc(order_column) if order.lower() == "desc" else asc(order_column)
+        )
 
-    # total_logs = query.count()
-    total_logs = await db.exec(queryCount)
-    total_logs = total_logs.one()
+        # Apply pagination
+        query = query.offset((page - 1) * page_size).limit(page_size)
 
-    def exclude_model_from_pricing(log):
-        l = log.dict()
-        model_pricing = l.get("model_pricing")
+        result = await db.exec(query)
+        logs = result.all()
 
-        if model_pricing is None:
-            return l
+        return {"page": page, "page_size": page_size, "logs": logs}
 
-        if model_pricing.get("model") is not None:
-            model_pricing.pop("model")
-
-        l["model_pricing"] = model_pricing
-        return l
-
-    filtered_logs = list(map(exclude_model_from_pricing, logs))
-
-    return {
-        "logs": filtered_logs,
-        "total": total_logs,
-        "page": page,
-        "page_size": page_size,
-    }
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400, detail=f"Invalid parameter value: {str(e)}"
+        )
+    except Exception as e:
+        logger.error(f"Error in list_all_logs: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get(
