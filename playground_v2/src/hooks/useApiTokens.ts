@@ -1,6 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useStore } from "@tanstack/react-store";
 import axios, { AxiosError } from "axios";
 import { API_BASE_URL } from "src/config";
+import {
+  apiKeysParamsState,
+  DEFAULT_PARAMS,
+} from "src/state/apiKeysParamsState";
 import { useSession } from "./useSession";
 
 export interface ApiKey {
@@ -9,12 +14,46 @@ export interface ApiKey {
   created_at: string;
 }
 
-const fetchApiKeys = async (token?: string): Promise<ApiKey[]> => {
+export interface ApiKeysResponse {
+  items: ApiKey[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+interface ApiKeysParams {
+  page: number;
+  page_size: number;
+  order_by: string;
+  order: string;
+}
+
+const fetchApiKeys = async ({
+  token,
+  page = DEFAULT_PARAMS.page,
+  pageSize = DEFAULT_PARAMS.pageSize,
+  orderBy = DEFAULT_PARAMS.orderBy,
+  order = DEFAULT_PARAMS.order,
+}: {
+  token?: string;
+  page?: number;
+  pageSize?: number;
+  orderBy?: string;
+  order?: string;
+}): Promise<ApiKeysResponse> => {
   if (!token) {
     throw new Error("No token provided");
   }
+  const params: ApiKeysParams = {
+    page,
+    page_size: pageSize,
+    order_by: orderBy,
+    order,
+  };
   const response = await axios.get(`${API_BASE_URL}/api-tokens`, {
     headers: { Authorization: `Bearer ${token}` },
+    params,
   });
   return response.data;
 };
@@ -48,10 +87,25 @@ const addApiKey = async (token: string, description: string) => {
 const useApiTokens = () => {
   const { data: userSession } = useSession();
   const queryClient = useQueryClient();
+  const params = useStore(apiKeysParamsState, (state) => state);
 
-  const query = useQuery<ApiKey[]>({
-    queryKey: ["apiKeys"],
-    queryFn: () => fetchApiKeys(userSession?.access_token),
+  const query = useQuery<ApiKeysResponse>({
+    queryKey: [
+      "apiKeys",
+      params.page,
+      params.pageSize,
+      params.orderBy,
+      params.order,
+      userSession?.access_token,
+    ],
+    queryFn: () =>
+      fetchApiKeys({
+        token: userSession?.access_token,
+        page: params.page,
+        pageSize: params.pageSize,
+        orderBy: params.orderBy,
+        order: params.order,
+      }),
     enabled: !!userSession?.access_token,
   });
 
@@ -62,7 +116,7 @@ const useApiTokens = () => {
       }
       let toAdd = description;
       if (!toAdd || toAdd.length === 0) {
-        toAdd = `secret-key-${(query?.data?.length ?? 0) + 1}`;
+        toAdd = `secret-key-${(query?.data?.items?.length ?? 0) + 1}`;
       }
       return addApiKey(userSession.access_token, toAdd);
     },
