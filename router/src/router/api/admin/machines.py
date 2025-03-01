@@ -30,7 +30,16 @@ async def register_machine(
     existing_machine = existing_machine_res.first()
 
     if existing_machine:
-        raise HTTPException(status_code=400, detail="Machine already registered")
+        return {
+            "id": existing_machine.id,
+            "network_ip": existing_machine.network_ip,
+            "name": existing_machine.name,
+            "description": existing_machine.description,
+            "created_at": existing_machine.created_at.isoformat(),
+            "disabled": existing_machine.disabled,
+            "status": "registered",
+            "message": "Machine already registered",
+        }
 
     new_machine = Machine(
         network_ip=request.network_ip,
@@ -44,12 +53,14 @@ async def register_machine(
     await redis_client.set(f"network_ip:{new_machine.id}", new_machine.network_ip)
 
     return {
-        "network_ip": request.network_ip,
-        "name": request.name,
-        "description": request.description,
+        "id": new_machine.id,
+        "network_ip": new_machine.network_ip,
+        "name": new_machine.name,
+        "description": new_machine.description,
         "created_at": new_machine.created_at.isoformat(),
         "disabled": new_machine.disabled,
         "status": "registered",
+        "message": "Machine registered successfully",
     }
 
 
