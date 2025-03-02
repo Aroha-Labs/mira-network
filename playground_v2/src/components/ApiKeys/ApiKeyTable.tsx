@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Table, TableBody, TableCell, TableRow } from "src/components/Table";
 import { Button } from "src/components/button";
 import Card from "src/components/card";
-import useApiTokens, { ApiKey } from "src/hooks/useApiTokens";
+import { ApiKey, ApiKeysResponse } from "src/hooks/useApiTokens";
 import AddApiKey from "./AddApiKey";
 import DeleteApiKey from "./DeleteApiKey";
 
@@ -14,10 +14,15 @@ const getTokenDisplay = (token: string) => {
 
 const ApiKeyTable = ({
   setIsModalOpen,
+  data,
+  isLoading,
+  error,
 }: {
+  data: ApiKeysResponse;
+  isLoading: boolean;
+  error: Error | null;
   setIsModalOpen: (open: boolean) => void;
 }) => {
-  const { data, isLoading, error } = useApiTokens();
   const [isCopied, setIsCopied] = useState("");
 
   const handleCopyToClipboard = async (token: string) => {
@@ -50,13 +55,13 @@ const ApiKeyTable = ({
     <Card className="min-w-full md:min-w-[720px] p-[32px]">
       <div className="flex gap-4 justify-between items-center sticky top-0 bg-white z-10">
         <p className="text-md leading-[22px] tracking-[-0.013em]">
-          YOU HAVE {data?.length} API KEY{data?.length === 1 ? "" : "S"}
+          YOU HAVE {data?.total} API KEY{data?.total === 1 ? "" : "S"}
         </p>
         <AddApiKey onModalOpenChange={setIsModalOpen} />
       </div>
       <Table className="mt-10 mb-10">
         <TableBody>
-          {data?.map((key: ApiKey) => {
+          {data?.items?.map((key: ApiKey) => {
             return (
               <TableRow key={key?.token} className="cursor-pointer">
                 <TableCell className="text-[13px] pl-0">
