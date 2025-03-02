@@ -17,7 +17,7 @@ const ManageApiKey = () => {
           <p className="text-[#303030] text-sm font-bold opacity-50">_ _</p>
         ) : (
           <p className="text-[#303030] text-sm font-bold opacity-50">
-            {data?.length ?? 0} Keys
+            {data?.total ?? 0} Keys
           </p>
         )}
       </div>
