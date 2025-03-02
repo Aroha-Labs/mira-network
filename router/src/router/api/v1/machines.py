@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
+import logging
 from sqlmodel import select
 from src.router.db.session import DBSession
 from src.router.core.security import verify_user, verify_machine
@@ -74,7 +75,7 @@ async def check_liveness_by_id(machine_id: str):
     description="""Updates the liveness status of a machine.
 
 ### Path Parameters
-- `machine_uid`: UUID of the machine to update
+- `network_ip`: Network IP address of the machine to update
 
 ### Response Format
 ```json
@@ -120,6 +121,7 @@ async def check_liveness_by_id(machine_id: str):
 )
 async def set_liveness(
     network_ip: str,
+    response: Response,
     db: DBSession,
     machine_auth: dict = Depends(verify_machine),
 ):
@@ -130,36 +132,42 @@ async def set_liveness(
             status_code=403, detail="Token not authorized for this machine"
         )
 
-    now = time.time()
-    await redis_client.setnx(f"liveness-start:{network_ip}", now)
-    ls_nip = await redis_client.get(f"liveness-start:{network_ip}")
-    created_at = float(ls_nip)
-    ttl = int((now - created_at) + 12)
-    await redis_client.expire(f"liveness-start:{network_ip}", ttl)
-
+    # First look up the machine to get its ID
     machine = await db.exec(select(Machine).where(Machine.network_ip == network_ip))
     machine = machine.first()
 
     if not machine:
         raise HTTPException(status_code=404, detail="Machine not found")
 
-    # check if machine liveness has not expired
-    liveness_key = f"liveness:{machine.id}"
-    liveness_ttl = await redis_client.ttl(liveness_key)
-    if liveness_ttl > 0:
-        return {"network_ip": network_ip, "status": "online"}
+    now = time.time()
+    machine_id = str(machine.id)
+    liveness_key = f"liveness:{machine_id}"
+    ttl = 12  # seconds
 
+    # Set the liveness data with a fixed TTL
     await redis_client.hset(
-        f"liveness:{machine.id}",
+        liveness_key,
         mapping={
             "network_ip": network_ip,
             "timestamp": now,
         },
     )
 
-    await redis_client.expire(f"liveness:{machine.id}", 12)
+    await redis_client.expire(liveness_key, ttl)
 
-    return {"network_ip": network_ip, "status": "online"}
+    # Add debug headers
+    response.headers["X-Liveness-Timestamp"] = str(now)
+    response.headers["X-Liveness-TTL"] = str(ttl)
+
+    logging.debug(f"Updated liveness for machine {machine_id} (IP: {network_ip})")
+
+    return {
+        "machine_id": machine_id,
+        "network_ip": network_ip,
+        "status": "online",
+        "timestamp": now,
+        "ttl": ttl,
+    }
 
 
 @router.get(
