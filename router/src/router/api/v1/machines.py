@@ -157,7 +157,7 @@ async def set_liveness(
         },
     )
 
-    await redis_client.expire(f"liveness:{machine.id}", 86400)
+    await redis_client.expire(f"liveness:{machine.id}", 12)
 
     return {"network_ip": network_ip, "status": "online"}
 
