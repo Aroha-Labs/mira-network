@@ -1,4 +1,3 @@
-import socket
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.responses import PlainTextResponse, StreamingResponse
 import csv
@@ -13,6 +12,8 @@ import logging
 import json
 import requests
 from config import Env
+from machine_registry import register_machine, get_local_ip
+import sys
 
 app = FastAPI()
 
@@ -503,22 +504,32 @@ async def update_liveness(machine_ip: str):
         await asyncio.sleep(3)
 
 
-def get_local_ip():
-    """Returns the local IP address of the container running on AWS Fargate"""
-    try:
-        hostname = socket.gethostname()
-        local_ip = socket.gethostbyname(hostname)
-        return local_ip
-    except Exception as e:
-        return str(e)
-
-
 @app.on_event("startup")
 async def startup_event():
     # Get the machine IP from environment or determine the local IP
     MACHINE_IP = Env.MACHINE_IP
     if MACHINE_IP is None:
         MACHINE_IP = get_local_ip()
+        logging.info(f"Determined local IP: {MACHINE_IP}")
 
-    # Start the liveness update task
-    asyncio.create_task(update_liveness(MACHINE_IP))
+    # Register the machine with the router and get an API token (with retries)
+    logging.info("Starting machine registration process...")
+    machine_token = await register_machine(ROUTER_BASE_URL)
+
+    if machine_token:
+        logging.info("Machine registered successfully and token acquired")
+        os.environ["MACHINE_API_TOKEN"] = machine_token
+        Env.MACHINE_API_TOKEN = machine_token
+        logging.info(f"Using machine name: {Env.MACHINE_NAME}")
+
+        # Start the liveness update task only if registration succeeded
+        asyncio.create_task(update_liveness(MACHINE_IP))
+    else:
+        # Registration failed, exit the application
+        logging.critical(
+            "Failed to register machine or acquire token after multiple attempts"
+        )
+        logging.critical("Machine registration is required to run the service")
+        logging.critical("Shutting down...")
+        # Exit with non-zero status to indicate failure
+        sys.exit(1)

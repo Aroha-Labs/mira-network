@@ -10,6 +10,7 @@ dependencies = [
     "openai==1.61.0",
     "uvicorn==0.34.0",
     "requests==2.32.3",
+    "tenacity>=9.0.0",
 ]
 requires-python = "==3.11.*"
 readme = "README.md"
