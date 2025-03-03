@@ -20,8 +20,6 @@ PROXY_PORT = 34523
 _machine_counter = itertools.cycle(range(1000000))  # Large enough cycle
 
 
-# Cache for machines that doesn't depend on db session
-@alru_cache(maxsize=1, ttl=3600)  # Cache for 1 hour
 async def _get_cached_machine_list():
     """Internal function to cache machine list without db dependency"""
     logger.info("Cache miss for machines - fetching from Redis")
