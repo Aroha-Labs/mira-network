@@ -36,7 +36,6 @@ redis_client = aioredis.Redis(connection_pool=redis_pool)
 # redis_client_async = aioredis.Redis(connection_pool=redis_pool_async)
 
 
-@alru_cache(maxsize=1, ttl=1800)  # Cache for 30 minutes
 async def get_online_machines() -> list[str]:
     """Get list of online machine IDs with caching using async_lru"""
     keys = await redis_client.keys(pattern="liveness:*")
