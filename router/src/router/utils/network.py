@@ -60,11 +60,9 @@ async def get_cached_machines(db: AsyncSession) -> List[MachineInfo]:
     # Try to get machines from cache first
     try:
         machines, missing_ids = await _get_cached_machine_list()
-        logger.info(f"Machine cache info: {_get_cached_machine_list.cache_info()}")
     except Exception as e:
         logger.error(f"Error getting cached machines: {str(e)}")
         # Clear cache and retry
-        _get_cached_machine_list.cache_clear()
         machines, missing_ids = await _get_cached_machine_list()
 
     # Only query DB for missing IPs if needed
@@ -89,7 +87,6 @@ async def get_cached_machines(db: AsyncSession) -> List[MachineInfo]:
             await pipe.execute()
 
         # Clear cache to update with new Redis values
-        _get_cached_machine_list.cache_clear()
 
     return machines
 
@@ -108,11 +105,9 @@ async def get_round_robin_machines(
     # Get machines with caching
     try:
         machines = await get_cached_machines(db)
-        logger.info(f"Machine cache info: {_get_cached_machine_list.cache_info()}")
     except Exception as e:
         logger.error(f"Error getting cached machines: {str(e)}")
         # Try to clear cache and retry once
-        _get_cached_machine_list.cache_clear()
         try:
             machines = await get_cached_machines(db)
         except Exception as retry_error:

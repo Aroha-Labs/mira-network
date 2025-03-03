@@ -49,9 +49,6 @@ async def get_online_machines() -> list[str]:
 
 
 async def cleanup():
-    # Clear caches
-    get_online_machines.cache_clear()
-
     # Close Redis connections
     await redis_client.close()
     await redis_pool.disconnect()
