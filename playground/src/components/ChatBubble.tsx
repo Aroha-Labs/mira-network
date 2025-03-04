@@ -6,7 +6,6 @@ import {
   PencilIcon,
   ArrowPathIcon,
 } from "@heroicons/react/24/outline";
-import ReactMarkdown from "react-markdown";
 import CopyToClipboardIcon from "src/components/CopyToClipboardIcon";
 import ConfirmModal from "src/components/ConfirmModal";
 import { User } from "@supabase/supabase-js";
@@ -14,6 +13,7 @@ import { useState } from "react";
 import ProfileImage from "./ProfileImage";
 import ToolDisplay from "./ToolDisplay";
 import { Message } from "src/utils/chat";
+import ReactMarkdown from "./ReactMarkdown";
 
 interface ChatBubbleProps {
   msg: Message;
@@ -82,19 +82,16 @@ export default function ChatBubble({
         }`}
       >
         <div className="flex-1 space-y-2 overflow-x-auto">
-          <div>
-            {showRaw ? (
-              <pre className="whitespace-pre-wrap">{msg.content}</pre>
-            ) : (
-              <ReactMarkdown className="prose">{msg.content}</ReactMarkdown>
-            )}
-            {(msg.tool_calls || msg.tool_responses) && (
-              <ToolDisplay
-                toolCalls={msg.tool_calls}
-                toolResponses={msg.tool_responses}
-              />
-            )}
-          </div>
+          {showRaw ? (
+            <pre className="whitespace-pre-wrap">{msg.content}</pre>
+          ) : (
+            <div className="prose">
+              <ReactMarkdown>{msg.content}</ReactMarkdown>
+            </div>
+          )}
+          {(msg.tool_calls || msg.tool_responses) && (
+            <ToolDisplay toolCalls={msg.tool_calls} toolResponses={msg.tool_responses} />
+          )}
         </div>
         <>
           <div className="border-t border-gray-300 my-2"></div>
