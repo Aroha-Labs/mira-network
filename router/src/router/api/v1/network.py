@@ -22,6 +22,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from src.router.utils.redis import redis_client  # new import for redis
 from src.router.utils.logger import logger
 import redis
+from src.router.utils.db import safe_transaction
 
 router = APIRouter()
 
@@ -371,7 +372,7 @@ async def save_log(
         created_at=datetime.now(timezone.utc).replace(tzinfo=None),
     )
 
-    async with db.begin():
+    async with safe_transaction(db):
         db.add(api_log)
         db.add(user_credits_history)
 
