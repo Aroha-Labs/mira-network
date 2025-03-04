@@ -18,11 +18,11 @@ import json
 from src.router.utils.settings import get_setting_value
 from src.router.utils.settings import get_supported_models
 import asyncio
-from sqlmodel.ext.asyncio.session import AsyncSession
 from src.router.utils.redis import redis_client  # new import for redis
 from src.router.utils.logger import logger
 import redis
-from src.router.utils.db import safe_transaction
+from src.router.db.session import get_session_context
+from src.router.api.v1.docs.network import chatCompletionGenerateDoc, list_models_doc
 
 router = APIRouter()
 
@@ -163,7 +163,7 @@ async def verify(req: VerifyRequest, db: DBSession):
             detail="Minimum yes must be less than or equal to the number of models",
         )
 
-    supported_models = await get_supported_models(db)
+    supported_models = await get_supported_models()
 
     # Validate and transform all models
     transformed_models = []
@@ -220,62 +220,12 @@ class ModelListRes(BaseModel):
 @router.get(
     "/v1/models",
     summary="List Available Models",
-    description="""Retrieves a list of all supported language models in the system.
-
-### Authentication
-- No authentication required
-- Rate limiting may apply
-
-### Response Format
-```json
-{
-    "object": "list",
-    "data": [
-        {
-            "id": string,     // Model identifier
-            "object": "model" // Always "model"
-        }
-    ]
-}
-```
-
-### Example Models
-- `openrouter/meta-llama/llama-3.3-70b-instruct`
-- `openai/gpt-4`
-- `openrouter/anthropic/claude-3.5-sonnet`
-
-### Notes
-- Models are fetched from system settings
-- Availability may vary based on system configuration
-- Model list is cached and periodically updated
-- Returns all models regardless of user access level""",
+    description=list_models_doc["description"],
     response_description="Returns an array of available model information",
-    responses={
-        200: {
-            "description": "Successfully retrieved models list",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "object": "list",
-                        "data": [
-                            {
-                                "id": "openrouter/meta-llama/llama-3.3-70b-instruct",
-                                "object": "model",
-                            },
-                            {"id": "openai/gpt-4", "object": "model"},
-                            {
-                                "id": "openrouter/anthropic/claude-3.5-sonnet",
-                                "object": "model",
-                            },
-                        ],
-                    }
-                }
-            },
-        }
-    },
+    responses=list_models_doc["responses"],
 )
-async def list_models(db: DBSession) -> ModelListRes:
-    supported_models = await get_supported_models(db)
+async def list_models() -> ModelListRes:
+    supported_models = await get_supported_models()
 
     # Create a properly typed response
     response = ModelListRes(
@@ -290,7 +240,6 @@ async def list_models(db: DBSession) -> ModelListRes:
 
 
 async def save_log(
-    db: AsyncSession,
     user: User,
     user_row: UserModel,
     req: AiRequest,
@@ -303,7 +252,6 @@ async def save_log(
     flow_id: Optional[str] = None,
 ) -> None:
     sm = await get_setting_value(
-        db,
         "SUPPORTED_MODELS",
         SETTINGS_MODELS["SUPPORTED_MODELS"],
     )
@@ -323,245 +271,71 @@ async def save_log(
 
     req.model = original_req_model
 
-    # Log the request
-    api_log = ApiLogs(
-        user_id=user.id,
-        api_key_id=user.api_key_id,
-        payload=req.model_dump_json(),
-        request_payload=req.model_dump(),
-        ttft=ttfs,
-        response=result_text,
-        prompt_tokens=usage.get("prompt_tokens", 0),
-        completion_tokens=usage.get("completion_tokens", 0),
-        total_tokens=usage.get("total_tokens", 0),
-        total_response_time=time.time() - timeStart,
-        model=req.model,
-        model_pricing=model_pricing,
-        machine_id=str(machine_id),
-        flow_id=flow_id,
-    )
+    # Create a new session context for this operation
+    async with get_session_context() as session:
+        async with session.begin():  # Direct transaction management
+            # Log the request
+            api_log = ApiLogs(
+                user_id=user.id,
+                api_key_id=user.api_key_id,
+                payload=req.model_dump_json(),
+                request_payload=req.model_dump(),
+                ttft=ttfs,
+                response=result_text,
+                prompt_tokens=usage.get("prompt_tokens", 0),
+                completion_tokens=usage.get("completion_tokens", 0),
+                total_tokens=usage.get("total_tokens", 0),
+                total_response_time=time.time() - timeStart,
+                model=req.model,
+                model_pricing=model_pricing,
+                machine_id=str(machine_id),
+                flow_id=flow_id,
+            )
 
-    # Calculate cost and reduce user credits
-    prompt_tokens = usage.get("prompt_tokens", 0)
-    completion_tokens = usage.get("completion_tokens", 0)
-    total_tokens = usage.get("total_tokens", 0)
+            # Calculate cost and reduce user credits
+            prompt_tokens = usage.get("prompt_tokens", 0)
+            completion_tokens = usage.get("completion_tokens", 0)
+            total_tokens = usage.get("total_tokens", 0)
 
-    prompt_tokens_cost = prompt_tokens * model_p.prompt_token
-    completion_tokens_cost = completion_tokens * model_p.completion_token
+            prompt_tokens_cost = prompt_tokens * model_p.prompt_token
+            completion_tokens_cost = completion_tokens * model_p.completion_token
 
-    cost = prompt_tokens_cost + completion_tokens_cost
+            cost = prompt_tokens_cost + completion_tokens_cost
 
-    # NEW: Use redis to manage user's credits instead of updating the db
-    redis_key = f"user_credit:{user.id}"
-    current_credit = await redis_client.get(redis_key)
-    if current_credit is None:
-        current_credit = user_row.credits
-        await redis_client.set(redis_key, current_credit)
-    else:
-        current_credit = float(current_credit)
-    new_credit = current_credit - cost
+            # NEW: Use redis to manage user's credits instead of updating the db
+            redis_key = f"user_credit:{user.id}"
+            current_credit = await redis_client.get(redis_key)
+            if current_credit is None:
+                current_credit = user_row.credits
+                await redis_client.set(redis_key, current_credit)
+            else:
+                current_credit = float(current_credit)
+            new_credit = current_credit - cost
 
-    await redis_client.set(redis_key, new_credit)
-    # Removed user_row credit update and db.add(user_row)
+            await redis_client.set(redis_key, new_credit)
+            # Removed user_row credit update and db.add(user_row)
 
-    # Update user credit history
-    user_credits_history = UserCreditsHistory(
-        user_id=user.id,
-        amount=-cost,
-        description=f"Used {total_tokens} tokens. Prompt tokens: {prompt_tokens}, Completion tokens: {completion_tokens}",
-        created_at=datetime.now(timezone.utc).replace(tzinfo=None),
-    )
+            # Update user credit history
+            user_credits_history = UserCreditsHistory(
+                user_id=user.id,
+                amount=-cost,
+                description=f"Used {total_tokens} tokens. Prompt tokens: {prompt_tokens}, Completion tokens: {completion_tokens}",
+                created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            )
 
-    async with safe_transaction(db):
-        db.add(api_log)
-        db.add(user_credits_history)
+            session.add(api_log)
+            session.add(user_credits_history)
+            # Session will commit when transaction exits context
 
 
 @router.post(
     "/v1/chat/completions",
     summary="Generate Chat Completion",
-    description="""Generates a chat completion using the specified model.
-
-### Authentication
-- Requires a valid authentication token
-- Token must be passed in the Authorization header
-- Sufficient credits required for generation
-
-### Request Body
-```json
-{
-    "model": string,
-    "model_provider": {
-        "base_url": string,
-        "api_key": string
-    } | null,
-    "messages": [
-        {
-            "role": "system" | "user" | "assistant",
-            "content": string
-        }
-    ],
-    "stream": boolean,
-    "tools": [
-        {
-            "type": "function",
-            "function": {
-                "name": string,
-                "description": string,
-                "parameters": object
-            }
-        }
-    ] | null,
-    "tool_choice": string
-}
-```
-
-### Response Format (Non-Streaming)
-```json
-{
-    "id": string,
-    "object": "chat.completion",
-    "created": int,
-    "model": string,
-    "choices": [
-        {
-            "index": 0,
-            "message": {
-                "role": "assistant",
-                "content": string,
-                "tool_calls": [
-                    {
-                        "id": string,
-                        "type": "function",
-                        "function": {
-                            "name": string,
-                            "arguments": string
-                        }
-                    }
-                ] | null
-            },
-            "finish_reason": "stop" | "length" | "tool_calls"
-        }
-    ],
-    "usage": {
-        "prompt_tokens": int,
-        "completion_tokens": int,
-        "total_tokens": int
-    }
-}
-```
-
-### Streaming Response Format
-Server-sent events with the following data structure:
-```json
-{
-    "content": string | null,
-    "tool_calls": [
-        {
-            "id": string,
-            "type": "function",
-            "function": {
-                "name": string,
-                "arguments": string
-            },
-            "index": int
-        }
-    ] | null
-}
-```
-
-### Error Responses
-- `400 Bad Request`:
-    ```json
-    {
-        "detail": "Unsupported model"
-    }
-    ```
-- `401 Unauthorized`:
-    ```json
-    {
-        "detail": "Could not validate credentials"
-    }
-    ```
-- `402 Payment Required`:
-    ```json
-    {
-        "detail": "Insufficient credits"
-    }
-    ```
-- `404 Not Found`:
-    ```json
-    {
-        "detail": "User not found"
-    }
-    ```
-
-### Notes
-- Supports both streaming and non-streaming responses
-- Automatically tracks usage and deducts credits
-- Records performance metrics (TTFT, total response time)
-- Distributes requests across available machines
-- Supports function calling through tools parameter
-- Credits are calculated based on prompt and completion tokens
-- Response streaming uses server-sent events (SSE)""",
+    description=chatCompletionGenerateDoc["description"],
     response_description="Returns the model's completion response",
-    responses={
-        200: {
-            "description": "Successfully generated completion",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "id": "chatcmpl-123",
-                        "object": "chat.completion",
-                        "created": 1677858242,
-                        "model": "gpt-4",
-                        "choices": [
-                            {
-                                "index": 0,
-                                "message": {
-                                    "role": "assistant",
-                                    "content": "Hello! How can I help you today?",
-                                    "tool_calls": None,
-                                },
-                                "finish_reason": "stop",
-                            }
-                        ],
-                        "usage": {
-                            "prompt_tokens": 10,
-                            "completion_tokens": 8,
-                            "total_tokens": 18,
-                        },
-                    }
-                }
-            },
-        },
-        400: {
-            "description": "Invalid request or unsupported model",
-            "content": {
-                "application/json": {"example": {"detail": "Unsupported model"}}
-            },
-        },
-        401: {
-            "description": "Unauthorized - Invalid or missing authentication",
-            "content": {
-                "application/json": {
-                    "example": {"detail": "Could not validate credentials"}
-                }
-            },
-        },
-        402: {
-            "description": "Insufficient credits",
-            "content": {
-                "application/json": {"example": {"detail": "Insufficient credits"}}
-            },
-        },
-        404: {
-            "description": "User not found",
-            "content": {"application/json": {"example": {"detail": "User not found"}}},
-        },
-    },
+    responses=chatCompletionGenerateDoc["responses"],
 )
-async def generate(
+async def chatCompletionGenerate(
     req: AiRequest,
     db: DBSession,
     user: User = Depends(verify_user),
@@ -597,7 +371,7 @@ async def generate(
         if float(user_row.credits) <= 0:
             raise HTTPException(status_code=402, detail="Insufficient credits")
 
-    supported_models = await get_supported_models(db)
+    supported_models = await get_supported_models()
     if req.model not in supported_models:
         raise HTTPException(status_code=400, detail="Unsupported model")
 
@@ -723,7 +497,6 @@ async def generate(
             # Always save log even if streaming fails
             try:
                 await save_log(
-                    db=db,
                     user=user,
                     user_row=user_row,
                     req=req,
@@ -754,7 +527,6 @@ async def generate(
             )
 
             await save_log(
-                db=db,
                 user=user,
                 user_row=user_row,
                 req=req,

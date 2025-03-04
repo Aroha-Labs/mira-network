@@ -3,7 +3,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from src.router.models.logs import ApiLogs
 from sqlmodel import select, func
-from src.router.api.v1.network import generate
+from src.router.api.v1.network import chatCompletionGenerate
 from src.router.core.security import verify_user
 from src.router.core.types import User
 from src.router.schemas.ai import AiRequest, Message
@@ -597,7 +597,7 @@ async def generate_with_flow_id(
     req.messages.insert(0, Message(role="system", content=system_prompt))
 
     try:
-        response = await generate(
+        response = await chatCompletionGenerate(
             req=AiRequest(
                 model=req.model,
                 messages=req.messages,
