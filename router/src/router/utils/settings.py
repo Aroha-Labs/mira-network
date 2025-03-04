@@ -5,6 +5,7 @@ from src.router.models.system_settings import SystemSettings
 from fastapi import HTTPException
 from src.router.core.settings_types import SETTINGS_MODELS
 from sqlmodel.ext.asyncio.session import AsyncSession
+from src.router.utils.redis import get_cached_setting, set_cached_setting
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -18,9 +19,20 @@ async def get_setting(db: AsyncSession, name: str):
 
 async def get_setting_value(db: AsyncSession, name: str, model: Type[T] = None):
     """Get a system setting value by name with optional model validation."""
+    # Try to get from cache first
+    cached_value = await get_cached_setting(name)
+    if cached_value:
+        if model:
+            return model(**cached_value)
+        return cached_value
+
+    # If not in cache, get from database
     setting = await get_setting(db, name)
     if not setting:
         raise HTTPException(status_code=404, detail=f"Setting {name} not found")
+
+    # Cache the setting
+    await set_cached_setting(name, setting.value)
 
     if model:
         try:
@@ -83,4 +95,8 @@ async def update_setting_value(
     db.add(setting)
     await db.commit()
     await db.refresh(setting)
+
+    # Update cache
+    await set_cached_setting(name, setting.value)
+
     return setting
