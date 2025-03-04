@@ -30,17 +30,15 @@ async def get_settings(db: DBSession, user=Depends(verify_admin)):
 @router.post("/settings", response_model=SystemSettings)
 async def create_setting(
     setting: SystemSettingCreate,
-    db: DBSession,
     user=Depends(verify_admin),
 ):
-    return update_setting_value(db, setting.name, setting.value, setting.description)
+    return await update_setting_value(setting.name, setting.value, setting.description)
 
 
 @router.put("/settings/{name}", response_model=SystemSettings)
 async def update_setting(
     name: str,
     setting: SystemSettingUpdate,
-    db: DBSession,
     user=Depends(verify_admin),
 ):
-    return update_setting_value(db, name, setting.value, setting.description)
+    return await update_setting_value(name, setting.value, setting.description)

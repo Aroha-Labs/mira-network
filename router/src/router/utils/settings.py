@@ -1,23 +1,26 @@
 from typing import Any, Dict, Optional, TypeVar, Type
 from pydantic import BaseModel
 from sqlmodel import select
+from src.router.db.session import get_session_context
 from src.router.models.system_settings import SystemSettings
 from fastapi import HTTPException
 from src.router.core.settings_types import SETTINGS_MODELS
-from sqlmodel.ext.asyncio.session import AsyncSession
 from src.router.utils.redis import get_cached_setting, set_cached_setting
 
 T = TypeVar("T", bound=BaseModel)
 
 
-async def get_setting(db: AsyncSession, name: str):
+async def get_setting(name: str):
     """Get a system setting by name."""
-    result = await db.exec(select(SystemSettings).where(SystemSettings.name == name))
-    row = result.first()
-    return row
+    async with get_session_context() as db:
+        result = await db.exec(
+            select(SystemSettings).where(SystemSettings.name == name)
+        )
+        row = result.first()
+        return row
 
 
-async def get_setting_value(db: AsyncSession, name: str, model: Type[T] = None):
+async def get_setting_value(name: str, model: Type[T] = None):
     """Get a system setting value by name with optional model validation."""
     # Try to get from cache first
     cached_value = await get_cached_setting(name)
@@ -27,7 +30,7 @@ async def get_setting_value(db: AsyncSession, name: str, model: Type[T] = None):
         return cached_value
 
     # If not in cache, get from database
-    setting = await get_setting(db, name)
+    setting = await get_setting(name)
     if not setting:
         raise HTTPException(status_code=404, detail=f"Setting {name} not found")
 
@@ -45,10 +48,9 @@ async def get_setting_value(db: AsyncSession, name: str, model: Type[T] = None):
     return setting.value
 
 
-async def get_supported_models(db: AsyncSession):
+async def get_supported_models():
     """Get the supported models configuration."""
     resp = await get_setting_value(
-        db,
         "SUPPORTED_MODELS",
         SETTINGS_MODELS["SUPPORTED_MODELS"],
     )
@@ -65,7 +67,6 @@ def validate_setting_name(name: str):
 
 
 async def update_setting_value(
-    db: AsyncSession,
     name: str,
     value: Dict[str, Any],
     description: Optional[str] = None,
@@ -84,7 +85,7 @@ async def update_setting_value(
                 detail=f"Invalid setting format: {str(e)}",
             )
 
-    setting = await get_setting(db, name)
+    setting = await get_setting(name)
     if setting:
         setting.value = value
         if description is not None:
@@ -92,9 +93,10 @@ async def update_setting_value(
     else:
         setting = SystemSettings(name=name, value=value, description=description)
 
-    db.add(setting)
-    await db.commit()
-    await db.refresh(setting)
+    async with get_session_context() as db:
+        db.add(setting)
+        await db.commit()
+        await db.refresh(setting)
 
     # Update cache
     await set_cached_setting(name, setting.value)
