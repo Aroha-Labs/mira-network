@@ -9,10 +9,7 @@ from src.router.core.types import ModelPricing, User
 from src.router.models.logs import ApiLogs
 from src.router.db.session import DBSession
 from src.router.core.security import verify_user
-from src.router.utils.network import (
-    get_random_machines,
-    PROXY_PORT,
-)
+from src.router.utils.network import get_random_machines, PROXY_PORT
 from src.router.models.user import User as UserModel, UserCreditsHistory
 from src.router.schemas.ai import AiRequest, VerifyRequest
 import time
@@ -24,7 +21,6 @@ import asyncio
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.router.utils.redis import redis_client  # new import for redis
 from src.router.utils.logger import logger
-import random
 import redis
 
 router = APIRouter()
@@ -344,8 +340,6 @@ async def save_log(
         flow_id=flow_id,
     )
 
-    db.add(api_log)
-
     # Calculate cost and reduce user credits
     prompt_tokens = usage.get("prompt_tokens", 0)
     completion_tokens = usage.get("completion_tokens", 0)
@@ -376,8 +370,10 @@ async def save_log(
         description=f"Used {total_tokens} tokens. Prompt tokens: {prompt_tokens}, Completion tokens: {completion_tokens}",
         created_at=datetime.now(timezone.utc).replace(tzinfo=None),
     )
-    db.add(user_credits_history)
-    await db.commit()
+
+    async with db.begin():
+        db.add(api_log)
+        db.add(user_credits_history)
 
 
 @router.post(
@@ -717,7 +713,7 @@ async def generate(
                 if l.strip():
                     yield f"data: {l}\n\n"
 
-            logger.info(f"Completed streaming response")
+            logger.info("Completed streaming response")
         except Exception as e:
             logger.error(f"Error during streaming: {str(e)}")
             # Send error to client
@@ -738,12 +734,12 @@ async def generate(
                     machine_id=machine.id,
                     flow_id=flow_id,
                 )
-                logger.info(f"Saved log")
+                logger.info("Saved log")
             except Exception as log_error:
                 logger.error(f"Error saving log: {str(log_error)}")
 
     if req.stream:
-        logger.info(f"Starting streaming response")
+        logger.info("Starting streaming response")
         res = StreamingResponse(generate(), media_type="text/event-stream")
     else:
         try:
@@ -773,7 +769,6 @@ async def generate(
             return Response(
                 content=llmres.text,
                 status_code=llmres.status_code,
-                headers=dict(llmres.headers),
             )
         except Exception as e:
             logger.error(f"Error processing non-streaming response: {str(e)}")
