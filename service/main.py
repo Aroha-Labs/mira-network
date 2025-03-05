@@ -381,7 +381,7 @@ async def generate(req: AiRequest):
     # Convert Message objects to dictionaries
     messages = [{"role": msg.role, "content": msg.content} for msg in req.messages]
 
-    return await get_llm_completion_async(
+    response = await get_llm_completion_async(
         model,
         model_provider,
         messages=[Message(**msg) for msg in messages],
@@ -389,6 +389,11 @@ async def generate(req: AiRequest):
         tools=req.tools,
         tool_choice=req.tool_choice,
     )
+
+    # Add MACHINE_IP to response headers
+    response.headers["X-Machine-IP"] = Env.MACHINE_IP
+
+    return response
 
 
 @app.get("/v1/models", tags=["network"])
