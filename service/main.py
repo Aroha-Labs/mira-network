@@ -390,8 +390,13 @@ async def generate(req: AiRequest):
         tool_choice=req.tool_choice,
     )
 
-    # Add MACHINE_IP to response headers
-    response.headers["X-Machine-IP"] = Env.MACHINE_IP
+    # Add MACHINE_IP to response headers with None check
+    if Env.MACHINE_IP:
+        response.headers["X-Machine-IP"] = Env.MACHINE_IP
+    else:
+        # Fallback to local IP if MACHINE_IP is not set
+        local_ip = get_local_ip()
+        response.headers["X-Machine-IP"] = local_ip
 
     return response
 
