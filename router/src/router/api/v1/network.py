@@ -4,6 +4,8 @@ from fastapi import APIRouter, Depends, Response, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlmodel import select
+from src.router.utils.machine import get_machine_id
+from src.router.core.config import MACHINE_ALB_URL
 from src.router.core.settings_types import SETTINGS_MODELS
 from src.router.core.types import ModelPricing, User
 from src.router.models.logs import ApiLogs
@@ -379,10 +381,10 @@ async def chatCompletionGenerate(
     original_req_model = req.model
     req.model = model_config.id
 
-    machine = (await get_random_machines(db, 1))[0]
+    # machine = (await get_random_machines(db, 1))[0]
     # print("machine", machine)
-    proxy_url = f"http://{machine.network_ip}:{PROXY_PORT}/v1/chat/completions"
-    logger.info(f"Using machine {machine.id} at {machine.network_ip}")
+    proxy_url = f"http://{MACHINE_ALB_URL}/v1/chat/completions"
+    logger.info(f"Using machine {MACHINE_ALB_URL}")
 
     # Create a client with increased timeouts and retries
     async with httpx.AsyncClient(
@@ -496,6 +498,15 @@ async def chatCompletionGenerate(
         finally:
             # Always save log even if streaming fails
             try:
+                # get machine_id from ip address of llmres
+
+                machine_ip = llmres.headers.get("X-Machine-IP")
+                logger.info(f"Machine IP: {machine_ip}")
+
+                # get machine_id from redis
+                machine_id = await get_machine_id(machine_ip, db)
+                logger.info(f"Machine ID: {machine_id}")
+
                 await save_log(
                     user=user,
                     user_row=user_row,
@@ -505,7 +516,7 @@ async def chatCompletionGenerate(
                     usage=usage,
                     ttfs=ttfs,
                     timeStart=timeStart,
-                    machine_id=machine.id,
+                    machine_id=machine_id,
                     flow_id=flow_id,
                 )
                 logger.info("Saved log")
@@ -526,6 +537,14 @@ async def chatCompletionGenerate(
                 f"Non-streaming response complete in {time.time() - timeStart:.2f}s"
             )
 
+            machine_ip = llmres.headers.get("X-Machine-IP")
+            logger.info(f"Machine IP: {machine_ip}")
+
+            # get machine_id from redis
+            machine_id = await get_machine_id(machine_ip, db)
+
+            logger.info(f"Machine ID: {machine_id}")
+
             await save_log(
                 user=user,
                 user_row=user_row,
@@ -535,7 +554,7 @@ async def chatCompletionGenerate(
                 usage=usage,
                 ttfs=ttfs,
                 timeStart=timeStart,
-                machine_id=machine.id,
+                machine_id=machine_id,
                 flow_id=flow_id,
             )
 

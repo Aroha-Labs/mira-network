@@ -153,6 +153,9 @@ async def set_liveness(
         },
     )
 
+    # Map machine_id to network_ip
+    await redis_client.set(f"machine_id:{network_ip}", machine_id)
+
     await redis_client.expire(liveness_key, ttl)
 
     # Add debug headers
