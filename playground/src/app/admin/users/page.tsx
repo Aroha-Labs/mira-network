@@ -20,6 +20,7 @@ import {
 import { SortField, SortOrder, User } from "src/types/user";
 import ErrorMessage from "src/components/ErrorMessage";
 import { Menu, Transition } from "@headlessui/react";
+import { useSearchParams, useRouter } from "next/navigation";
 
 interface UsersResponse {
   users: User[];
@@ -59,13 +60,28 @@ const calculateTotalPages = (total: number, perPage: number) => {
 };
 
 const AdminUsers = () => {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { data: userSession } = useSession();
-  const [searchQuery, setSearchQuery] = useState<string>("");
-  const [submittedQuery, setSubmittedQuery] = useState<string>("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [sortBy, setSortBy] = useState<SortField>("created_at");
-  const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
-  const [filters, setFilters] = useState<Filters>({});
+  const [searchQuery, setSearchQuery] = useState<string>(searchParams.get("q") || "");
+  const [submittedQuery, setSubmittedQuery] = useState<string>(
+    searchParams.get("q") || ""
+  );
+  const [currentPage, setCurrentPage] = useState(Number(searchParams.get("page")) || 1);
+  const [sortBy, setSortBy] = useState<SortField>(
+    (searchParams.get("sort_by") as SortField) || "created_at"
+  );
+  const [sortOrder, setSortOrder] = useState<SortOrder>(
+    (searchParams.get("sort_order") as SortOrder) || "desc"
+  );
+  const [filters, setFilters] = useState<Filters>({
+    minCredits: searchParams.get("min_credits")
+      ? Number(searchParams.get("min_credits"))
+      : undefined,
+    maxCredits: searchParams.get("max_credits")
+      ? Number(searchParams.get("max_credits"))
+      : undefined,
+  });
 
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: ["users", submittedQuery, currentPage, sortBy, sortOrder, filters],
@@ -74,16 +90,70 @@ const AdminUsers = () => {
     retry: 2,
   });
 
+  const updateURL = (params: Record<string, string | undefined>) => {
+    const url = new URL(window.location.href);
+    Object.entries(params).forEach(([key, value]) => {
+      if (value) {
+        url.searchParams.set(key, value);
+      } else {
+        url.searchParams.delete(key);
+      }
+    });
+    router.push(url.pathname + url.search);
+  };
+
   const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setCurrentPage(1);
     setSubmittedQuery(searchQuery);
+    updateURL({
+      q: searchQuery,
+      page: "1",
+      sort_by: sortBy,
+      sort_order: sortOrder,
+      min_credits: filters.minCredits?.toString(),
+      max_credits: filters.maxCredits?.toString(),
+    });
   };
 
   const handleClearSearch = () => {
     setSearchQuery("");
     setSubmittedQuery("");
     setCurrentPage(1);
+    updateURL({
+      q: undefined,
+      page: "1",
+      sort_by: sortBy,
+      sort_order: sortOrder,
+      min_credits: filters.minCredits?.toString(),
+      max_credits: filters.maxCredits?.toString(),
+    });
+  };
+
+  const handleSort = (field: SortField) => {
+    const newOrder = sortBy === field && sortOrder === "asc" ? "desc" : "asc";
+    setSortBy(field);
+    setSortOrder(newOrder);
+    updateURL({
+      q: submittedQuery,
+      page: currentPage.toString(),
+      sort_by: field,
+      sort_order: newOrder,
+      min_credits: filters.minCredits?.toString(),
+      max_credits: filters.maxCredits?.toString(),
+    });
+  };
+
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage);
+    updateURL({
+      q: submittedQuery,
+      page: newPage.toString(),
+      sort_by: sortBy,
+      sort_order: sortOrder,
+      min_credits: filters.minCredits?.toString(),
+      max_credits: filters.maxCredits?.toString(),
+    });
   };
 
   // Add keyboard shortcut
@@ -100,7 +170,7 @@ const AdminUsers = () => {
   }, []);
 
   const renderSortingAndFilters = () => (
-    <div className="mb-6 flex flex-wrap items-center gap-4">
+    <div className="flex flex-wrap items-center gap-4 mb-6">
       <Menu as="div" className="relative">
         <Menu.Button className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-white border rounded-lg hover:bg-gray-50">
           <AdjustmentsHorizontalIcon className="w-4 h-4" />
@@ -120,17 +190,14 @@ const AdminUsers = () => {
           leaveFrom="transform opacity-100 scale-100"
           leaveTo="transform opacity-0 scale-95"
         >
-          <Menu.Items className="absolute left-0 z-10 mt-2 w-56 origin-top-left rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-hidden">
+          <Menu.Items className="absolute left-0 z-10 w-56 mt-2 origin-top-left bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-hidden">
             <div className="py-1">
               {["created_at", "last_login_at", "credits", "email", "full_name"].map(
                 (field) => (
                   <Menu.Item key={field}>
                     {({ active }) => (
                       <button
-                        onClick={() => {
-                          setSortBy(field as SortField);
-                          setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-                        }}
+                        onClick={() => handleSort(field as SortField)}
                         className={`
                         ${active ? "bg-gray-100" : ""} 
                         ${sortBy === field ? "font-medium" : ""}
@@ -167,17 +234,17 @@ const AdminUsers = () => {
           leaveFrom="transform opacity-100 scale-100"
           leaveTo="transform opacity-0 scale-95"
         >
-          <Menu.Items className="absolute left-0 z-10 mt-2 w-72 origin-top-left rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-hidden p-4">
+          <Menu.Items className="absolute left-0 z-10 p-4 mt-2 origin-top-left bg-white rounded-md shadow-lg w-72 ring-1 ring-black ring-opacity-5 focus:outline-hidden">
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block mb-1 text-sm font-medium text-gray-700">
                   Credits Range
                 </label>
                 <div className="flex gap-2">
                   <input
                     type="number"
                     placeholder="Min"
-                    className="w-full rounded-md border-gray-300 shadow-xs focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                    className="w-full border-gray-300 rounded-md shadow-xs focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                     value={filters.minCredits || ""}
                     onChange={(e) =>
                       setFilters((f) => ({
@@ -189,7 +256,7 @@ const AdminUsers = () => {
                   <input
                     type="number"
                     placeholder="Max"
-                    className="w-full rounded-md border-gray-300 shadow-xs focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                    className="w-full border-gray-300 rounded-md shadow-xs focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                     value={filters.maxCredits || ""}
                     onChange={(e) =>
                       setFilters((f) => ({
@@ -234,25 +301,25 @@ const AdminUsers = () => {
 
   return (
     <div className="flex-1">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
-        <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 sm:gap-0">
+      <div className="px-4 py-4 mx-auto max-w-7xl sm:px-6 lg:px-8 sm:py-8">
+        <div className="flex flex-col gap-4 mb-6 sm:mb-8 sm:flex-row sm:items-start sm:justify-between sm:gap-0">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+            <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">
               User Management
             </h1>
-            <p className="mt-1 sm:mt-2 text-sm text-gray-600">
+            <p className="mt-1 text-sm text-gray-600 sm:mt-2">
               Manage users, their roles, credits, and view their usage metrics
             </p>
           </div>
           <button
             onClick={() => refetch()}
             disabled={isLoading || isFetching}
-            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed relative"
+            className="relative p-2 text-gray-500 transition-colors rounded-lg hover:text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
             title="Refresh users list"
           >
             <ArrowPathIcon className={`w-5 h-5 ${isFetching ? "animate-spin" : ""}`} />
             {isFetching && (
-              <span className="absolute top-1/2 -translate-y-1/2 -left-24 px-2 py-1 text-xs text-white bg-gray-900 rounded-sm shadow-xs whitespace-nowrap">
+              <span className="absolute px-2 py-1 text-xs text-white -translate-y-1/2 bg-gray-900 rounded-sm shadow-xs top-1/2 -left-24 whitespace-nowrap">
                 Refreshing...
               </span>
             )}
@@ -261,9 +328,9 @@ const AdminUsers = () => {
 
         <form onSubmit={handleSearch} className="mb-6 sm:mb-8">
           <div className="relative max-w-2xl mx-auto">
-            <div className="flex items-center bg-white shadow-xs border border-gray-300 rounded-lg hover:shadow-md transition-shadow duration-200">
+            <div className="flex items-center transition-shadow duration-200 bg-white border border-gray-300 rounded-lg shadow-xs hover:shadow-md">
               <div className="pl-4">
-                <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
+                <MagnifyingGlassIcon className="w-5 h-5 text-gray-400" />
               </div>
               <input
                 id="user-search"
@@ -271,7 +338,7 @@ const AdminUsers = () => {
                 placeholder='Search users... (Press "/" to focus)'
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full px-3 py-3 bg-transparent border-0 focus:ring-0 focus:outline-hidden text-gray-900 placeholder-gray-500"
+                className="w-full px-3 py-3 text-gray-900 placeholder-gray-500 bg-transparent border-0 focus:ring-0 focus:outline-hidden"
               />
               <div className="flex items-center pr-2 space-x-2">
                 {(searchQuery || submittedQuery) && (
@@ -282,7 +349,7 @@ const AdminUsers = () => {
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
-                      className="h-5 w-5"
+                      className="w-5 h-5"
                       viewBox="0 0 20 20"
                       fill="currentColor"
                     >
@@ -294,7 +361,7 @@ const AdminUsers = () => {
                     </svg>
                   </button>
                 )}
-                <div className="h-6 w-px bg-gray-300"></div>
+                <div className="w-px h-6 bg-gray-300"></div>
                 <button
                   type="submit"
                   disabled={isLoading}
@@ -306,7 +373,7 @@ const AdminUsers = () => {
             </div>
           </div>
           {submittedQuery && (
-            <div className="mt-3 text-sm text-gray-600 text-center">
+            <div className="mt-3 text-sm text-center text-gray-600">
               Showing results for: &quot;{submittedQuery}&quot;
             </div>
           )}
@@ -328,7 +395,7 @@ const AdminUsers = () => {
                 <Loading />
               </div>
             ) : data?.users.length === 0 ? (
-              <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
+              <div className="py-12 text-center bg-white border border-gray-200 rounded-xl">
                 <div className="text-gray-500">
                   No users found {submittedQuery && `for "${submittedQuery}"`}
                 </div>
@@ -346,23 +413,23 @@ const AdminUsers = () => {
           data.page >= calculateTotalPages(data.total, data.per_page) && (
             <div className="mt-8 mb-6 text-center">
               <div className="inline-flex items-center gap-3">
-                <div className="h-px w-12 bg-gray-200"></div>
+                <div className="w-12 h-px bg-gray-200"></div>
                 <span className="text-sm text-gray-500 font-medium inline-flex items-center gap-1.5">
                   <FlagIcon className="w-4 h-4" />
                   End of results
                 </span>
-                <div className="h-px w-12 bg-gray-200"></div>
+                <div className="w-12 h-px bg-gray-200"></div>
               </div>
             </div>
           )}
 
         {/* Pagination Controls */}
         {!isError && data && (
-          <div className="mt-6 flex justify-center items-center gap-3">
+          <div className="flex items-center justify-center gap-3 mt-6">
             <button
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
               disabled={currentPage === 1 || isLoading}
-              className="px-4 py-2 bg-white border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors inline-flex items-center gap-1"
+              className="inline-flex items-center gap-1 px-4 py-2 transition-colors bg-white border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
             >
               <ChevronLeftIcon className="w-4 h-4" />
               Previous
@@ -379,13 +446,13 @@ const AdminUsers = () => {
               )}
             </div>
             <button
-              onClick={() => setCurrentPage((p) => p + 1)}
+              onClick={() => handlePageChange(currentPage + 1)}
               disabled={
                 !data ||
                 data.page >= calculateTotalPages(data.total, data.per_page) ||
                 isLoading
               }
-              className="px-4 py-2 bg-white border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors inline-flex items-center gap-1"
+              className="inline-flex items-center gap-1 px-4 py-2 transition-colors bg-white border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
             >
               Next
               <ChevronRightIcon className="w-4 h-4" />
