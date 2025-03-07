@@ -5,7 +5,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlmodel import select
 from src.router.utils.machine import get_machine_id
-from src.router.core.config import MACHINE_ALB_URL
+from src.router.core.config import NODE_SERVICE_URL
 from src.router.core.settings_types import SETTINGS_MODELS
 from src.router.core.types import ModelPricing, User
 from src.router.models.logs import ApiLogs
@@ -27,9 +27,7 @@ from src.router.api.v1.docs.network import chatCompletionGenerateDoc, list_model
 
 router = APIRouter()
 
-transport = httpx.AsyncHTTPTransport(
-    retries=3,
-)
+transport = httpx.AsyncHTTPTransport(retries=3)
 
 
 @router.post(
@@ -377,8 +375,8 @@ async def chatCompletionGenerate(
 
     # machine = (await get_random_machines(db, 1))[0]
     # print("machine", machine)
-    proxy_url = f"http://{MACHINE_ALB_URL}/v1/chat/completions"
-    logger.info(f"Using machine {MACHINE_ALB_URL}")
+    proxy_url = f"{NODE_SERVICE_URL}/v1/chat/completions"
+    logger.info(f"Using machine {NODE_SERVICE_URL}")
 
     # Create a client with increased timeouts and retries
     async with httpx.AsyncClient(
