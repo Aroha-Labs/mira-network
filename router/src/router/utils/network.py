@@ -1,7 +1,4 @@
-import random
-from typing import List, Dict, Optional
-import time
-import asyncio
+from typing import List
 import itertools
 
 from fastapi import HTTPException
@@ -12,9 +9,6 @@ from src.router.models.machines import Machine
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.router.utils.logger import logger
 
-from async_lru import alru_cache
-
-PROXY_PORT = 34523
 
 # Create a global counter for round-robin selection
 _machine_counter = itertools.cycle(range(1000000))  # Large enough cycle
