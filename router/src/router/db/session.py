@@ -2,7 +2,6 @@ from contextlib import asynccontextmanager
 import os
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
-from sqlalchemy.pool import NullPool
 from typing import Annotated, AsyncGenerator
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -15,7 +14,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 # )
 
 async_engine = create_async_engine(
-    os.getenv("ASYNC_DB_CONNECTION_STRING"), poolclass=NullPool
+    url=os.getenv("ASYNC_DB_CONNECTION_STRING"),
 )
 
 # Create Async Session Factory
