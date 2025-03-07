@@ -1,5 +1,5 @@
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import select
+from src.router.db.session import DBSession
 from src.router.models.machines import Machine
 import logging
 from src.router.utils.redis import redis_client
@@ -7,7 +7,7 @@ from src.router.utils.redis import redis_client
 logger = logging.getLogger(__name__)
 
 
-async def get_machine_id(machine_ip: str, db: AsyncSession) -> str:
+async def get_machine_id(machine_ip: str, db: DBSession) -> str:
     """
     Get machine ID from Redis cache or database.
 
