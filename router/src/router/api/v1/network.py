@@ -11,7 +11,7 @@ from src.router.core.types import ModelPricing, User
 from src.router.models.logs import ApiLogs
 from src.router.db.session import DBSession
 from src.router.core.security import verify_user
-from src.router.utils.network import get_random_machines, PROXY_PORT
+from src.router.utils.network import get_random_machines
 from src.router.models.user import User as UserModel, UserCreditsHistory
 from src.router.schemas.ai import AiRequest, VerifyRequest
 import time
@@ -23,7 +23,6 @@ import asyncio
 from src.router.utils.redis import redis_client  # new import for redis
 from src.router.utils.logger import logger
 import redis
-from src.router.db.session import get_session_context
 from src.router.api.v1.docs.network import chatCompletionGenerateDoc, list_models_doc
 
 router = APIRouter()
@@ -177,7 +176,7 @@ async def verify(req: VerifyRequest, db: DBSession):
 
     async def process_model(model, idx):
         machine = await get_random_machines(db, 1)
-        proxy_url = f"http://{machine[0].network_ip}:{PROXY_PORT}/v1/verify"
+        proxy_url = f"http://{machine[0].network_ip}:34523/v1/verify"
         async with httpx.AsyncClient(timeout=httpx.Timeout(60.0)) as client:
             response = await client.post(
                 proxy_url,
@@ -252,7 +251,7 @@ async def save_log(
     timeStart: float,
     machine_id: int,
     flow_id: Optional[str] = None,
-) -> None:
+):
     sm = await get_setting_value(
         "SUPPORTED_MODELS",
         SETTINGS_MODELS["SUPPORTED_MODELS"],
@@ -273,61 +272,56 @@ async def save_log(
 
     req.model = original_req_model
 
-    # Create a new session context for this operation
-    async with get_session_context() as session:
-        async with session.begin():  # Direct transaction management
-            # Log the request
-            api_log = ApiLogs(
-                user_id=user.id,
-                api_key_id=user.api_key_id,
-                payload=req.model_dump_json(),
-                request_payload=req.model_dump(),
-                ttft=ttfs,
-                response=result_text,
-                prompt_tokens=usage.get("prompt_tokens", 0),
-                completion_tokens=usage.get("completion_tokens", 0),
-                total_tokens=usage.get("total_tokens", 0),
-                total_response_time=time.time() - timeStart,
-                model=req.model,
-                model_pricing=model_pricing,
-                machine_id=str(machine_id),
-                flow_id=flow_id,
-            )
+    # Log the request
+    api_log = ApiLogs(
+        user_id=user.id,
+        api_key_id=user.api_key_id,
+        payload=req.model_dump_json(),
+        request_payload=req.model_dump(),
+        ttft=ttfs,
+        response=result_text,
+        prompt_tokens=usage.get("prompt_tokens", 0),
+        completion_tokens=usage.get("completion_tokens", 0),
+        total_tokens=usage.get("total_tokens", 0),
+        total_response_time=time.time() - timeStart,
+        model=req.model,
+        model_pricing=model_pricing,
+        machine_id=str(machine_id),
+        flow_id=flow_id,
+    )
 
-            # Calculate cost and reduce user credits
-            prompt_tokens = usage.get("prompt_tokens", 0)
-            completion_tokens = usage.get("completion_tokens", 0)
-            total_tokens = usage.get("total_tokens", 0)
+    # Calculate cost and reduce user credits
+    prompt_tokens = usage.get("prompt_tokens", 0)
+    completion_tokens = usage.get("completion_tokens", 0)
+    total_tokens = usage.get("total_tokens", 0)
 
-            prompt_tokens_cost = prompt_tokens * model_p.prompt_token
-            completion_tokens_cost = completion_tokens * model_p.completion_token
+    prompt_tokens_cost = prompt_tokens * model_p.prompt_token
+    completion_tokens_cost = completion_tokens * model_p.completion_token
 
-            cost = prompt_tokens_cost + completion_tokens_cost
+    cost = prompt_tokens_cost + completion_tokens_cost
 
-            # NEW: Use redis to manage user's credits instead of updating the db
-            redis_key = f"user_credit:{user.id}"
-            current_credit = await redis_client.get(redis_key)
-            if current_credit is None:
-                current_credit = user_row.credits
-                await redis_client.set(redis_key, current_credit)
-            else:
-                current_credit = float(current_credit)
-            new_credit = current_credit - cost
+    # NEW: Use redis to manage user's credits instead of updating the db
+    redis_key = f"user_credit:{user.id}"
+    current_credit = await redis_client.get(redis_key)
+    if current_credit is None:
+        current_credit = user_row.credits
+        await redis_client.set(redis_key, current_credit)
+    else:
+        current_credit = float(current_credit)
+    new_credit = current_credit - cost
 
-            await redis_client.set(redis_key, new_credit)
-            # Removed user_row credit update and db.add(user_row)
+    await redis_client.set(redis_key, new_credit)
+    # Removed user_row credit update and db.add(user_row)
 
-            # Update user credit history
-            user_credits_history = UserCreditsHistory(
-                user_id=user.id,
-                amount=-cost,
-                description=f"Used {total_tokens} tokens. Prompt tokens: {prompt_tokens}, Completion tokens: {completion_tokens}",
-                created_at=datetime.now(timezone.utc).replace(tzinfo=None),
-            )
+    # Update user credit history
+    user_credits_history = UserCreditsHistory(
+        user_id=user.id,
+        amount=-cost,
+        description=f"Used {total_tokens} tokens. Prompt tokens: {prompt_tokens}, Completion tokens: {completion_tokens}",
+        created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+    )
 
-            session.add(api_log)
-            session.add(user_credits_history)
-            # Session will commit when transaction exits context
+    return api_log, user_credits_history
 
 
 @router.post(
@@ -499,7 +493,6 @@ async def chatCompletionGenerate(
             # Always save log even if streaming fails
             try:
                 # get machine_id from ip address of llmres
-
                 machine_ip = llmres.headers.get("X-Machine-IP")
                 logger.info(f"Machine IP: {machine_ip}")
 
@@ -507,7 +500,7 @@ async def chatCompletionGenerate(
                 machine_id = await get_machine_id(machine_ip, db)
                 logger.info(f"Machine ID: {machine_id}")
 
-                await save_log(
+                api_log, user_credit_history = await save_log(
                     user=user,
                     user_row=user_row,
                     req=req,
@@ -519,54 +512,60 @@ async def chatCompletionGenerate(
                     machine_id=machine_id,
                     flow_id=flow_id,
                 )
-                logger.info("Saved log")
+
+                db.add(api_log)
+                db.add(user_credit_history)
+                await db.commit()
             except Exception as log_error:
                 logger.error(f"Error saving log: {str(log_error)}")
 
     if req.stream:
         logger.info("Starting streaming response")
         res = StreamingResponse(generate(), media_type="text/event-stream")
-    else:
-        try:
-            response_json = llmres.json()
-            result_text = response_json["choices"][0]["message"]["content"]
-            ttfs = time.time() - timeStart
-            usage = response_json.get("usage", {})
+        return res
 
-            logger.info(
-                f"Non-streaming response complete in {time.time() - timeStart:.2f}s"
-            )
+    try:
+        response_json = llmres.json()
+        result_text = response_json["choices"][0]["message"]["content"]
+        ttfs = time.time() - timeStart
+        usage = response_json.get("usage", {})
 
-            machine_ip = llmres.headers.get("X-Machine-IP")
-            logger.info(f"Machine IP: {machine_ip}")
+        logger.info(
+            f"Non-streaming response complete in {time.time() - timeStart:.2f}s"
+        )
 
-            # get machine_id from redis
-            machine_id = await get_machine_id(machine_ip, db)
+        machine_ip = llmres.headers.get("X-Machine-IP")
+        logger.info(f"Machine IP: {machine_ip}")
 
-            logger.info(f"Machine ID: {machine_id}")
+        # get machine_id from redis
+        machine_id = await get_machine_id(machine_ip, db)
 
-            await save_log(
-                user=user,
-                user_row=user_row,
-                req=req,
-                original_req_model=original_req_model,
-                result_text=result_text,
-                usage=usage,
-                ttfs=ttfs,
-                timeStart=timeStart,
-                machine_id=machine_id,
-                flow_id=flow_id,
-            )
+        logger.info(f"Machine ID: {machine_id}")
 
-            return Response(
-                content=llmres.text,
-                status_code=llmres.status_code,
-            )
-        except Exception as e:
-            logger.error(f"Error processing non-streaming response: {str(e)}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Error processing response: {str(e)}",
-            )
+        api_log, user_credit_history = await save_log(
+            user=user,
+            user_row=user_row,
+            req=req,
+            original_req_model=original_req_model,
+            result_text=result_text,
+            usage=usage,
+            ttfs=ttfs,
+            timeStart=timeStart,
+            machine_id=machine_id,
+            flow_id=flow_id,
+        )
 
-    return res
+        db.add(api_log)
+        db.add(user_credit_history)
+        await db.commit()
+
+        return Response(
+            content=llmres.text,
+            status_code=llmres.status_code,
+        )
+    except Exception as e:
+        logger.error(f"Error processing non-streaming response: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error processing response: {str(e)}",
+        )
