@@ -22,7 +22,6 @@ from src.router.utils.settings import get_supported_models
 import asyncio
 from src.router.utils.redis import redis_client  # new import for redis
 from src.router.utils.logger import logger
-import redis
 from src.router.api.v1.docs.network import chatCompletionGenerateDoc, list_models_doc
 
 router = APIRouter()
@@ -238,9 +237,29 @@ async def list_models() -> ModelListRes:
     return response
 
 
+async def get_user_credits(user_id: int, db: DBSession):
+    redis_key = f"user_credit:{user_id}"
+    current_credit = await redis_client.get(redis_key)
+
+    if current_credit is not None:
+        current_credit = float(current_credit)
+        return current_credit
+
+    user_credits = await db.exec(
+        select(UserModel.credits).where(UserModel.user_id == user_id)
+    )
+    user_credits = user_credits.one_or_none()
+    if user_credits is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    current_credit = user_credits
+    await redis_client.set(redis_key, current_credit)
+    return current_credit
+
+
 async def save_log(
     user: User,
-    user_row: UserModel,
+    user_credits: float,
     req: AiRequest,
     original_req_model: str,
     result_text: str,
@@ -300,16 +319,9 @@ async def save_log(
 
     # NEW: Use redis to manage user's credits instead of updating the db
     redis_key = f"user_credit:{user.id}"
-    current_credit = await redis_client.get(redis_key)
-    if current_credit is None:
-        current_credit = user_row.credits
-        await redis_client.set(redis_key, current_credit)
-    else:
-        current_credit = float(current_credit)
-    new_credit = current_credit - cost
+    new_credit = user_credits - cost
 
     await redis_client.set(redis_key, new_credit)
-    # Removed user_row credit update and db.add(user_row)
 
     # Update user credit history
     user_credits_history = UserCreditsHistory(
@@ -337,33 +349,9 @@ async def chatCompletionGenerate(
 ) -> Response:
     timeStart = time.time()
 
-    user_row = await db.exec(select(UserModel).where(UserModel.user_id == user.id))
-    user_row = user_row.one_or_none()
-
-    if not user_row:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    # Check user's credit using Redis: initialize if missing, then verify
-    redis_key = f"user_credit:{user.id}"
-    try:
-        current_credit = await redis_client.get(redis_key)
-        if current_credit is None:
-            current_credit = user_row.credits
-            await redis_client.set(redis_key, str(current_credit))
-        else:
-            current_credit = float(current_credit)
-
-        logger.info(f"Current credit: {current_credit} (type: {type(current_credit)})")
-
-        if float(current_credit) <= 0:
-            logger.info("Credit check failed, raising 402")
-            raise HTTPException(status_code=402, detail="Insufficient credits")
-
-    except (redis.RedisError, ValueError) as e:  # Only catch Redis-related errors
-        logger.error(f"Redis error checking credits: {str(e)}")
-        # Fallback to database if Redis fails
-        if float(user_row.credits) <= 0:
-            raise HTTPException(status_code=402, detail="Insufficient credits")
+    user_credits = await get_user_credits(user.id, db)
+    if user_credits <= 0:
+        raise HTTPException(status_code=402, detail="Insufficient credits")
 
     supported_models = await get_supported_models()
     if req.model not in supported_models:
@@ -500,7 +488,7 @@ async def chatCompletionGenerate(
 
                 api_log, user_credit_history = await save_log(
                     user=user,
-                    user_row=user_row,
+                    user_credits=user_credits,
                     req=req,
                     original_req_model=original_req_model,
                     result_text=result_text,
@@ -542,7 +530,7 @@ async def chatCompletionGenerate(
 
         api_log, user_credit_history = await save_log(
             user=user,
-            user_row=user_row,
+            user_credits=user_credits,
             req=req,
             original_req_model=original_req_model,
             result_text=result_text,
