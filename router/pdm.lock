@@ -5,7 +5,7 @@
 groups = ["default"]
 strategy = []
 lock_version = "4.5.0"
-content_hash = "sha256:7fb1630b8687caf7226d3edca63e898b4fb9793ecfa6028e463cd9afaf0cdaea"
+content_hash = "sha256:8f16e9ec3b4c483a3492dc96cc0717ac6722a298837d9d8e85e0ea15dbb4c8d0"
 
 [[metadata.targets]]
 requires_python = "==3.11.*"
@@ -440,6 +440,14 @@ files = [
 ]
 
 [[package]]
+name = "events"
+version = "0.5"
+summary = "Bringing the elegance of C# EventHandler to Python"
+files = [
+    {file = "Events-0.5-py3-none-any.whl", hash = "sha256:a7286af378ba3e46640ac9825156c93bdba7502174dd696090fdfcd4d80a1abd"},
+]
+
+[[package]]
 name = "fastapi"
 version = "0.115.5"
 requires_python = ">=3.8"
@@ -707,6 +715,24 @@ files = [
     {file = "newrelic-10.6.0-cp311-cp311-musllinux_1_2_aarch64.whl", hash = "sha256:659991fc2f5149b4f7711e7f51c0a76ac1bdef7ca0b5f1b4806c21ed05553963"},
     {file = "newrelic-10.6.0-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:c657a50cc831d80bff310022106e1086c224b50a114241cb61194921498bcd5c"},
     {file = "newrelic-10.6.0.tar.gz", hash = "sha256:46d6f39a9cb89cca2440211e272e6a13bb89802865a4c2b2cd9d613c1488c3ba"},
+]
+
+[[package]]
+name = "opensearch-py"
+version = "2.8.0"
+requires_python = "<4,>=3.8"
+summary = "Python client for OpenSearch"
+dependencies = [
+    "Events",
+    "certifi>=2024.07.04",
+    "python-dateutil",
+    "requests<3.0.0,>=2.32.0",
+    "urllib3!=2.2.0,!=2.2.1,<3,>=1.26.19; python_version >= \"3.10\"",
+    "urllib3<1.27,>=1.26.19; python_version < \"3.10\"",
+]
+files = [
+    {file = "opensearch_py-2.8.0-py3-none-any.whl", hash = "sha256:52c60fdb5d4dcf6cce3ee746c13b194529b0161e0f41268b98ab8f1624abe2fa"},
+    {file = "opensearch_py-2.8.0.tar.gz", hash = "sha256:6598df0bc7a003294edd0ba88a331e0793acbb8c910c43edf398791e3b2eccda"},
 ]
 
 [[package]]
