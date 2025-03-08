@@ -1,3 +1,5 @@
+import { Message } from "src/utils/chat";
+
 export interface ModelPricing {
   label: string;
   prompt_token: number;
@@ -7,7 +9,9 @@ export interface ModelPricing {
 export interface ApiLog {
   id: number;
   user_id: string;
-  payload?: string;
+  payload: {
+    messages: Message[];
+  };
   request_payload?: Record<string, unknown>;
   ttft: number;
   response: string;
