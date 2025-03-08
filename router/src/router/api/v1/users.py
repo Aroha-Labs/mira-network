@@ -1,10 +1,8 @@
 from fastapi import APIRouter, Depends
-from sqlmodel import select
+from src.router.utils.user import get_user_credits
 from src.router.core.types import User
-from src.router.models.user import User as UserModel
 from src.router.db.session import DBSession
 from src.router.core.security import verify_token
-from src.router.utils.redis import redis_client  # new import for redis
 
 router = APIRouter()
 
@@ -46,24 +44,8 @@ router = APIRouter()
         },
     },
 )
-async def get_current_user(
-    db: DBSession,
-    user: User = Depends(verify_token),
-) -> dict | None:
-    # Retrieve user data from the DB
-    user_data = await db.exec(select(UserModel).where(UserModel.user_id == user.id))
-    user_data = user_data.first()
-    if not user_data:
-        return None
-
-    # Get updated credits from Redis; fallback to DB value if missing
-    redis_key = f"user_credit:{user.id}"
-    credit = await redis_client.get(redis_key)
-    if credit is None:
-        credit = user_data.credits
-    else:
-        credit = float(credit)
-
-    data = user_data.model_dump()
-    data["credits"] = credit
+async def get_current_user(db: DBSession, user: User = Depends(verify_token)):
+    user_credits = await get_user_credits(user.id, db)
+    data = user.model_dump()
+    data["credits"] = user_credits
     return data
