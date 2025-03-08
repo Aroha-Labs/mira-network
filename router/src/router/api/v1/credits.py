@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends
-from sqlmodel import select
-from src.router.core.types import User
-from src.router.models.user import User as UserModel, UserCreditsHistory
+from fastapi import APIRouter, Depends, Query
+from src.router.utils.user import get_user_credits
+from src.router.models.user import User
 from src.router.db.session import DBSession
 from src.router.core.security import verify_user
+from datetime import datetime
+from src.router.utils.opensearch import opensearch_client, OPENSEARCH_CREDITS_INDEX
 
 router = APIRouter()
 
@@ -58,10 +59,9 @@ router = APIRouter()
         },
     },
 )
-async def get_user_credits(db: DBSession, user: User = Depends(verify_user)):
-    user_data = await db.exec(select(UserModel).where(UserModel.user_id == user.id))
-    user_data = user_data.one()
-    return {"credits": user_data.credits if user_data else 0}
+async def get_credit_balance(db: DBSession, user: User = Depends(verify_user)):
+    user_credits = await get_user_credits(user.id, db)
+    return {"credits": user_credits}
 
 
 @router.get(
@@ -146,10 +146,94 @@ async def get_user_credits(db: DBSession, user: User = Depends(verify_user)):
         },
     },
 )
-async def get_user_credits_history(db: DBSession, user: User = Depends(verify_user)):
-    history = await db.exec(
-        select(UserCreditsHistory)
-        .where(UserCreditsHistory.user_id == user.id)
-        .order_by(UserCreditsHistory.created_at.desc())
-    )
-    return history.all()
+async def get_user_credits_history(
+    user: User = Depends(verify_user),
+    page: int = Query(default=1, ge=1, description="Page number"),
+    size: int = Query(default=20, ge=1, le=100, description="Items per page"),
+):
+    start = (page - 1) * size
+
+    query = {
+        "query": {
+            "bool": {
+                "must": [
+                    {"match": {"user_id": user.id}},
+                    {"term": {"doc_type": "credit_history"}},
+                ]
+            }
+        },
+        "from": start,
+        "size": size,
+        "sort": [{"timestamp": {"order": "desc"}}],
+        "track_total_hits": True,
+    }
+
+    response = opensearch_client.search(index=OPENSEARCH_CREDITS_INDEX, body=query)
+    total = response["hits"]["total"]["value"]
+    total_pages = (total + size - 1) // size
+
+    history = []
+    for hit in response["hits"]["hits"]:
+        source = hit["_source"]
+        history.append(
+            {
+                "id": hit["_id"],
+                "user_id": source.get("user_id", ""),
+                "amount": source.get("amount", None),
+                "description": source.get("description", ""),
+                "created_at": datetime.fromisoformat(
+                    source["timestamp"].replace("Z", "+00:00")
+                ),
+            }
+        )
+
+    return {
+        "items": history,
+        "total": total,
+        "page": page,
+        "size": size,
+        "pages": total_pages,
+    }
+
+
+@router.get(
+    "/user-credits-stats",
+    summary="Get User Credits Statistics",
+    response_description="Returns the user's credit usage statistics",
+)
+async def get_user_credits_stats(user: User = Depends(verify_user)):
+    query = {
+        "query": {
+            "bool": {
+                "must": [
+                    {"match": {"user_id": user.id}},
+                    {"term": {"doc_type": "credit_history"}},
+                ]
+            }
+        },
+        "aggs": {
+            "total_credits_added": {
+                "sum": {
+                    "script": {
+                        "source": "doc['amount'].value > 0 ? doc['amount'].value : 0"
+                    }
+                }
+            },
+            "total_credits_used": {
+                "sum": {
+                    "script": {
+                        "source": "doc['amount'].value < 0 ? Math.abs(doc['amount'].value) : 0"
+                    }
+                }
+            },
+        },
+        "size": 0,
+    }
+
+    response = opensearch_client.search(index=OPENSEARCH_CREDITS_INDEX, body=query)
+    aggs = response["aggregations"]
+
+    return {
+        "total_credits_added": aggs["total_credits_added"]["value"],
+        "total_credits_used": aggs["total_credits_used"]["value"],
+    }
