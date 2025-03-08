@@ -22,7 +22,17 @@ from src.router.utils.settings import get_supported_models
 import asyncio
 from src.router.utils.redis import redis_client  # new import for redis
 from src.router.utils.logger import logger
-from src.router.api.v1.docs.network import chatCompletionGenerateDoc, list_models_doc
+from src.router.api.v1.docs.network import (
+    chatCompletionGenerateDoc,
+    list_models_doc,
+    verify_doc,
+)
+from src.router.utils.opensearch import (
+    opensearch_client,
+    OPENSEARCH_MODEL_USAGE_INDEX,
+    OPENSEARCH_CREDITS_INDEX,
+)
+
 
 router = APIRouter()
 
@@ -32,121 +42,9 @@ transport = httpx.AsyncHTTPTransport(retries=3)
 @router.post(
     "/v1/verify",
     summary="Verify Model Response",
-    description="""Verifies responses from multiple AI models against a given prompt.
-
-### Authentication
-- No authentication required
-- Rate limiting may apply
-
-### Request Body
-```json
-{
-    "messages": [
-        {
-            "role": "user" | "assistant" | "system",
-            "content": string
-        }
-    ],
-    "models": string[],  // List of model identifiers to verify with
-    "min_yes": int      // Minimum number of 'yes' responses required
-}
-```
-
-### Response Format
-```json
-{
-    "result": "yes" | "no",
-    "results": [
-        {
-            "machine": {
-                "machine_uid": string,
-                "network_ip": string
-            },
-            "result": "yes" | "no",
-            "response": {
-                // Raw response from the model
-                "result": "yes" | "no",
-                // Additional model-specific response data
-            }
-        }
-    ]
-}
-```
-
-### Error Responses
-- `400 Bad Request`:
-    ```json
-    {
-        "detail": "At least one model is required"
-    }
-    ```
-    ```json
-    {
-        "detail": "Minimum yes must be at least 1"
-    }
-    ```
-    ```json
-    {
-        "detail": "Minimum yes must be less than or equal to the number of models"
-    }
-    ```
-
-### Notes
-- Distributes verification requests across available machines
-- Returns aggregated results from all models
-- Overall result is 'yes' if at least min_yes models return 'yes'
-- Each model's individual response is included in the results array""",
-    response_description="Returns verification results from all models",
-    responses={
-        200: {
-            "description": "Successfully verified responses",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "result": "yes",
-                        "results": [
-                            {
-                                "machine": {
-                                    "machine_uid": "machine_123",
-                                    "network_ip": "10.0.0.1",
-                                },
-                                "result": "yes",
-                                "response": {"result": "yes", "confidence": 0.95},
-                            },
-                            {
-                                "machine": {
-                                    "machine_uid": "machine_456",
-                                    "network_ip": "10.0.0.2",
-                                },
-                                "result": "no",
-                                "response": {"result": "no", "confidence": 0.75},
-                            },
-                        ],
-                    }
-                }
-            },
-        },
-        400: {
-            "description": "Invalid request parameters",
-            "content": {
-                "application/json": {
-                    "examples": {
-                        "no_models": {
-                            "value": {"detail": "At least one model is required"}
-                        },
-                        "invalid_min_yes": {
-                            "value": {"detail": "Minimum yes must be at least 1"}
-                        },
-                        "min_yes_too_high": {
-                            "value": {
-                                "detail": "Minimum yes must be less than or equal to the number of models"
-                            }
-                        },
-                    }
-                }
-            },
-        },
-    },
+    description=verify_doc["description"],
+    response_description=verify_doc["response_description"],
+    responses=verify_doc["responses"],
 )
 async def verify(req: VerifyRequest, db: DBSession):
     if len(req.models) < 1:
@@ -331,6 +229,75 @@ async def save_log(
         created_at=datetime.now(timezone.utc).replace(tzinfo=None),
     )
 
+    # Prepare documents for OpenSearch
+    model_usage_doc = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "user_id": user.id,
+        "api_key_id": user.api_key_id,
+        "model": req.model,
+        "original_model": original_req_model,
+        "prompt_tokens": usage.get("prompt_tokens", 0),
+        "completion_tokens": usage.get("completion_tokens", 0),
+        "total_tokens": usage.get("total_tokens", 0),
+        "ttft": ttfs,
+        "total_response_time": time.time() - timeStart,
+        "machine_id": str(machine_id),
+        "flow_id": flow_id,
+        "cost": cost,
+        "request": req.model_dump(),
+        "response": result_text,
+        "doc_type": "model_usage",
+    }
+
+    credit_history_doc = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "user_id": user.id,
+        "doc_type": "credit_history",
+        "amount": -cost,
+        "previous_balance": user_credits,
+        "new_balance": new_credit,
+        "model": original_req_model,
+        "machine_id": str(machine_id),
+        "flow_id": flow_id,
+        "tokens": {
+            "prompt": prompt_tokens,
+            "completion": completion_tokens,
+            "total": total_tokens,
+        },
+        "costs": {
+            "prompt": prompt_tokens_cost,
+            "completion": completion_tokens_cost,
+            "total": cost,
+        },
+        "metrics": {
+            "ttft": ttfs,
+            "total_response_time": time.time() - timeStart,
+        },
+        "description": f"Used {total_tokens} tokens. Prompt tokens: {prompt_tokens}, Completion tokens: {completion_tokens}",
+    }
+
+    try:
+        # Send both documents to OpenSearch asynchronously
+        await asyncio.gather(
+            asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: opensearch_client.index(
+                    index=OPENSEARCH_MODEL_USAGE_INDEX,
+                    body=model_usage_doc,
+                ),
+            ),
+            asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: opensearch_client.index(
+                    index=OPENSEARCH_CREDITS_INDEX,
+                    body=credit_history_doc,
+                ),
+            ),
+        )
+    except Exception as e:
+        logger.error(f"Failed to send logs to OpenSearch: {str(e)}")
+        # Continue execution even if OpenSearch fails
+
     return api_log, user_credits_history
 
 
@@ -503,6 +470,7 @@ async def chatCompletionGenerate(
                 db.add(user_credit_history)
                 await db.commit()
             except Exception as log_error:
+                await db.rollback()
                 logger.error(f"Error saving log: {str(log_error)}")
 
     if req.stream:
@@ -550,6 +518,7 @@ async def chatCompletionGenerate(
             status_code=llmres.status_code,
         )
     except Exception as e:
+        await db.rollback()
         logger.error(f"Error processing non-streaming response: {str(e)}")
         raise HTTPException(
             status_code=500,

@@ -235,3 +235,122 @@ list_models_doc = {
         }
     },
 }
+
+
+verify_doc = {
+    "description": """Verifies responses from multiple AI models against a given prompt.
+
+### Authentication
+- No authentication required
+- Rate limiting may apply
+
+### Request Body
+```json
+{
+    "messages": [
+        {
+            "role": "user" | "assistant" | "system",
+            "content": string
+        }
+    ],
+    "models": string[],  // List of model identifiers to verify with
+    "min_yes": int      // Minimum number of 'yes' responses required
+}
+```
+
+### Response Format
+```json
+{
+    "result": "yes" | "no",
+    "results": [
+        {
+            "machine": {
+                "machine_uid": string,
+                "network_ip": string
+            },
+            "result": "yes" | "no",
+            "response": {
+                // Raw response from the model
+                "result": "yes" | "no",
+                // Additional model-specific response data
+            }
+        }
+    ]
+}
+```
+
+### Error Responses
+- `400 Bad Request`:
+    ```json
+    {
+        "detail": "At least one model is required"
+    }
+    ```
+    ```json
+    {
+        "detail": "Minimum yes must be at least 1"
+    }
+    ```
+    ```json
+    {
+        "detail": "Minimum yes must be less than or equal to the number of models"
+    }
+    ```
+
+### Notes
+- Distributes verification requests across available machines
+- Returns aggregated results from all models
+- Overall result is 'yes' if at least min_yes models return 'yes'
+- Each model's individual response is included in the results array""",
+    "response_description": "Returns verification results from all models",
+    "responses": {
+        200: {
+            "description": "Successfully verified responses",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "result": "yes",
+                        "results": [
+                            {
+                                "machine": {
+                                    "machine_uid": "machine_123",
+                                    "network_ip": "10.0.0.1",
+                                },
+                                "result": "yes",
+                                "response": {"result": "yes", "confidence": 0.95},
+                            },
+                            {
+                                "machine": {
+                                    "machine_uid": "machine_456",
+                                    "network_ip": "10.0.0.2",
+                                },
+                                "result": "no",
+                                "response": {"result": "no", "confidence": 0.75},
+                            },
+                        ],
+                    }
+                }
+            },
+        },
+        400: {
+            "description": "Invalid request parameters",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "no_models": {
+                            "value": {"detail": "At least one model is required"}
+                        },
+                        "invalid_min_yes": {
+                            "value": {"detail": "Minimum yes must be at least 1"}
+                        },
+                        "min_yes_too_high": {
+                            "value": {
+                                "detail": "Minimum yes must be less than or equal to the number of models"
+                            }
+                        },
+                    }
+                }
+            },
+        },
+    },
+}
