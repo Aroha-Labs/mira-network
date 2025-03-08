@@ -9,9 +9,15 @@ from src.router.models.user import UserCreditsHistory
 from src.router.db.session import DBSession
 from enum import Enum
 from gotrue.types import User
-from datetime import datetime
+from datetime import datetime, timezone
 from src.router.models.user import User as UserModel  # rename to avoid conflict
 from src.router.utils.redis import redis_client  # new import for redis
+from src.router.utils.opensearch import (
+    opensearch_client,
+    OPENSEARCH_CREDITS_INDEX,
+)
+from src.router.utils.logger import logger
+import asyncio
 
 router = APIRouter()
 
@@ -333,8 +339,37 @@ async def add_credit(
         description=request.description,
         created_at=datetime.utcnow(),
     )
+
+    # Prepare credit history document for OpenSearch
+    credit_history_doc = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "user_id": request.user_id,
+        "doc_type": "credit_history",
+        "amount": request.amount,
+        "previous_balance": current_credit,
+        "new_balance": new_credit,
+        "description": request.description,
+        "type": "manual_credit_add",
+        "admin_user_id": user.id,
+    }
+
     db.add(credit_history)
-    await db.commit()
+    try:
+        # Send document to OpenSearch asynchronously and commit DB transaction
+        await asyncio.gather(
+            asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: opensearch_client.index(
+                    index=OPENSEARCH_CREDITS_INDEX,
+                    body=credit_history_doc,
+                ),
+            ),
+            db.commit(),
+        )
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Error adding credit or sending to OpenSearch: {e}")
+        raise HTTPException(status_code=500, detail=f"Error adding credit: {e}")
 
     return {"credits": new_credit}
 
