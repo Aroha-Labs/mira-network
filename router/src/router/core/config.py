@@ -8,3 +8,8 @@ JWT_SECRET = os.getenv(
 )  # This should be the same as your Supabase JWT secret
 
 NODE_SERVICE_URL = os.getenv("NODE_SERVICE_URL")
+
+# OpenSearch Configuration
+OPENSEARCH_BASE_URL = os.getenv("OPENSEARCH_BASE_URL", "")
+OPENSEARCH_USER = os.getenv("OPENSEARCH_USER", "")
+OPENSEARCH_PASSWORD = os.getenv("OPENSEARCH_PASSWORD", "")
