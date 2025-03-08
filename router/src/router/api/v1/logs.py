@@ -1,4 +1,4 @@
-import logging
+from src.router.utils.logger import logger
 from typing import Optional, Literal
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import select
@@ -6,9 +6,10 @@ from src.router.core.types import User
 from src.router.models.logs import ApiLogs
 from src.router.db.session import DBSession
 from src.router.core.security import verify_user
-from sqlalchemy import func, desc, asc
+from sqlalchemy import func
 from sqlalchemy.types import Float
 from datetime import datetime, timedelta
+from src.router.utils.opensearch import opensearch_client, OPENSEARCH_MODEL_USAGE_INDEX
 
 router = APIRouter()
 
@@ -203,57 +204,102 @@ async def list_all_logs(
         flow_id: Filter by flow ID
     """
     try:
-        # Validate dates if provided
-        if isinstance(start_date, str):
-            start_date = datetime.fromisoformat(start_date.replace("Z", "+00:00"))
-        if isinstance(end_date, str):
-            end_date = datetime.fromisoformat(end_date.replace("Z", "+00:00"))
+        # Build OpenSearch query
+        must_conditions = [{"term": {"doc_type": "model_usage"}}]
 
-        # Ensure api_key_id is integer
-        if api_key_id is not None:
-            api_key_id = int(api_key_id)
-
-        # Build query with proper types
-        query = select(ApiLogs)
-
-        if start_date:
-            query = query.where(ApiLogs.created_at >= start_date)
-        if end_date:
-            query = query.where(ApiLogs.created_at <= end_date)
-        if machine_id:
-            query = query.where(ApiLogs.machine_id == str(machine_id))
-        if model:
-            query = query.where(ApiLogs.model == str(model))
-        if api_key_id:
-            query = query.where(ApiLogs.api_key_id == int(api_key_id))
+        # Access control
         if user_id:
-            query = query.where(ApiLogs.user_id == str(user_id))
+            if "admin" not in user.roles:
+                raise HTTPException(
+                    status_code=403, detail="Only admins can query other users' logs"
+                )
+            must_conditions.append({"match": {"user_id": user_id}})
+        else:
+            if "admin" not in user.roles:
+                must_conditions.append({"match": {"user_id": user.id}})
+
+        # Add filters
+        if start_date:
+            must_conditions.append(
+                {"range": {"timestamp": {"gte": start_date.isoformat()}}}
+            )
+        if end_date:
+            must_conditions.append(
+                {"range": {"timestamp": {"lte": end_date.isoformat()}}}
+            )
+        if machine_id:
+            must_conditions.append({"term": {"machine_id": machine_id}})
+        if model:
+            must_conditions.append({"match": {"model": model}})
+        if api_key_id:
+            must_conditions.append({"term": {"api_key_id": api_key_id}})
         if flow_id:
-            query = query.where(ApiLogs.flow_id == str(flow_id))
+            must_conditions.append({"term": {"flow_id": flow_id}})
 
-        # Validate order_by field
-        valid_order_fields = ["created_at", "model", "machine_id"]
-        if order_by not in valid_order_fields:
-            order_by = "created_at"
+        # Calculate pagination
+        start = (page - 1) * page_size
 
-        # Apply ordering
-        order_column = getattr(ApiLogs, order_by)
-        query = query.order_by(
-            desc(order_column) if order.lower() == "desc" else asc(order_column)
+        # Build the full query
+        query = {
+            "query": {"bool": {"must": must_conditions}},
+            "sort": [
+                {
+                    order_by if order_by != "created_at" else "timestamp": {
+                        "order": order
+                    }
+                }
+            ],
+            "from": start,
+            "size": page_size,
+            "track_total_hits": True,
+        }
+
+        # Execute search
+        response = opensearch_client.search(
+            index=OPENSEARCH_MODEL_USAGE_INDEX, body=query
         )
 
-        # Apply pagination
-        query = query.offset((page - 1) * page_size).limit(page_size)
+        # Transform results
+        logs = []
+        for hit in response["hits"]["hits"]:
+            source = hit["_source"]
+            logs.append(
+                {
+                    "id": hit["_id"],
+                    "user_id": source.get("user_id"),
+                    "api_key_id": source.get("api_key_id"),
+                    "payload": source.get("request"),
+                    "request_payload": source.get("request"),
+                    "ttft": source.get("ttft"),
+                    "response": source.get("response"),
+                    "prompt_tokens": source.get("prompt_tokens"),
+                    "completion_tokens": source.get("completion_tokens"),
+                    "total_tokens": source.get("total_tokens"),
+                    "total_response_time": source.get("total_response_time"),
+                    "model": source.get("model"),
+                    "model_pricing": {
+                        "prompt_token": source.get("costs", {}).get("prompt_token", 0),
+                        "completion_token": source.get("costs", {}).get(
+                            "completion_token", 0
+                        ),
+                    },
+                    "machine_id": source.get("machine_id"),
+                    "created_at": source.get("timestamp"),
+                    "flow_id": source.get("flow_id"),
+                }
+            )
 
-        result = await db.exec(query)
-        logs = result.all()
+        total_hits = response["hits"]["total"]["value"]
+        total_pages = (total_hits + page_size - 1) // page_size
 
-        return {"page": page, "page_size": page_size, "logs": logs}
+        return {
+            "logs": logs,
+            "total": total_hits,
+            "page": page,
+            "page_size": page_size,
+            "pages": total_pages,
+        }
 
-    except ValueError as e:
-        raise HTTPException(
-            status_code=400, detail=f"Invalid parameter value: {str(e)}"
-        )
     except Exception as e:
         logger.error(f"Error in list_all_logs: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
