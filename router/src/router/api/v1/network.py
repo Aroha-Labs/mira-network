@@ -7,12 +7,11 @@ from sqlmodel import select
 from src.router.utils.machine import get_machine_id
 from src.router.core.config import NODE_SERVICE_URL
 from src.router.core.settings_types import SETTINGS_MODELS
-from src.router.core.types import ModelPricing, User
-from src.router.models.logs import ApiLogs
+from src.router.core.types import User
 from src.router.db.session import DBSession
 from src.router.core.security import verify_user
 from src.router.utils.network import get_random_machines
-from src.router.models.user import User as UserModel, UserCreditsHistory
+from src.router.models.user import User as UserModel
 from src.router.schemas.ai import AiRequest, VerifyRequest
 import time
 import httpx
@@ -179,31 +178,7 @@ async def save_log(
             status_code=500, detail="Supported model not found in settings"
         )
 
-    model_pricing = ModelPricing(
-        model=req.model,
-        prompt_token=model_p.prompt_token,
-        completion_token=model_p.completion_token,
-    )
-
     req.model = original_req_model
-
-    # Log the request
-    api_log = ApiLogs(
-        user_id=user.id,
-        api_key_id=user.api_key_id,
-        payload=req.model_dump_json(),
-        request_payload=req.model_dump(),
-        ttft=ttfs,
-        response=result_text,
-        prompt_tokens=usage.get("prompt_tokens", 0),
-        completion_tokens=usage.get("completion_tokens", 0),
-        total_tokens=usage.get("total_tokens", 0),
-        total_response_time=time.time() - timeStart,
-        model=req.model,
-        model_pricing=model_pricing,
-        machine_id=str(machine_id),
-        flow_id=flow_id,
-    )
 
     # Calculate cost and reduce user credits
     prompt_tokens = usage.get("prompt_tokens", 0)
@@ -220,14 +195,6 @@ async def save_log(
     new_credit = user_credits - cost
 
     await redis_client.set(redis_key, new_credit)
-
-    # Update user credit history
-    user_credits_history = UserCreditsHistory(
-        user_id=user.id,
-        amount=-cost,
-        description=f"Used {total_tokens} tokens. Prompt tokens: {prompt_tokens}, Completion tokens: {completion_tokens}",
-        created_at=datetime.now(timezone.utc).replace(tzinfo=None),
-    )
 
     # Prepare documents for OpenSearch
     model_usage_doc = {
@@ -297,8 +264,6 @@ async def save_log(
     except Exception as e:
         logger.error(f"Failed to send logs to OpenSearch: {str(e)}")
         # Continue execution even if OpenSearch fails
-
-    return api_log, user_credits_history
 
 
 @router.post(
@@ -453,7 +418,7 @@ async def chatCompletionGenerate(
                 machine_id = await get_machine_id(machine_ip, db)
                 logger.info(f"Machine ID: {machine_id}")
 
-                api_log, user_credit_history = await save_log(
+                await save_log(
                     user=user,
                     user_credits=user_credits,
                     req=req,
@@ -466,11 +431,7 @@ async def chatCompletionGenerate(
                     flow_id=flow_id,
                 )
 
-                db.add(api_log)
-                db.add(user_credit_history)
-                await db.commit()
             except Exception as log_error:
-                await db.rollback()
                 logger.error(f"Error saving log: {str(log_error)}")
 
     if req.stream:
@@ -496,7 +457,7 @@ async def chatCompletionGenerate(
 
         logger.info(f"Machine ID: {machine_id}")
 
-        api_log, user_credit_history = await save_log(
+        await save_log(
             user=user,
             user_credits=user_credits,
             req=req,
@@ -509,16 +470,11 @@ async def chatCompletionGenerate(
             flow_id=flow_id,
         )
 
-        db.add(api_log)
-        db.add(user_credit_history)
-        await db.commit()
-
         return Response(
             content=llmres.text,
             status_code=llmres.status_code,
         )
     except Exception as e:
-        await db.rollback()
         logger.error(f"Error processing non-streaming response: {str(e)}")
         raise HTTPException(
             status_code=500,
