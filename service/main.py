@@ -276,7 +276,6 @@ async def get_llm_completion_async(
                 "Lambda",
             ],
         }
-    logging.info(f"payload: {payload}")
     # Add tools/functions if provided
     if tools:
         if model_provider.provider_name == "anthropic":
