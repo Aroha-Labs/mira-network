@@ -161,6 +161,17 @@ def get_llm_completion(
         "stream": stream,
     }
 
+    if model_provider.provider_name == "openrouter":
+        payload["provider"] = {
+            "ignore": [
+                "Azure",
+                "DeepInfra",
+                "Nebius",
+                "InferenceNet",
+                "Novita",
+                "Lambda",
+            ],
+        }
     # Add tools/functions if provided
     if tools:
         if model_provider.provider_name == "anthropic":
