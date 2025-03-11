@@ -45,10 +45,6 @@ COPY package.json yarn.lock ./
 
 # Set environment variables
 ENV NODE_ENV=production
-ENV PORT=80
-
-# Expose port 80
-EXPOSE 80
 
 # Use non-root user to run the app
 USER appuser
