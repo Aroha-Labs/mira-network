@@ -5,7 +5,20 @@ import { registerMachine, getLocalIp } from "../utils/machineRegistry";
 import OpenAI from "openai";
 
 import pino from "pino";
-const logger = pino();
+const logger = pino({
+  level: process.env.LOG_LEVEL || 'info',
+  timestamp: true,
+  formatters: {
+    level: (label) => {
+      return { level: label };
+    },
+  },
+  serializers: {
+    error: pino.stdSerializers.err,
+    req: pino.stdSerializers.req,
+    res: pino.stdSerializers.res
+  }
+});
 
 enum PROVIDER_NAME {
   OPENAI = "openai",
@@ -98,6 +111,14 @@ async function getLlmCompletion({
   messages,
   stream = false,
 }: GetLlmCompletionRequest) {
+  // const startTime = Date.now();
+  logger.info({
+    msg: 'Starting LLM completion request',
+    provider: modelProvider.providerName,
+    model,
+    stream
+  });
+
   try {
     const openai = new OpenAI({
       apiKey: modelProvider.apiKey,
@@ -108,6 +129,12 @@ async function getLlmCompletion({
       model,
       messages,
       stream,
+    });
+
+    logger.info({
+      msg: 'LLM completion request successful',
+      provider: modelProvider.providerName,
+      model
     });
 
     return response;
@@ -170,11 +197,9 @@ const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
       // Start the liveness update task
       updateLiveness(machineIp);
     } else {
-      console.error(
-        "Failed to register machine or acquire token after multiple attempts"
-      );
-      console.error("Machine registration is required to run the service");
-      console.error("Shutting down...");
+      logger.error("Failed to register machine or acquire token after multiple attempts");
+      logger.error("Machine registration is required to run the service");
+      logger.error("Shutting down...");
       process.exit(1);
     }
   });

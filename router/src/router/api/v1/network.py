@@ -448,9 +448,11 @@ async def chatCompletionGenerate(
 
     try:
         response_json = llmres.json()
-        result_text = response_json["choices"][0]["message"]["content"]
+        # Handle nested response structure
+        content_json = response_json.get("data", response_json)
+        result_text = content_json["choices"][0]["message"]["content"]
         ttfs = time.time() - timeStart
-        usage = response_json.get("usage", {})
+        usage = content_json.get("usage", {})
 
         logger.info(
             f"Non-streaming response complete in {time.time() - timeStart:.2f}s"
