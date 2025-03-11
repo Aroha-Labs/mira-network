@@ -327,7 +327,7 @@ async def add_credit(
         current_credit = float(current_credit)
 
     new_credit = current_credit + request.amount
-    await redis_client.set(redis_key, new_credit)
+    await redis_client.incrbyfloat(redis_key, request.amount)
 
     # Update DB using value from redis
     user_data.credits = new_credit
