@@ -29,13 +29,16 @@ WORKDIR /app
 # Add a non-root user (good practice for security)
 RUN addgroup --system appgroup && adduser --system appuser --ingroup appgroup
 
+# Install libcap package (needed for setcap command)
+RUN apk add --no-cache libcap
+
 # Copy only production dependencies from builder
 COPY --from=builder /app/node_modules ./node_modules
 
 # Copy the built app from builder
 COPY --from=builder /app/dist ./dist
 
-# Optional: persist version info (you can pass IMAGE_VERSION at build time)
+# Optional: persist version info
 ARG IMAGE_VERSION=0.0.0
 ENV VERSION=${IMAGE_VERSION}
 RUN echo ${IMAGE_VERSION} > /app/version.txt
@@ -45,10 +48,9 @@ COPY package.json yarn.lock ./
 
 # Set environment variables
 ENV NODE_ENV=production
-ENV PORT=80
 
 # Set capability to bind to privileged ports
-RUN setcap 'cap_net_bind_service=+ep' /usr/local/bin/node
+RUN setcap cap_net_bind_service=+ep $(which node)
 
 # Use non-root user to run the app
 USER appuser
