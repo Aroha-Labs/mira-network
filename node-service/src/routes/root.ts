@@ -252,6 +252,8 @@ const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
         }
 
         // Handle streaming response
+        reply.raw.setHeader("x-machine-ip", Env.MACHINE_IP || getLocalIp());
+        reply.raw.setHeader("x-machine-name", Env.MACHINE_NAME);
         reply.raw.setHeader("Content-Type", "text/event-stream");
         reply.raw.setHeader("Cache-Control", "no-cache");
         reply.raw.setHeader("Connection", "keep-alive");
@@ -278,10 +280,10 @@ const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
             stack: error.stack,
             response: error.response
               ? {
-                  status: error.response.status,
-                  statusText: error.response.statusText,
-                  data: error.response.data,
-                }
+                status: error.response.status,
+                statusText: error.response.statusText,
+                data: error.response.data,
+              }
               : undefined,
           },
         });
