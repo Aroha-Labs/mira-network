@@ -328,6 +328,10 @@ async def get_llm_completion_async(
             )
 
     except httpx.RequestError as e:
+        import traceback
+
+        logging.error(f"Error calling LLM API: {e}")
+        logging.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Error calling LLM API: {str(e)}")
 
 
@@ -392,14 +396,21 @@ async def generate(req: AiRequest):
     # Convert Message objects to dictionaries
     messages = [{"role": msg.role, "content": msg.content} for msg in req.messages]
 
-    response = await get_llm_completion_async(
-        model,
-        model_provider,
-        messages=[Message(**msg) for msg in messages],
-        stream=req.stream,
-        tools=req.tools,
-        tool_choice=req.tool_choice,
-    )
+    try:
+        response = await get_llm_completion_async(
+            model,
+            model_provider,
+            messages=[Message(**msg) for msg in messages],
+            stream=req.stream,
+            tools=req.tools,
+            tool_choice=req.tool_choice,
+        )
+    except Exception as e:
+        import traceback
+
+        logging.error(f"Error generating response: {e}")
+        logging.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Error generating response: {e}")
 
     # Add MACHINE_IP to response headers with None check
     if Env.MACHINE_IP:
