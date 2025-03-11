@@ -64,6 +64,21 @@ async def register_machine(
     }
 
 
+@router.get(
+    "/machines/{network_ip}",
+    summary="Get Machine Details",
+)
+async def get_machine(
+    network_ip: str,
+    db: DBSession,
+    user: User = Depends(verify_admin),
+):
+    machine_res = await db.exec(select(Machine).where(Machine.network_ip == network_ip))
+    machine = machine_res.first()
+
+    return machine
+
+
 @router.put(
     "/machines/{network_ip}",
     summary="Update Machine Details",
