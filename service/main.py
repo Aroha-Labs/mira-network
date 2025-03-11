@@ -292,47 +292,87 @@ async def get_llm_completion_async(
             "Accept-Encoding": "identity",
         }
 
-        async with httpx.AsyncClient() as client:
-            req = await client.post(
-                url=f"{model_provider.base_url}/chat/completions",
-                headers=headers,
-                json=payload,
-                timeout=60.0,
-            )
-            req.raise_for_status()
-
-            if stream:
-                return StreamingResponse(
-                    req.aiter_bytes(chunk_size=1024),
-                    media_type="text/event-stream",
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(connect=60.0, read=180.0, write=60.0, pool=240.0),
+            transport=httpx.AsyncHTTPTransport(retries=5),
+        ) as client:
+            try:
+                req = await client.post(
+                    url=f"{model_provider.base_url}/chat/completions",
+                    headers=headers,
+                    json=payload,
                 )
+                req.raise_for_status()
+                
+                if stream:
+                    return StreamingResponse(
+                        req.aiter_bytes(chunk_size=1024),
+                        media_type="text/event-stream",
+                    )
 
-            # Convert provider-specific response to OpenAI format if needed
-            response_data = req.json()
-            if model_provider.provider_name == "anthropic":
-                # Convert Anthropic response to OpenAI format
-                if "tool_calls" in response_data.get("content", []):
-                    response_data["choices"][0]["message"]["function_call"] = {
-                        "name": response_data["content"][0]["tool_calls"][0][
-                            "function"
-                        ]["name"],
-                        "arguments": response_data["content"][0]["tool_calls"][0][
-                            "function"
-                        ]["arguments"],
-                    }
+                # Convert provider-specific response to OpenAI format if needed
+                response_data = req.json()
+                if model_provider.provider_name == "anthropic":
+                    # Convert Anthropic response to OpenAI format
+                    if "tool_calls" in response_data.get("content", []):
+                        response_data["choices"][0]["message"]["function_call"] = {
+                            "name": response_data["content"][0]["tool_calls"][0][
+                                "function"
+                            ]["name"],
+                            "arguments": response_data["content"][0]["tool_calls"][0][
+                                "function"
+                            ]["arguments"],
+                        }
 
-            return Response(
-                content=json.dumps(response_data),
-                status_code=req.status_code,
-                headers=dict(req.headers),
-            )
-
-    except httpx.RequestError as e:
+                return Response(
+                    content=json.dumps(response_data),
+                    status_code=req.status_code,
+                    headers=dict(req.headers),
+                )
+                
+            except httpx.TimeoutException as e:
+                import traceback
+                logging.error(f"Timeout error calling {model_provider.provider_name} API: {e}")
+                logging.error(f"Timeout details: connect={client.timeout.connect}, read={client.timeout.read}, write={client.timeout.write}, pool={client.timeout.pool}")
+                logging.error("Timeout traceback: " + traceback.format_exc())
+                raise HTTPException(status_code=504, detail=f"Timeout error calling {model_provider.provider_name} API: {str(e)}")
+                
+            except httpx.HTTPStatusError as e:
+                import traceback
+                logging.error(f"HTTP status error from {model_provider.provider_name} API: {e.response.status_code} - {e.response.text}")
+                logging.error("HTTP error traceback: " + traceback.format_exc())
+                
+                # Try to parse the error response
+                error_detail = str(e)
+                try:
+                    error_json = e.response.json()
+                    if "error" in error_json:
+                        error_detail = f"{error_json.get('error', {}).get('message', str(e))}"
+                except:
+                    pass
+                    
+                raise HTTPException(
+                    status_code=e.response.status_code, 
+                    detail=f"Error from {model_provider.provider_name} API: {error_detail}"
+                )
+                
+            except httpx.RequestError as e:
+                import traceback
+                logging.error(f"Request error calling {model_provider.provider_name} API: {e}")
+                logging.error("Request error traceback: " + traceback.format_exc())
+                raise HTTPException(status_code=500, detail=f"Request error calling {model_provider.provider_name} API: {str(e)}")
+                
+            except json.JSONDecodeError as e:
+                import traceback
+                logging.error(f"JSON decode error from {model_provider.provider_name} API response: {e}")
+                logging.error("JSON error traceback: " + traceback.format_exc())
+                raise HTTPException(status_code=500, detail=f"Invalid JSON response from {model_provider.provider_name} API")
+                
+    except Exception as e:
         import traceback
-
-        logging.error(f"Error calling LLM API: {e}")
-        logging.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Error calling LLM API: {str(e)}")
+        logging.error(f"Unexpected error calling {model_provider.provider_name} API: {e}")
+        logging.error("Unexpected error traceback: " + traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Unexpected error calling {model_provider.provider_name} API: {str(e)}")
 
 
 @app.get("/health")
