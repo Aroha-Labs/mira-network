@@ -11,6 +11,7 @@ dependencies = [
     "uvicorn==0.34.0",
     "requests==2.32.3",
     "tenacity>=9.0.0",
+    "newrelic>=10.7.0",
 ]
 requires-python = "==3.11.*"
 readme = "README.md"
@@ -23,4 +24,4 @@ distribution = false
 [tool.pdm.scripts]
 _.env_file = ".env"
 dev = "uvicorn main:app --reload --host 0.0.0.0 --port 34523"
-prod = "uvicorn main:app --host 0.0.0.0 --port 80"
+prod = "newrelic-admin run-python -m uvicorn main:app --host 0.0.0.0 --port 80"
