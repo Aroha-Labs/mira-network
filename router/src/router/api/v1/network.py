@@ -421,6 +421,10 @@ async def chatCompletionGenerate(
                 machine_ip = llmres.headers.get("x-machine-ip")
                 logger.info(f"Machine IP: {machine_ip}")
 
+                # TODO: REMOVE THIS, IT IS FALLBACK
+                if machine_ip is None:
+                    machine_ip = "172.31.42.40"
+                    logger.warning("Machine IP is None, using fallback")
                 # get machine_id from redis
                 machine_id = await get_machine_id(machine_ip, db)
                 logger.info(f"Machine ID: {machine_id}")
@@ -460,6 +464,11 @@ async def chatCompletionGenerate(
 
         machine_ip = llmres.headers.get("x-machine-ip")
         logger.info(f"Machine IP: {machine_ip}")
+
+        # TODO: REMOVE THIS, IT IS FALLBACK
+        if machine_ip is None:
+            logger.warning("Machine IP is None, using fallback")
+            machine_ip = "172.31.42.40"
 
         # get machine_id from redis
         machine_id = await get_machine_id(machine_ip, db)
