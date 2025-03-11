@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, AsyncGenerator
 from fastapi import APIRouter, Depends, Response, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -29,6 +29,13 @@ from src.router.utils.opensearch import (
     opensearch_client,
     OPENSEARCH_MODEL_USAGE_INDEX,
     OPENSEARCH_CREDITS_INDEX,
+)
+from aiohttp import (
+    ClientSession,
+    ClientTimeout,
+    ClientPayloadError,
+    ServerDisconnectedError,
+    TCPConnector,
 )
 
 
@@ -241,8 +248,51 @@ async def save_log(
             ),
         )
     except Exception as e:
-        logger.error(f"Failed to send logs to OpenSearch: {str(e)}")
-        # Continue execution even if OpenSearch fails
+        logger.error(f"Log saving error: {str(e)}")
+
+
+async def handle_stream_chunk(chunk: bytes) -> AsyncGenerator[str, None]:
+    """Handle individual chunks with proper error handling and parsing"""
+    try:
+        # Convert bytes to text
+        if isinstance(chunk, bytes):
+            text = chunk.decode("utf-8")
+        else:
+            text = str(chunk)
+
+        # Split into lines and process each
+        lines = text.split("\n")
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+
+            # Handle SSE format
+            if line.startswith("data: "):
+                line = line[6:]
+
+            try:
+                # Try to parse as JSON
+                json_data = json.loads(line)
+                yield f"data: {json.dumps(json_data)}\n\n"
+            except json.JSONDecodeError:
+                # If not JSON, send as raw data
+                if line.strip():
+                    yield f"data: {json.dumps({'raw': line})}\n\n"
+    except Exception as e:
+        logger.error(f"Stream chunk processing error: {str(e)}")
+        yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+
+async def stream_response(response) -> AsyncGenerator[str, None]:
+    """Simple streaming response handler"""
+    try:
+        async for chunk in response.content.iter_chunked(1024):
+            async for processed_chunk in handle_stream_chunk(chunk):
+                yield processed_chunk
+    except Exception as e:
+        logger.error(f"Streaming error: {str(e)}")
+        yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
 
 @router.post(
@@ -260,242 +310,145 @@ async def chatCompletionGenerate(
 ) -> Response:
     timeStart = time.time()
 
-    user_credits = await get_user_credits(user.id, db)
-    if user_credits <= 0:
-        raise HTTPException(status_code=402, detail="Insufficient credits")
+    try:
+        # Fix type conversion for user_id
+        user_credits = await get_user_credits((user.id), db)
+        if user_credits <= 0:
+            raise HTTPException(status_code=402, detail="Insufficient credits")
 
-    supported_models = await get_supported_models()
-    if req.model not in supported_models:
-        raise HTTPException(status_code=400, detail="Unsupported model")
+        supported_models = await get_supported_models()
+        if req.model not in supported_models:
+            raise HTTPException(status_code=400, detail="Unsupported model")
 
-    model_config = supported_models[req.model]
-    original_req_model = req.model
-    req.model = model_config.id
+        model_config = supported_models[req.model]
+        original_req_model = req.model
+        req.model = model_config.id
 
-    # machine = (await get_random_machines(db, 1))[0]
-    # print("machine", machine)
-    proxy_url = f"{NODE_SERVICE_URL}/v1/chat/completions"
-    logger.info(f"Using machine {NODE_SERVICE_URL}")
+        proxy_url = f"{NODE_SERVICE_URL}/v1/chat/completions"
+        logger.info(f"Using machine {NODE_SERVICE_URL}")
 
-    # Create a client with increased timeouts and retries
-    async with httpx.AsyncClient(
-        timeout=httpx.Timeout(connect=60.0, read=120.0, write=60.0, pool=180.0),
-        transport=httpx.AsyncHTTPTransport(retries=5),
-    ) as client:
-        try:
-            logger.info(f"Sending request to {proxy_url}")
-            llmres = await client.post(
+        # Create timeout configuration
+        timeout = ClientTimeout(
+            total=300.0, connect=60.0, sock_connect=30.0, sock_read=60.0
+        )
+
+        connector = TCPConnector(
+            limit=3000,  # For 100 req/sec minimum
+            limit_per_host=500,  # Prevent single host overwhelming
+        )
+
+        async def generate():
+            usage = {}
+            result_text = ""
+            current_tool_calls = {}
+            ttfs: Optional[float] = None
+            machine_id = None
+
+            # Create session inside the generator to ensure it stays open during streaming
+            async with ClientSession(connector=connector, timeout=timeout) as session:
+                try:
+                    llmres = await session.post(
+                        proxy_url,
+                        json=req.model_dump(),
+                        headers={"Accept-Encoding": "identity"},
+                    )
+                    llmres.raise_for_status()
+                    logger.info(f"Received response with status {llmres.status}")
+
+                    # Get machine_id early to handle potential None
+                    machine_ip = llmres.headers.get("x-machine-ip", "")
+                    if not machine_ip:
+                        logger.warning("No machine IP in headers")
+                        machine_ip = ""
+
+                    try:
+                        machine_id = int(await get_machine_id(machine_ip, db))
+                    except (ValueError, TypeError) as e:
+                        logger.error(f"Error converting machine_id: {str(e)}")
+                        machine_id = 0
+
+                    async for data in stream_response(llmres):
+                        if ttfs is None:
+                            ttfs = time.time() - timeStart
+                            logger.info(f"TTFS: {ttfs:.2f}s")
+                        yield data
+
+                except Exception as e:
+                    logger.error(f"Generation error: {str(e)}")
+                    yield f"data: {json.dumps({'error': str(e)})}\n\n"
+                finally:
+                    try:
+                        # Save logs with proper error handling
+                        await save_log(
+                            user=user,
+                            user_credits=user_credits,
+                            req=req,
+                            original_req_model=original_req_model,
+                            result_text=result_text,
+                            usage=usage,
+                            ttfs=ttfs,
+                            timeStart=timeStart,
+                            machine_id=machine_id or 0,
+                            flow_id=flow_id,
+                        )
+                    except Exception as log_error:
+                        logger.error(f"Log saving error: {str(log_error)}")
+
+        if req.stream:
+            logger.info("Starting streaming response")
+            return StreamingResponse(
+                generate(),
+                media_type="text/event-stream",
+                headers={
+                    "Cache-Control": "no-cache",
+                    "Connection": "keep-alive",
+                },
+            )
+
+        # Handle non-streaming response
+        async with ClientSession(connector=connector, timeout=timeout) as session:
+            llmres = await session.post(
                 proxy_url,
                 json=req.model_dump(),
                 headers={"Accept-Encoding": "identity"},
             )
             llmres.raise_for_status()
-            logger.info(f"Received response with status {llmres.status_code}")
-        except httpx.ReadError as e:
-            logger.error(f"Read error connecting to service at {proxy_url}: {str(e)}")
-            raise HTTPException(
-                status_code=503,
-                detail="Service temporarily unavailable. Please try again later.",
-            )
-        except httpx.TimeoutException as e:
-            logger.error(f"Timeout error: {str(e)}")
-            raise HTTPException(
-                status_code=504,
-                detail="Request timed out. The service is experiencing high load.",
-            )
-        except httpx.HTTPStatusError as e:
-            logger.error(
-                f"HTTP Status error from LLM service: {e.response.status_code} - {str(e)}"
-            )
-            if e.response.status_code == 401:
-                raise HTTPException(
-                    status_code=401, detail="Authentication failed with LLM service"
-                )
-            elif e.response.status_code == 429:
-                raise HTTPException(status_code=429, detail="Rate limit exceeded")
-            else:
-                raise HTTPException(status_code=502, detail="LLM service error")
-        except httpx.ConnectError as e:
-            logger.error(f"Connection error to {proxy_url}: {str(e)}")
-            raise HTTPException(
-                status_code=503, detail="Could not connect to LLM service"
-            )
-        except ValueError as e:
-            logger.error(f"Data serialization error: {str(e)}")
-            raise HTTPException(status_code=400, detail="Invalid request format")
-        except MemoryError as e:
-            logger.error(f"Memory error processing request: {str(e)}")
-            raise HTTPException(
-                status_code=503, detail="Server resource limit exceeded"
-            )
-        except Exception as e:
-            logger.error(f"Unexpected error with proxy_url {proxy_url}: {e}")
-            logger.exception("Full traceback:")  # This logs the full stack trace
-            raise HTTPException(
-                status_code=500,
-                detail="An unexpected error occurred. Please try again later.",
-            )
 
-    async def generate():
-        usage = {}
-        result_text = ""
-        current_tool_calls = {}
-        ttfs: Optional[float] = None
+            response_text = await llmres.text()
+            response_json = json.loads(response_text)
+            content_json = response_json.get("data", response_json)
+            result_text = content_json["choices"][0]["message"]["content"]
+            ttfs = time.time() - timeStart
+            usage = content_json.get("usage", {})
 
-        try:
-            for line in llmres.iter_lines():
-                # Handle line depending on whether it's bytes or string
-                if isinstance(line, bytes):
-                    l = line.decode("utf-8")
-                else:
-                    l = line
-
-                if l.startswith("data: "):
-                    l = l[6:]
-                try:
-                    json_line = json.loads(l)
-                    if "choices" in json_line:
-                        choice = json_line["choices"][0]
-                        if "delta" in choice:
-                            delta = choice["delta"]
-                            if "content" in delta and delta["content"] is not None:
-                                result_text += delta["content"]
-                                yield f"data: {json.dumps({'content': delta['content']})}\n\n"
-                            if "tool_calls" in delta:
-                                for tool_call in delta["tool_calls"]:
-                                    index = tool_call.get("index", 0)
-                                    if index not in current_tool_calls:
-                                        current_tool_calls[index] = {
-                                            "id": tool_call.get("id", ""),
-                                            "type": tool_call.get("type", "function"),
-                                            "function": {
-                                                "name": tool_call.get(
-                                                    "function", {}
-                                                ).get("name", ""),
-                                                "arguments": tool_call.get(
-                                                    "function", {}
-                                                ).get("arguments", ""),
-                                            },
-                                            "index": index,
-                                        }
-                                    else:
-                                        # Update existing tool call
-                                        if "id" in tool_call:
-                                            current_tool_calls[index]["id"] = tool_call[
-                                                "id"
-                                            ]
-                                        if "function" in tool_call:
-                                            if "name" in tool_call["function"]:
-                                                current_tool_calls[index]["function"][
-                                                    "name"
-                                                ] = tool_call["function"]["name"]
-                                            if "arguments" in tool_call["function"]:
-                                                current_tool_calls[index]["function"][
-                                                    "arguments"
-                                                ] += tool_call["function"]["arguments"]
-
-                                # Send the current state of tool calls
-                                yield f"data: {json.dumps({'tool_calls': list(current_tool_calls.values())})}\n\n"
-                    if "usage" in json_line:
-                        usage = json_line["usage"]
-                except json.JSONDecodeError:
-                    pass
-
-                if ttfs is None:
-                    ttfs = time.time() - timeStart
-                    logger.info(f"TTFS: {ttfs:.2f}s")
-
-                # Format response as SSE data
-                if l.strip():
-                    yield f"data: {l}\n\n"
-
-            logger.info("Completed streaming response")
-        except Exception as e:
-            logger.error(f"Error during streaming: {str(e)}")
-            # Send error to client
-            yield f"data: {json.dumps({'error': str(e)})}\n\n"
-        finally:
-            # Always save log even if streaming fails
+            # Handle machine_id safely
+            machine_ip = llmres.headers.get("x-machine-ip", "")
             try:
-                # get machine_id from ip address of llmres
-                machine_ip = llmres.headers.get("x-machine-ip")
-                logger.info(f"Machine IP: {machine_ip}")
+                machine_id = int(await get_machine_id(machine_ip, db))
+            except (ValueError, TypeError):
+                machine_id = 0
 
-                # TODO: REMOVE THIS, IT IS FALLBACK
-                # if machine_ip is None:
-                #     machine_ip = "172.31.42.40"
-                #     logger.warning("Machine IP is None, using fallback")
-                # get machine_id from redis
-                machine_id = await get_machine_id(machine_ip, db)
-                logger.info(f"Machine ID: {machine_id}")
+            await save_log(
+                user=user,
+                user_credits=user_credits,
+                req=req,
+                original_req_model=original_req_model,
+                result_text=result_text,
+                usage=usage,
+                ttfs=ttfs,
+                timeStart=timeStart,
+                machine_id=machine_id,
+                flow_id=flow_id,
+            )
 
-                await save_log(
-                    user=user,
-                    user_credits=user_credits,
-                    req=req,
-                    original_req_model=original_req_model,
-                    result_text=result_text,
-                    usage=usage,
-                    ttfs=ttfs,
-                    timeStart=timeStart,
-                    machine_id=machine_id,
-                    flow_id=flow_id,
-                )
+            return Response(
+                content=response_text,
+                status_code=200,
+            )
 
-            except Exception as log_error:
-                logger.error(f"Error saving log: {str(log_error)}")
-
-    if req.stream:
-        logger.info("Starting streaming response")
-        res = StreamingResponse(generate(), media_type="text/event-stream")
-        return res
-
-    try:
-        response_json = llmres.json()
-        # Handle nested response structure
-        content_json = response_json.get("data", response_json)
-        result_text = content_json["choices"][0]["message"]["content"]
-        ttfs = time.time() - timeStart
-        usage = content_json.get("usage", {})
-
-        logger.info(
-            f"Non-streaming response complete in {time.time() - timeStart:.2f}s"
-        )
-
-        machine_ip = llmres.headers.get("x-machine-ip")
-        logger.info(f"Machine IP: {machine_ip}")
-
-        # TODO: REMOVE THIS, IT IS FALLBACK
-        # if machine_ip is None:
-        #     logger.warning("Machine IP is None, using fallback")
-        #     machine_ip = "172.31.42.40"
-
-        # get machine_id from redis
-        machine_id = await get_machine_id(machine_ip, db)
-
-        logger.info(f"Machine ID: {machine_id}")
-
-        await save_log(
-            user=user,
-            user_credits=user_credits,
-            req=req,
-            original_req_model=original_req_model,
-            result_text=result_text,
-            usage=usage,
-            ttfs=ttfs,
-            timeStart=timeStart,
-            machine_id=machine_id,
-            flow_id=flow_id,
-        )
-
-        return Response(
-            content=llmres.text,
-            status_code=llmres.status_code,
-        )
     except Exception as e:
-        logger.error(f"Error processing non-streaming response: {str(e)}")
-        logger.exception(f"Full Response: {response_json}")
+        logger.error(f"Request processing error: {str(e)}")
         raise HTTPException(
             status_code=500,
-            detail=f"Error processing response: {str(e)}",
+            detail=f"Error processing request: {str(e)}",
         )
