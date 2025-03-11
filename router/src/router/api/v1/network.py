@@ -189,7 +189,8 @@ async def save_log(
     logger.info(f"Cost: {-cost}")
     await redis_client.incrbyfloat(redis_key, float(-cost))
 
-    new_credit = await redis_client.get(redis_key)
+    new_credit_bytes = await redis_client.get(redis_key)
+    new_credit = float(new_credit_bytes.decode("utf-8")) if new_credit_bytes else 0.0
 
     logger.info(f"New credit: {new_credit}")
 
@@ -219,7 +220,7 @@ async def save_log(
         "doc_type": "credit_history",
         "amount": -cost,
         "previous_balance": user_credits,
-        "new_balance": new_credit,
+        "new_balance": str(new_credit),
         "model": original_req_model,
         "machine_id": str(machine_id),
         "flow_id": flow_id,
@@ -262,7 +263,7 @@ async def save_log(
         logger.error(f"Log saving error: {str(e)}")
 
 
-async def handle_stream_chunk(chunk: bytes) -> AsyncGenerator[str, None]:
+async def handle_stream_chunk(chunk: bytes) -> AsyncGenerator[tuple[str, dict], None]:
     """Handle individual chunks with proper error handling and parsing"""
     try:
         # Convert bytes to text
@@ -285,30 +286,25 @@ async def handle_stream_chunk(chunk: bytes) -> AsyncGenerator[str, None]:
             try:
                 # Try to parse as JSON
                 json_data = json.loads(line)
-                yield f"data: {json.dumps(json_data)}\n\n"
+                yield f"data: {json.dumps(json_data)}\n\n", json_data
             except json.JSONDecodeError:
                 # If not JSON, send as raw data
                 if line.strip():
-                    yield f"data: {json.dumps({'raw': line})}\n\n"
-
-            if "usage" in json_data:
-                logger.info(f"Usage: {json_data['usage']}")
-                usage = json_data["usage"]
-                logger.info(f"Usage: {usage}")
+                    yield f"data: {json.dumps({'raw': line})}\n\n", {"raw": line}
     except Exception as e:
         logger.error(f"Stream chunk processing error: {str(e)}")
-        yield f"data: {json.dumps({'error': str(e)})}\n\n"
+        yield f"data: {json.dumps({'error': str(e)})}\n\n", {"error": str(e)}
 
 
-async def stream_response(response) -> AsyncGenerator[str, None]:
+async def stream_response(response) -> AsyncGenerator[tuple[str, dict], None]:
     """Simple streaming response handler"""
     try:
         async for chunk in response.content.iter_chunked(1024):
-            async for processed_chunk in handle_stream_chunk(chunk):
-                yield processed_chunk
+            async for message, data in handle_stream_chunk(chunk):
+                yield message, data
     except Exception as e:
         logger.error(f"Streaming error: {str(e)}")
-        yield f"data: {json.dumps({'error': str(e)})}\n\n"
+        yield f"data: {json.dumps({'error': str(e)})}\n\n", {"error": str(e)}
 
 
 @router.post(
@@ -360,7 +356,6 @@ async def chatCompletionGenerate(
             ttfs: Optional[float] = None
             machine_id = None
 
-            # Create session inside the generator to ensure it stays open during streaming
             async with ClientSession(connector=connector, timeout=timeout) as session:
                 try:
                     llmres = await session.post(
@@ -371,7 +366,6 @@ async def chatCompletionGenerate(
                     llmres.raise_for_status()
                     logger.info(f"Received response with status {llmres.status}")
 
-                    # Get machine_id early to handle potential None
                     machine_ip = llmres.headers.get("x-machine-ip", "")
                     if not machine_ip:
                         logger.warning("No machine IP in headers")
@@ -383,20 +377,16 @@ async def chatCompletionGenerate(
                         logger.error(f"Error converting machine_id: {str(e)}")
                         machine_id = 0
 
-                    async for data in stream_response(llmres):
+                    async for message, data in stream_response(llmres):
                         if ttfs is None:
                             ttfs = time.time() - timeStart
                             logger.info(f"TTFS: {ttfs:.2f}s")
 
-                        # Only update usage if it's in the data
-                        try:
-                            json_data = json.loads(data.replace("data: ", ""))
-                            if "usage" in json_data:
-                                usage = json_data["usage"]
-                        except (json.JSONDecodeError, KeyError):
-                            pass
+                        if "usage" in data:
+                            usage = data["usage"]
+                            logger.info(f"Usage: {usage}")
 
-                        yield data
+                        yield message
 
                 except Exception as e:
                     logger.error(f"Generation error: {str(e)}")
