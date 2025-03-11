@@ -45,6 +45,10 @@ COPY package.json yarn.lock ./
 
 # Set environment variables
 ENV NODE_ENV=production
+ENV PORT=80
+
+# Set capability to bind to privileged ports
+RUN setcap 'cap_net_bind_service=+ep' /usr/local/bin/node
 
 # Use non-root user to run the app
 USER appuser
