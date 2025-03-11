@@ -171,16 +171,27 @@ async def save_log(
     completion_tokens = usage.get("completion_tokens", 0)
     total_tokens = usage.get("total_tokens", 0)
 
+    logger.info(f"Prompt tokens: {prompt_tokens}")
+    logger.info(f"Completion tokens: {completion_tokens}")
+    logger.info(f"Total tokens: {total_tokens}")
+
     prompt_tokens_cost = prompt_tokens * model_p.prompt_token
     completion_tokens_cost = completion_tokens * model_p.completion_token
+
+    logger.info(f"Prompt tokens cost: {prompt_tokens_cost}")
+    logger.info(f"Completion tokens cost: {completion_tokens_cost}")
 
     cost = prompt_tokens_cost + completion_tokens_cost
 
     # NEW: Use redis to manage user's credits instead of updating the db
     redis_key = f"user_credit:{user.id}"
-    new_credit = user_credits - cost
+    # new_credit = user_credits - cost
+    logger.info(f"Cost: {-cost}")
+    await redis_client.incrbyfloat(redis_key, float(-cost))
 
-    await redis_client.set(redis_key, new_credit)
+    new_credit = await redis_client.get(redis_key)
+
+    logger.info(f"New credit: {new_credit}")
 
     # Prepare documents for OpenSearch
     model_usage_doc = {
@@ -279,6 +290,11 @@ async def handle_stream_chunk(chunk: bytes) -> AsyncGenerator[str, None]:
                 # If not JSON, send as raw data
                 if line.strip():
                     yield f"data: {json.dumps({'raw': line})}\n\n"
+
+            if "usage" in json_data:
+                logger.info(f"Usage: {json_data['usage']}")
+                usage = json_data["usage"]
+                logger.info(f"Usage: {usage}")
     except Exception as e:
         logger.error(f"Stream chunk processing error: {str(e)}")
         yield f"data: {json.dumps({'error': str(e)})}\n\n"
@@ -371,6 +387,15 @@ async def chatCompletionGenerate(
                         if ttfs is None:
                             ttfs = time.time() - timeStart
                             logger.info(f"TTFS: {ttfs:.2f}s")
+
+                        # Only update usage if it's in the data
+                        try:
+                            json_data = json.loads(data.replace("data: ", ""))
+                            if "usage" in json_data:
+                                usage = json_data["usage"]
+                        except (json.JSONDecodeError, KeyError):
+                            pass
+
                         yield data
 
                 except Exception as e:
