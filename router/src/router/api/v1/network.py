@@ -293,7 +293,6 @@ async def chatCompletionGenerate(
             logger.info(f"Received response with status {llmres.status_code}")
         except httpx.ReadError as e:
             logger.error(f"Read error connecting to service at {proxy_url}: {str(e)}")
-            # Try with a different machine as fallback
             raise HTTPException(
                 status_code=503,
                 detail="Service temporarily unavailable. Please try again later.",
@@ -304,9 +303,38 @@ async def chatCompletionGenerate(
                 status_code=504,
                 detail="Request timed out. The service is experiencing high load.",
             )
+        except httpx.HTTPStatusError as e:
+            logger.error(
+                f"HTTP Status error from LLM service: {e.response.status_code} - {str(e)}"
+            )
+            if e.response.status_code == 401:
+                raise HTTPException(
+                    status_code=401, detail="Authentication failed with LLM service"
+                )
+            elif e.response.status_code == 429:
+                raise HTTPException(status_code=429, detail="Rate limit exceeded")
+            else:
+                raise HTTPException(status_code=502, detail="LLM service error")
+        except httpx.ConnectError as e:
+            logger.error(f"Connection error to {proxy_url}: {str(e)}")
+            raise HTTPException(
+                status_code=503, detail="Could not connect to LLM service"
+            )
+        except ValueError as e:
+            logger.error(f"Data serialization error: {str(e)}")
+            raise HTTPException(status_code=400, detail="Invalid request format")
+        except MemoryError as e:
+            logger.error(f"Memory error processing request: {str(e)}")
+            raise HTTPException(
+                status_code=503, detail="Server resource limit exceeded"
+            )
         except Exception as e:
-            logger.error(f"Error generating with proxy_url {proxy_url}: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
+            logger.error(f"Unexpected error with proxy_url {proxy_url}: {e}")
+            logger.exception("Full traceback:")  # This logs the full stack trace
+            raise HTTPException(
+                status_code=500,
+                detail="An unexpected error occurred. Please try again later.",
+            )
 
     async def generate():
         usage = {}
@@ -455,6 +483,7 @@ async def chatCompletionGenerate(
         )
     except Exception as e:
         logger.error(f"Error processing non-streaming response: {str(e)}")
+        logger.exception(f"Full Response: {response_json}")
         raise HTTPException(
             status_code=500,
             detail=f"Error processing response: {str(e)}",
