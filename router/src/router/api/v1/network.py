@@ -3,11 +3,13 @@ from typing import Optional, AsyncGenerator
 from fastapi import APIRouter, Depends, Response, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from src.router.models.user import UserCreditsHistory
+from src.router.models.logs import ApiLogs
 from src.router.utils.user import get_user_credits
 from src.router.utils.machine import get_machine_id
 from src.router.core.config import NODE_SERVICE_URL
 from src.router.core.settings_types import SETTINGS_MODELS
-from src.router.core.types import User
+from src.router.core.types import ModelPricing, User
 from src.router.db.session import DBSession
 from src.router.core.security import verify_user
 from src.router.utils.network import get_random_machines
@@ -164,6 +166,12 @@ async def save_log(
             status_code=500, detail="Supported model not found in settings"
         )
 
+    model_pricing = ModelPricing(
+        model=req.model,
+        prompt_token=model_p.prompt_token,
+        completion_token=model_p.completion_token,
+    )
+
     req.model = original_req_model
 
     # Calculate cost and reduce user credits
@@ -193,6 +201,32 @@ async def save_log(
     new_credit = float(new_credit_bytes.decode("utf-8")) if new_credit_bytes else 0.0
 
     logger.info(f"New credit: {new_credit}")
+
+    # Log the request
+    api_log = ApiLogs(
+        user_id=user.id,
+        api_key_id=user.api_key_id,
+        payload=req.model_dump_json(),
+        request_payload=req.model_dump(),
+        ttft=ttfs,
+        response=result_text,
+        prompt_tokens=usage.get("prompt_tokens", 0),
+        completion_tokens=usage.get("completion_tokens", 0),
+        total_tokens=usage.get("total_tokens", 0),
+        total_response_time=time.time() - timeStart,
+        model=req.model,
+        model_pricing=model_pricing,
+        machine_id=str(machine_id),
+        flow_id=flow_id,
+    )
+
+    # Update user credit history
+    user_credits_history = UserCreditsHistory(
+        user_id=user.id,
+        amount=-cost,
+        description=f"Used {total_tokens} tokens. Prompt tokens: {prompt_tokens}, Completion tokens: {completion_tokens}",
+        created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+    )
 
     # Prepare documents for OpenSearch
     model_usage_doc = {
@@ -261,6 +295,8 @@ async def save_log(
         )
     except Exception as e:
         logger.error(f"Log saving error: {str(e)}")
+
+    return api_log, user_credits_history
 
 
 async def handle_stream_chunk(chunk: bytes) -> AsyncGenerator[tuple[str, dict], None]:
@@ -394,7 +430,7 @@ async def chatCompletionGenerate(
                 finally:
                     try:
                         # Save logs with proper error handling
-                        await save_log(
+                        api_log, user_credits_history = await save_log(
                             user=user,
                             user_credits=user_credits,
                             req=req,
@@ -406,6 +442,9 @@ async def chatCompletionGenerate(
                             machine_id=machine_id or 0,
                             flow_id=flow_id,
                         )
+                        db.add(api_log)
+                        db.add(user_credits_history)
+                        await db.commit()
                     except Exception as log_error:
                         logger.error(f"Log saving error: {str(log_error)}")
 
@@ -443,7 +482,7 @@ async def chatCompletionGenerate(
             except (ValueError, TypeError):
                 machine_id = 0
 
-            await save_log(
+            api_log, user_credits_history = await save_log(
                 user=user,
                 user_credits=user_credits,
                 req=req,
@@ -455,6 +494,10 @@ async def chatCompletionGenerate(
                 machine_id=machine_id,
                 flow_id=flow_id,
             )
+
+            db.add(api_log)
+            db.add(user_credits_history)
+            await db.commit()
 
             return Response(
                 content=response_text,
