@@ -1,7 +1,7 @@
+import socket
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.responses import PlainTextResponse, StreamingResponse
 import csv
-import uvicorn
 import io
 from typing import List, Dict, Optional
 from pydantic import BaseModel, Field
@@ -10,24 +10,13 @@ import os
 import asyncio
 import httpx
 import logging
-from fastapi.middleware.cors import CORSMiddleware
 import json
 import requests
+from config import Env
 
 app = FastAPI()
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-ROUTER_BASE_URL = os.getenv(
-    "ROUTER_BASE_URL",
-    "https://mira-client-balancer.alts.dev",
-)
+ROUTER_BASE_URL = os.getenv("ROUTER_BASE_URL")
 
 logging.basicConfig(level=logging.INFO)
 
@@ -103,6 +92,11 @@ model_providers = {
         base_url=os.getenv("MIRA_BASE_URL", "https://ollama.alts.dev/v1"),
         api_key=os.getenv("MIRA_API_KEY"),
         provider_name="mira",
+    ),
+    "groq": ModelProvider(
+        base_url=os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1"),
+        api_key=os.getenv("GROQ_API_KEY"),
+        provider_name="groq",
     ),
 }
 
@@ -327,65 +321,84 @@ async def verify(req: VerifyRequest):
     if not req.messages:
         raise HTTPException(status_code=400, detail="At least one message is required")
 
-    # message with role=system shouldn't be present
-    if any(msg.role == "system" for msg in req.messages):
-        raise HTTPException(status_code=400, detail="System message is not allowed")
-
-    system_message = Message(
-        role="system",
-        content="""You verify user message if it is correct or not.
-                Don't be verbose.
-                Don't provide additional information.
-
-                you only reply with `yes` or `no`.
-                reply with `yes` if the user message is correct.
-                reply with `no` if the user message is a question or incorrect or incomplete or irrelevant or not factual or not making sense or not clear or not understandable.
-
-                Examples:
-                User: India is a country.
-                Assistant: yes
-
-                User: 1+1
-                Assistant: no
-
-                User: 1+1=2
-                Assistant: yes
-
-                User: who is the president of India?
-                Assistant: no""",
-    )
+    if not any(msg.role == "system" for msg in req.messages):
+        system_message = Message(
+            role="system",
+            content="""You are a verification assistant. Your task is to verify if the user message is correct or not.
+                    Use the provided verify_statement function to respond.
+                    Be concise with your reasoning.
+                    Always use the function to respond.""",
+        )
+        req.messages.insert(0, system_message)
 
     model_provider, model = get_model_provider(req.model, req.model_provider)
-
-    # Convert Message objects to dictionaries
     messages = [{"role": msg.role, "content": msg.content} for msg in req.messages]
-
-    # prepend system message
-    messages.insert(0, {"role": system_message.role, "content": system_message.content})
 
     res = get_llm_completion(
         model=model,
         model_provider=model_provider,
         messages=[Message(**msg) for msg in messages],
         stream=False,
+        tools=[
+            Tool(
+                type="function",
+                function=Function(
+                    name="verify_statement",
+                    description="Verify if the user message is correct or not",
+                    parameters={
+                        "type": "object",
+                        "properties": {
+                            "is_correct": {
+                                "type": "boolean",
+                                "description": "Whether the statement is correct (true) or incorrect (false)",
+                            },
+                            "reason": {
+                                "type": "string",
+                                "description": "Brief explanation for the verification result",
+                            },
+                        },
+                        "required": ["is_correct", "reason"],
+                    },
+                ),
+            )
+        ],
+        tool_choice="auto",
     )
 
-    content = res["choices"][0]["message"]["content"]
+    if isinstance(res, StreamingResponse):
+        return {
+            "result": "no",
+            "content": "Streaming response not supported for verification",
+        }
 
-    if content.strip().lower() == "yes":
-        return {"result": "yes", "content": content}
-    else:
-        return {"result": "no", "content": content}
+    data = json.loads(res.body)
+    tool_call = data["choices"][0]["message"].get("tool_calls", [])[0]
+
+    if tool_call:
+        args = json.loads(tool_call["function"]["arguments"])
+        return {
+            "result": "yes" if args["is_correct"] else "no",
+            "content": args["reason"],
+        }
+
+    # Fallback to content-based response if no tool call
+    content = data["choices"][0]["message"]["content"]
+    return {
+        "result": "yes" if content.strip().lower() == "yes" else "no",
+        "content": content,
+    }
 
 
-async def update_liveness(machine_uid: str):
-    url = f"{ROUTER_BASE_URL}/liveness/{machine_uid}"
+async def update_liveness(machine_ip: str):
+    url = f"{ROUTER_BASE_URL}/liveness/{machine_ip}"
+    headers = {"Authorization": f"Bearer {Env.MACHINE_API_TOKEN}"}
+
     while True:
         async with httpx.AsyncClient() as client:
             try:
-                response = await client.post(url)
+                response = await client.post(url, headers=headers)
                 response.raise_for_status()
-                logging.info(f"Liveness check successful for {machine_uid}")
+                logging.info(f"Liveness check successful for {machine_ip}")
             except httpx.HTTPStatusError as exc:
                 logging.error(
                     f"HTTP error occurred: {exc.response.status_code} - {exc.response.text}"
@@ -395,11 +408,23 @@ async def update_liveness(machine_uid: str):
         await asyncio.sleep(3)
 
 
+def get_local_ip():
+    """Returns the local IP address of the container running on AWS Fargate"""
+    try:
+        hostname = socket.gethostname()
+        print("hostname", hostname)
+        local_ip = socket.gethostbyname(hostname)
+        return local_ip
+    except Exception as e:
+        return str(e)
+
+
 @app.on_event("startup")
 async def startup_event():
-    machine_uid = os.getenv("MC_MACHINE_ID")
-    asyncio.create_task(update_liveness(machine_uid))
+    # Get the machine IP from environment or determine the local IP
+    MACHINE_IP = Env.MACHINE_IP
+    if MACHINE_IP is None:
+        MACHINE_IP = get_local_ip()
 
-
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # Start the liveness update task
+    asyncio.create_task(update_liveness(MACHINE_IP))

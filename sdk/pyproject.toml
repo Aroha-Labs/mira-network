@@ -3,21 +3,23 @@ authors = [
   {name = "mira-network", email = "sdk@mira.network"},
 ]
 dependencies = [
-  "httpx>=0.28.1",
   "pydantic>=2.10.4",
   "typing-extensions>=4.8.0",
   "requests>=2.32.3",
   "pytest-cov>=6.0.0",
   "pytest>=8.3.4",
   "pytest-asyncio>=0.25.0",
+  "ruff>=0.9.3",
+  "black>=25.1.0",
+  "httpx>=0.28.1",
 ]
 
 description = "Python SDK for Mira Network API"
 license = {text = "MIT"}
 name = "mira-network"
 readme = "README.md"
-requires-python = "==3.11.*"
-version = "0.1.6"
+requires-python = ">=3.9"
+version = "0.1.10"
 
 [build-system]
 build-backend = "pdm.backend"
@@ -34,6 +36,6 @@ test = [
 ]
 
 [tool.pdm.scripts]
-lint = "ruff check ."
 format = "ruff format ."
 format-check = "ruff format . --check"
+lint = "ruff check ."

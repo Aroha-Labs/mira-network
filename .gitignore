@@ -7,3 +7,7 @@ cli/bin
 
 .DS_Store
 *test.py
+
+node_modules/
+android/
+ios/

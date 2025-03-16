@@ -18,6 +18,7 @@ import httpx
 import json
 from src.router.utils.settings import get_setting_value
 from src.router.utils.settings import get_supported_models
+import asyncio
 
 router = APIRouter()
 
@@ -101,29 +102,23 @@ router = APIRouter()
                             {
                                 "machine": {
                                     "machine_uid": "machine_123",
-                                    "network_ip": "10.0.0.1"
+                                    "network_ip": "10.0.0.1",
                                 },
                                 "result": "yes",
-                                "response": {
-                                    "result": "yes",
-                                    "confidence": 0.95
-                                }
+                                "response": {"result": "yes", "confidence": 0.95},
                             },
                             {
                                 "machine": {
                                     "machine_uid": "machine_456",
-                                    "network_ip": "10.0.0.2"
+                                    "network_ip": "10.0.0.2",
                                 },
                                 "result": "no",
-                                "response": {
-                                    "result": "no",
-                                    "confidence": 0.75
-                                }
-                            }
-                        ]
+                                "response": {"result": "no", "confidence": 0.75},
+                            },
+                        ],
                     }
                 }
-            }
+            },
         },
         400: {
             "description": "Invalid request parameters",
@@ -131,27 +126,23 @@ router = APIRouter()
                 "application/json": {
                     "examples": {
                         "no_models": {
-                            "value": {
-                                "detail": "At least one model is required"
-                            }
+                            "value": {"detail": "At least one model is required"}
                         },
                         "invalid_min_yes": {
-                            "value": {
-                                "detail": "Minimum yes must be at least 1"
-                            }
+                            "value": {"detail": "Minimum yes must be at least 1"}
                         },
                         "min_yes_too_high": {
                             "value": {
                                 "detail": "Minimum yes must be less than or equal to the number of models"
                             }
-                        }
+                        },
                     }
                 }
-            }
-        }
-    }
+            },
+        },
+    },
 )
-async def verify(req: VerifyRequest):
+async def verify(req: VerifyRequest, db: Session = Depends(get_session)):
     if len(req.models) < 1:
         raise HTTPException(status_code=400, detail="At least one model is required")
 
@@ -164,12 +155,20 @@ async def verify(req: VerifyRequest):
             detail="Minimum yes must be less than or equal to the number of models",
         )
 
-    machines = get_random_machines(len(req.models))
+    supported_models = get_supported_models(db)
 
-    results = []
-    async with httpx.AsyncClient() as client:
-        for idx, machine in enumerate(machines):
-            proxy_url = f"http://{machine.network_ip}:{PROXY_PORT}/v1/verify"
+    # Validate and transform all models
+    transformed_models = []
+    for model in req.models:
+        if model not in supported_models:
+            raise HTTPException(status_code=400, detail=f"Unsupported model: {model}")
+        model_config = supported_models[model]
+        transformed_models.append({"original": model, "id": model_config.id})
+
+    async def process_model(model, idx):
+        machine = get_random_machines(1)
+        proxy_url = f"http://{machine[0].network_ip}:{PROXY_PORT}/v1/verify"
+        async with httpx.AsyncClient(timeout=httpx.Timeout(60.0)) as client:
             response = await client.post(
                 proxy_url,
                 json={
@@ -177,17 +176,21 @@ async def verify(req: VerifyRequest):
                         {"role": msg.role, "content": msg.content}
                         for msg in req.messages
                     ],
-                    "model": req.models[idx],
+                    "model": model["id"],
                 },
             )
             response_data = response.json()
-            results.append(
-                {
-                    "machine": machine.model_dump(),
-                    "result": response_data["result"],
-                    "response": response_data,
-                }
-            )
+            return {
+                "machine": machine,
+                "result": response_data["result"],
+                "response": response_data,
+                "model": transformed_models[idx]["original"],
+            }
+
+    # Make parallel requests
+    results = await asyncio.gather(
+        *[process_model(model, idx) for idx, model in enumerate(transformed_models)]
+    )
 
     yes_count = sum(1 for result in results if result["result"] == "yes")
     if yes_count >= req.min_yes:
@@ -249,22 +252,19 @@ class ModelListRes(BaseModel):
                         "data": [
                             {
                                 "id": "openrouter/meta-llama/llama-3.3-70b-instruct",
-                                "object": "model"
+                                "object": "model",
                             },
-                            {
-                                "id": "openai/gpt-4",
-                                "object": "model"
-                            },
+                            {"id": "openai/gpt-4", "object": "model"},
                             {
                                 "id": "openrouter/anthropic/claude-3.5-sonnet",
-                                "object": "model"
-                            }
-                        ]
+                                "object": "model",
+                            },
+                        ],
                     }
                 }
-            }
+            },
         }
-    }
+    },
 )
 async def list_models(db: Session = Depends(get_session)) -> ModelListRes:
     supported_models = get_supported_models(db)
@@ -287,7 +287,8 @@ def save_log(
     usage: dict,
     ttfs: Optional[float],
     timeStart: float,
-    machine_uid: str,
+    machine_id: int,
+    flow_id: Optional[str] = None,
 ) -> None:
     sm = get_setting_value(
         db,
@@ -324,7 +325,8 @@ def save_log(
         total_response_time=time.time() - timeStart,
         model=req.model,
         model_pricing=model_pricing,
-        machine_id=machine_uid,
+        machine_id=str(machine_id),
+        flow_id=flow_id,
     )
 
     db.add(api_log)
@@ -503,66 +505,51 @@ Server-sent events with the following data structure:
                                 "message": {
                                     "role": "assistant",
                                     "content": "Hello! How can I help you today?",
-                                    "tool_calls": None
+                                    "tool_calls": None,
                                 },
-                                "finish_reason": "stop"
+                                "finish_reason": "stop",
                             }
                         ],
                         "usage": {
                             "prompt_tokens": 10,
                             "completion_tokens": 8,
-                            "total_tokens": 18
-                        }
+                            "total_tokens": 18,
+                        },
                     }
                 }
-            }
+            },
         },
         400: {
             "description": "Invalid request or unsupported model",
             "content": {
-                "application/json": {
-                    "example": {
-                        "detail": "Unsupported model"
-                    }
-                }
-            }
+                "application/json": {"example": {"detail": "Unsupported model"}}
+            },
         },
         401: {
             "description": "Unauthorized - Invalid or missing authentication",
             "content": {
                 "application/json": {
-                    "example": {
-                        "detail": "Could not validate credentials"
-                    }
+                    "example": {"detail": "Could not validate credentials"}
                 }
-            }
+            },
         },
         402: {
             "description": "Insufficient credits",
             "content": {
-                "application/json": {
-                    "example": {
-                        "detail": "Insufficient credits"
-                    }
-                }
-            }
+                "application/json": {"example": {"detail": "Insufficient credits"}}
+            },
         },
         404: {
             "description": "User not found",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "detail": "User not found"
-                    }
-                }
-            }
-        }
-    }
+            "content": {"application/json": {"example": {"detail": "User not found"}}},
+        },
+    },
 )
 async def generate(
     req: AiRequest,
     user: User = Depends(verify_user),
     db: Session = Depends(get_session),
+    flow_id: Optional[str] = None,
 ) -> Response:
     timeStart = time.time()
 
@@ -673,7 +660,8 @@ async def generate(
             usage=usage,
             ttfs=ttfs,
             timeStart=timeStart,
-            machine_uid=machine.machine_uid,
+            machine_id=machine.id,
+            flow_id=flow_id,
         )
 
     if req.stream:
@@ -694,7 +682,8 @@ async def generate(
             usage=usage,
             ttfs=ttfs,
             timeStart=timeStart,
-            machine_uid=machine.machine_uid,
+            machine_id=machine.id,
+            flow_id=flow_id,
         )
 
         return Response(

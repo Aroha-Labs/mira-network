@@ -68,7 +68,6 @@ const fetchApiLogs = async ({
   order: string;
   machineId?: string | null;
 }) => {
-  console.log("fetching api logs", page);
   if (!token) {
     throw new Error("No token provided");
   }

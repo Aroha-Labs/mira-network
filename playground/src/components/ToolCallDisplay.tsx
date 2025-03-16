@@ -28,7 +28,7 @@ export default function ToolCallDisplay({ toolCall, response }: ToolCallDisplayP
         <div className="p-3 space-y-3">
           <div>
             <h4 className="text-sm font-medium text-gray-700 mb-1">Arguments:</h4>
-            <pre className="text-sm bg-gray-50 p-2 rounded">
+            <pre className="text-sm bg-gray-50 p-2 rounded-sm">
               {JSON.stringify(toolCall.arguments, null, 2)}
             </pre>
           </div>
@@ -36,7 +36,7 @@ export default function ToolCallDisplay({ toolCall, response }: ToolCallDisplayP
           {response && (
             <div>
               <h4 className="text-sm font-medium text-gray-700 mb-1">Response:</h4>
-              <div className="text-sm bg-gray-50 p-2 rounded">
+              <div className="text-sm bg-gray-50 p-2 rounded-sm">
                 <ReactMarkdown>{response.content}</ReactMarkdown>
               </div>
             </div>

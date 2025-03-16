@@ -2,7 +2,6 @@
 
 import { useStore } from "@tanstack/react-store";
 import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
 import { Header } from "src/components/apiLogs";
 import LogDetailsModal from "src/components/apiLogs/LogDetailsModal";
 import LogsTable from "src/components/apiLogs/LogsTable";
@@ -49,16 +48,15 @@ const ApiLogsPage = () => {
           isLoading={isLoading}
           error={error}
         />
-        {selectedLog &&
-          createPortal(
-            <LogDetailsModal log={selectedLog} onClose={handleCloseModal} />,
-            document.body
-          )}
+        {selectedLog && (
+          <LogDetailsModal log={selectedLog} onClose={handleCloseModal} />
+        )}
         <div className="flex justify-between">
           <Footer />
           <Pagination
             currentPage={params.page ?? 1}
-            totalPages={Number((data?.total ?? 0) / (data?.page_size ?? 1))}
+            pageSize={data?.page_size ?? 1}
+            totalRecords={data?.total ?? 0}
             handlePageChange={(pageNumber) =>
               apiLogsParamsState.setState(() => ({
                 ...params,

@@ -81,14 +81,17 @@ const PaginationItems = ({
 };
 
 const CustomPagination = ({
-  totalPages,
+  totalRecords,
   currentPage,
+  pageSize,
   handlePageChange,
 }: {
-  totalPages: number;
+  totalRecords: number;
   currentPage: number;
+  pageSize: number;
   handlePageChange: (page: number) => void;
 }) => {
+  const totalPages = Math.ceil((totalRecords ?? 0) / (pageSize ?? 1));
   if (totalPages <= 1) return null;
   return (
     <Pagination className="mt-8 justify-end">

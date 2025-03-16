@@ -1,7 +1,7 @@
 import type { Config } from "tailwindcss";
 
 export default {
-  darkMode: ["class"],
+  darkMode: "class",
   content: [
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
@@ -60,6 +60,38 @@ export default {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+      },
+      typography: {
+        DEFAULT: {
+          css: {
+            fontSize: "12px",
+            fontWeight: 400,
+            h3: {
+              marginTop: "0px",
+              marginBottom: "0px",
+            },
+            p: {
+              marginTop: "0px",
+              marginBottom: "6px",
+            },
+            li: {},
+            "*": {
+              fontSize: "12px",
+              lineHeight: "18px",
+              letterSpacing: "-0.013em",
+              textWrap: "auto",
+              p: {
+                marginTop: "0px",
+                marginBottom: "6px",
+              },
+            },
+          },
+        },
+        sm: {
+          css: {
+            fontSize: "12px",
+          },
+        },
       },
     },
   },

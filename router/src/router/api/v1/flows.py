@@ -1,17 +1,31 @@
 import re
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Response
-from sqlmodel import Session, select
+from src.router.models.logs import ApiLogs
+from sqlmodel import Session, select, func, text
 from src.router.api.v1.network import generate
 from src.router.core.security import verify_user
 from src.router.core.types import User
 from src.router.schemas.ai import AiRequest, Message, Function, Tool
 from src.router.models.flows import Flows
-from src.router.schemas.flows import FlowRequest, FlowChatCompletion
+from src.router.schemas.flows import (
+    FlowRequest,
+    FlowChatCompletion,
+    FlowAnalytics,
+    TimeRange,
+    ModelStats,
+    TimeSeriesEntry,
+    FlowStats,
+)
 from src.router.db.session import get_session
 from src.router.utils.network import get_random_machines, PROXY_PORT
 import requests
 import json
+from src.router.api.v1.docs.flows import (
+    CREATE_FLOW_DOCS,
+    LIST_FLOWS_DOCS,
+)
+from datetime import datetime, timedelta
 
 router = APIRouter()
 
@@ -22,95 +36,12 @@ def extract_variables(system_prompt: str) -> List[str]:
     return variables
 
 
-@router.post(
-    "/flows",
-    summary="Create New Flow",
-    description="""Creates a new flow with a system prompt and extracts any variables from it.
-
-### Authentication
-- Requires a valid authentication token
-- Token must be passed in the Authorization header
-
-### Request Body
-```json
-{
-    "system_prompt": string,  // System prompt with optional variables
-    "name": string           // Name of the flow
-}
-```
-
-### Variables in System Prompt
-- Variables are defined using double curly braces: `{{variable_name}}`
-- Example: "You are helping with {{task}} in {{language}}"
-- Variables are automatically extracted and stored
-
-### Response Format
-```json
-{
-    "id": string,
-    "name": string,
-    "system_prompt": string,
-    "variables": string[]    // Array of extracted variable names
-}
-```
-
-### Error Responses
-- `400 Bad Request`:
-    ```json
-    {
-        "detail": "Invalid request body"
-    }
-    ```
-- `401 Unauthorized`:
-    ```json
-    {
-        "detail": "Could not validate credentials"
-    }
-    ```
-
-### Notes
-- Variables in system prompt are automatically detected and extracted
-- Variable names must be alphanumeric (including underscores)
-- Empty variables array if no variables are found in prompt
-- System prompt can be used as template for chat completions""",
-    response_description="Returns the created flow object with extracted variables",
-    responses={
-        200: {
-            "description": "Successfully created flow",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "id": "flow_123",
-                        "name": "Translation Assistant",
-                        "system_prompt": "You are helping with {{task}} in {{language}}",
-                        "variables": ["task", "language"]
-                    }
-                }
-            }
-        },
-        400: {
-            "description": "Invalid request body",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "detail": "Invalid request body"
-                    }
-                }
-            }
-        },
-        401: {
-            "description": "Unauthorized - Invalid or missing authentication",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "detail": "Could not validate credentials"
-                    }
-                }
-            }
-        }
-    }
-)
-def create_flow(flow: FlowRequest, db: Session = Depends(get_session)):
+@router.post("/flows", **CREATE_FLOW_DOCS)
+def create_flow(
+    flow: FlowRequest,
+    db: Session = Depends(get_session),
+    user: User = Depends(verify_user),
+):
     variables = extract_variables(flow.system_prompt)
 
     new_flow = Flows(
@@ -124,67 +55,7 @@ def create_flow(flow: FlowRequest, db: Session = Depends(get_session)):
     return new_flow
 
 
-@router.get(
-    "/flows",
-    summary="List All Flows",
-    description="""Retrieves a list of all available flows.
-
-### Authentication
-- Requires a valid authentication token
-- Token must be passed in the Authorization header
-
-### Response Format
-```json
-[
-    {
-        "id": string,
-        "name": string,
-        "system_prompt": string,
-        "variables": string[]
-    }
-]
-```
-
-### Notes
-- Returns all flows accessible to the user
-- Empty array if no flows exist
-- Flows are ordered by creation date (newest first)
-- System prompts are returned in their template form with variables""",
-    response_description="Returns an array of flow objects",
-    responses={
-        200: {
-            "description": "Successfully retrieved flows",
-            "content": {
-                "application/json": {
-                    "example": [
-                        {
-                            "id": "flow_123",
-                            "name": "Translation Assistant",
-                            "system_prompt": "You are helping with {{task}} in {{language}}",
-                            "variables": ["task", "language"]
-                        },
-                        {
-                            "id": "flow_456",
-                            "name": "Code Review",
-                            "system_prompt": "You are reviewing {{language}} code",
-                            "variables": ["language"]
-                        }
-                    ]
-                }
-            }
-        },
-        401: {
-            "description": "Unauthorized - Invalid or missing authentication",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "detail": "Could not validate credentials"
-                    }
-                }
-            }
-        }
-    }
-)
+@router.get("/flows", **LIST_FLOWS_DOCS)
 def list_all_flows(db: Session = Depends(get_session)):
     flows = db.query(Flows).all()
     return flows
@@ -239,32 +110,24 @@ def list_all_flows(db: Session = Depends(get_session)):
                         "id": "flow_123",
                         "name": "Translation Assistant",
                         "system_prompt": "You are helping with {{task}} in {{language}}",
-                        "variables": ["task", "language"]
+                        "variables": ["task", "language"],
                     }
                 }
-            }
+            },
         },
         401: {
             "description": "Unauthorized - Invalid or missing authentication",
             "content": {
                 "application/json": {
-                    "example": {
-                        "detail": "Could not validate credentials"
-                    }
+                    "example": {"detail": "Could not validate credentials"}
                 }
-            }
+            },
         },
         404: {
             "description": "Flow not found",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "detail": "Flow not found"
-                    }
-                }
-            }
-        }
-    }
+            "content": {"application/json": {"example": {"detail": "Flow not found"}}},
+        },
+    },
 )
 def get_flow(flow_id: str, db: Session = Depends(get_session)):
     flow = db.exec(select(Flows).where(Flows.id == flow_id)).first()
@@ -331,32 +194,24 @@ def get_flow(flow_id: str, db: Session = Depends(get_session)):
                         "id": "flow_123",
                         "name": "Updated Translation Assistant",
                         "system_prompt": "You are helping with {{task}} in {{language}} and {{style}}",
-                        "variables": ["task", "language", "style"]
+                        "variables": ["task", "language", "style"],
                     }
                 }
-            }
+            },
         },
         401: {
             "description": "Unauthorized - Invalid or missing authentication",
             "content": {
                 "application/json": {
-                    "example": {
-                        "detail": "Could not validate credentials"
-                    }
+                    "example": {"detail": "Could not validate credentials"}
                 }
-            }
+            },
         },
         404: {
             "description": "Flow not found",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "detail": "Flow not found"
-                    }
-                }
-            }
-        }
-    }
+            "content": {"application/json": {"example": {"detail": "Flow not found"}}},
+        },
+    },
 )
 def update_flow(flow_id: str, flow: FlowRequest, db: Session = Depends(get_session)):
     existing_flow = db.query(Flows).filter(Flows.id == flow_id).first()
@@ -365,6 +220,7 @@ def update_flow(flow_id: str, flow: FlowRequest, db: Session = Depends(get_sessi
 
     existing_flow.system_prompt = flow.system_prompt
     existing_flow.name = flow.name
+    existing_flow.variables = extract_variables(flow.system_prompt)
 
     db.commit()
     db.refresh(existing_flow)
@@ -413,33 +269,23 @@ def update_flow(flow_id: str, flow: FlowRequest, db: Session = Depends(get_sessi
             "description": "Successfully deleted flow",
             "content": {
                 "application/json": {
-                    "example": {
-                        "message": "Flow deleted successfully"
-                    }
+                    "example": {"message": "Flow deleted successfully"}
                 }
-            }
+            },
         },
         401: {
             "description": "Unauthorized - Invalid or missing authentication",
             "content": {
                 "application/json": {
-                    "example": {
-                        "detail": "Could not validate credentials"
-                    }
+                    "example": {"detail": "Could not validate credentials"}
                 }
-            }
+            },
         },
         404: {
             "description": "Flow not found",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "detail": "Flow not found"
-                    }
-                }
-            }
-        }
-    }
+            "content": {"application/json": {"example": {"detail": "Flow not found"}}},
+        },
+    },
 )
 def delete_flow(flow_id: str, db: Session = Depends(get_session)):
     existing_flow = db.query(Flows).filter(Flows.id == flow_id).first()
@@ -604,19 +450,19 @@ Server-sent events with the following data structure:
                                 "message": {
                                     "role": "assistant",
                                     "content": "Here's the translation in French: Bonjour le monde!",
-                                    "tool_calls": None
+                                    "tool_calls": None,
                                 },
-                                "finish_reason": "stop"
+                                "finish_reason": "stop",
                             }
                         ],
                         "usage": {
                             "prompt_tokens": 25,
                             "completion_tokens": 12,
-                            "total_tokens": 37
-                        }
+                            "total_tokens": 37,
+                        },
                     }
                 }
-            }
+            },
         },
         400: {
             "description": "Bad Request - Invalid parameters",
@@ -632,42 +478,30 @@ Server-sent events with the following data structure:
                             "value": {
                                 "detail": "Missing required variables: language, task"
                             }
-                        }
+                        },
                     }
                 }
-            }
+            },
         },
         401: {
             "description": "Unauthorized - Invalid or missing authentication",
             "content": {
                 "application/json": {
-                    "example": {
-                        "detail": "Could not validate credentials"
-                    }
+                    "example": {"detail": "Could not validate credentials"}
                 }
-            }
+            },
         },
         402: {
             "description": "Payment Required - Insufficient credits",
             "content": {
-                "application/json": {
-                    "example": {
-                        "detail": "Insufficient credits"
-                    }
-                }
-            }
+                "application/json": {"example": {"detail": "Insufficient credits"}}
+            },
         },
         404: {
             "description": "Flow not found",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "detail": "Flow not found"
-                    }
-                }
-            }
-        }
-    }
+            "content": {"application/json": {"example": {"detail": "Flow not found"}}},
+        },
+    },
 )
 async def generate_with_flow_id(
     flow_id: str,
@@ -716,6 +550,7 @@ async def generate_with_flow_id(
             tools=req.tools,
             tool_choice=req.tool_choice,
         ),
+        flow_id=flow_id,
         user=user,
         db=db,
     )
@@ -723,194 +558,105 @@ async def generate_with_flow_id(
     return response
 
 
-@router.post(
-    "/flows/try",
-    summary="Try Flow",
-    description="""Tests a flow configuration without saving it to the database.
-
-### Authentication
-- Requires a valid authentication token
-- Token must be passed in the Authorization header
-- Sufficient credits required for generation
-
-### Request Body
-```json
-{
-    "flow": {
-        "system_prompt": string,
-        "name": string
-    },
-    "chat": {
-        "model": string,
-        "messages": [
-            {
-                "role": "user" | "assistant",
-                "content": string
-            }
-        ],
-        "variables": {
-            "variable_name": any
-        },
-        "stream": boolean,
-        "tools": [
-            {
-                "type": "function",
-                "function": {
-                    "name": string,
-                    "description": string,
-                    "parameters": object
-                }
-            }
-        ],
-        "tool_choice": string
-    }
-}
-```
-
-### Response Format
-Same as `/v1/flow/{flow_id}/chat/completions` endpoint
-
-### Error Responses
-- `400 Bad Request`:
-    ```json
-    {
-        "detail": "Variables are required but none were provided"
-    }
-    ```
-    ```json
-    {
-        "detail": "Missing required variables: var1, var2"
-    }
-    ```
-- `401 Unauthorized`:
-    ```json
-    {
-        "detail": "Could not validate credentials"
-    }
-    ```
-- `402 Payment Required`:
-    ```json
-    {
-        "detail": "Insufficient credits"
-    }
-    ```
-
-### Notes
-- Useful for testing flow configurations before saving
-- Variables are extracted and validated from system prompt
-- Credits are deducted for the test generation
-- Does not persist any data to the database""",
-    response_description="Returns the chat completion response using the test flow",
-    responses={
-        200: {
-            "description": "Successfully tested flow",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "id": "chatcmpl-123",
-                        "object": "chat.completion",
-                        "created": 1677858242,
-                        "model": "gpt-4",
-                        "choices": [
-                            {
-                                "index": 0,
-                                "message": {
-                                    "role": "assistant",
-                                    "content": "Test response with variable substitution",
-                                    "tool_calls": None
-                                },
-                                "finish_reason": "stop"
-                            }
-                        ],
-                        "usage": {
-                            "prompt_tokens": 20,
-                            "completion_tokens": 10,
-                            "total_tokens": 30
-                        }
-                    }
-                }
-            }
-        },
-        400: {
-            "description": "Bad Request - Invalid parameters",
-            "content": {
-                "application/json": {
-                    "examples": {
-                        "missing_variables": {
-                            "value": {
-                                "detail": "Missing required variables: language, task"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        401: {
-            "description": "Unauthorized - Invalid or missing authentication",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "detail": "Could not validate credentials"
-                    }
-                }
-            }
-        },
-        402: {
-            "description": "Payment Required - Insufficient credits",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "detail": "Insufficient credits"
-                    }
-                }
-            }
-        }
-    }
+@router.get(
+    "/flows/{flow_id}/stats",
+    response_model=FlowStats,
+    summary="Get Flow Stats",
+    description="Get basic usage statistics and time series data for a specific flow",
 )
-async def try_flow(
-    req: FlowRequest,
-    chat: FlowChatCompletion,
-    user: User = Depends(verify_user),
+async def get_flow_stats(
+    flow_id: str,
     db: Session = Depends(get_session),
-):
-    # Extract variables from the system prompt
-    variables = extract_variables(req.system_prompt)
+    user: User = Depends(verify_user),
+) -> FlowStats:
+    # Verify flow exists
+    flow = db.exec(select(Flows).where(Flows.id == flow_id)).first()
+    if not flow:
+        raise HTTPException(status_code=404, detail="Flow not found")
 
-    if variables:
-        if chat.variables is None:
-            raise HTTPException(
-                status_code=400, detail="Variables are required but none were provided"
-            )
-        missing_vars = [var for var in variables if var not in chat.variables]
-        if missing_vars:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Missing required variables: {', '.join(missing_vars)}",
-            )
+    # Get the latest log entry for this flow
+    log = db.exec(
+        select(ApiLogs)
+        .where(ApiLogs.flow_id == flow_id)
+        .order_by(ApiLogs.created_at.desc())
+        .limit(1)
+    ).first()
 
-        system_prompt = req.system_prompt
-        for var in variables:
-            system_prompt = system_prompt.replace(
-                f"{{{{{var}}}}}", str(chat.variables[var])
-            )
+    if not log:
+        raise HTTPException(status_code=404, detail="No stats available for this flow")
+
+    # Get time series data for the last 24 hours
+    end_date = datetime.utcnow()
+    start_date = end_date - timedelta(hours=24)
+
+    time_series = db.exec(
+        select(
+            func.date_trunc("hour", ApiLogs.created_at).label("timestamp"),
+            func.sum(ApiLogs.total_tokens).label("tokens"),
+            func.sum(ApiLogs.prompt_tokens).label("prompt_tokens"),
+            func.sum(ApiLogs.completion_tokens).label("completion_tokens"),
+            ApiLogs.model_pricing,
+        )
+        .where(
+            ApiLogs.flow_id == flow_id,
+            ApiLogs.created_at >= start_date,
+            ApiLogs.created_at <= end_date,
+        )
+        .group_by(
+            func.date_trunc("hour", ApiLogs.created_at),
+            ApiLogs.model_pricing,
+        )
+        .order_by(func.date_trunc("hour", ApiLogs.created_at))
+    ).all()
+
+    # Process time series data
+    time_series_data = []
+    for entry in time_series:
+        try:
+            model_pricing = entry.model_pricing
+            if (
+                model_pricing
+                and hasattr(model_pricing, "prompt_token")
+                and hasattr(model_pricing, "completion_token")
+            ):
+                cost = entry.prompt_tokens * float(
+                    model_pricing.prompt_token
+                ) + entry.completion_tokens * float(model_pricing.completion_token)
+            else:
+                cost = 0.0
+        except (AttributeError, ValueError):
+            cost = 0.0
+
+        time_series_data.append(
+            {"timestamp": entry.timestamp, "tokens": entry.tokens, "cost": cost}
+        )
+
+    # Get current stats from the latest log
+    current_pricing = {}
+    if (
+        log.model_pricing
+        and hasattr(log.model_pricing, "prompt_token")
+        and hasattr(log.model_pricing, "completion_token")
+    ):
+        current_pricing = {
+            "prompt_token": float(log.model_pricing.prompt_token),
+            "completion_token": float(log.model_pricing.completion_token),
+        }
+        total_cost = (
+            log.prompt_tokens * current_pricing["prompt_token"]
+            + log.completion_tokens * current_pricing["completion_token"]
+        )
     else:
-        system_prompt = req.system_prompt
+        total_cost = 0.0
 
-    chat.messages.insert(0, Message(role="system", content=system_prompt))
-
-    print(chat.messages)
-
-    response = await generate(
-        req=AiRequest(
-            model=chat.model,
-            messages=chat.messages,
-            stream=chat.stream,
-            model_provider=None,
-            tools=chat.tools,
-            tool_choice=chat.tool_choice,
-        ),
-        user=user,
-        db=db,
+    return FlowStats(
+        total_tokens=log.total_tokens,
+        prompt_tokens=log.prompt_tokens,
+        completion_tokens=log.completion_tokens,
+        total_cost=total_cost,
+        model=log.model,
+        model_pricing=current_pricing,
+        total_response_time=log.total_response_time,
+        ttft=log.ttft,
+        time_series=time_series_data,
     )
-    return response
-
