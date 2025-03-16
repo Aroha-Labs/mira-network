@@ -1,0 +1,12 @@
+.textArea::-webkit-scrollbar {
+  width: 4px;
+  height: 62px;
+}
+
+.textArea::-webkit-scrollbar-thumb {
+  background-color: #b7cec5;
+}
+
+.textArea::-webkit-scrollbar-track {
+  background: transparent;
+}

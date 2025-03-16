@@ -17,14 +17,14 @@ const UserProfile = () => {
   const logout = useLogout();
 
   if (isLoading) {
-    return <div className="h-9 w-9 rounded-md bg-gray-100 animate-pulse" />;
+    return <div className="bg-gray-100 rounded-md h-9 w-9 animate-pulse" />;
   }
 
   if (!session) {
     return (
       <Link
         href="/login"
-        className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+        className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
       >
         Sign in
       </Link>
@@ -33,9 +33,9 @@ const UserProfile = () => {
 
   return (
     <Menu as="div" className="relative">
-      <Menu.Button className="flex items-center gap-2 p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-50">
-        <UserCircleIcon className="h-6 w-6" />
-        <span className="hidden md:block text-sm">
+      <Menu.Button className="flex items-center gap-2 p-2 text-gray-600 rounded-md hover:text-gray-900 hover:bg-gray-50">
+        <UserCircleIcon className="w-6 h-6" />
+        <span className="hidden text-sm md:block">
           {session?.user?.email?.split("@")[0]}
         </span>
       </Menu.Button>
@@ -48,7 +48,7 @@ const UserProfile = () => {
         leaveFrom="transform opacity-100 scale-100"
         leaveTo="transform opacity-0 scale-95"
       >
-        <Menu.Items className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 focus:outline-none">
+        <Menu.Items className="absolute right-0 w-48 mt-2 bg-white border border-gray-200 rounded-md shadow-lg focus:outline-hidden">
           <div className="py-1">
             <Menu.Item>
               {({ active }) => (
@@ -58,7 +58,7 @@ const UserProfile = () => {
                     active ? "bg-gray-50" : ""
                   } flex items-center px-4 py-2 text-sm text-gray-700`}
                 >
-                  <Cog6ToothIcon className="mr-3 h-4 w-4" />
+                  <Cog6ToothIcon className="w-4 h-4 mr-3" />
                   Admin Panel
                 </Link>
               )}
@@ -73,7 +73,7 @@ const UserProfile = () => {
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
-                    className="mr-3 h-4 w-4"
+                    className="w-4 h-4 mr-3"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -101,47 +101,47 @@ export const Header = () => {
 
   return (
     <header className="sticky top-0 z-10 bg-white border-b border-gray-200">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+      <div className="px-4 mx-auto max-w-7xl sm:px-6">
         <div className="flex items-center h-16">
-          <div className="flex-1 flex items-center">
+          <div className="flex items-center flex-1">
             <Link href="/" className="flex items-center gap-2">
-              <img src="/img/logo.svg" alt="Mira" className="h-8 w-auto" />
+              <img src="/img/logo.svg" alt="Mira" className="w-auto h-8" />
               <div className="flex items-center gap-1">
                 <h3 className="text-lg font-medium">console</h3>
-                <div className="text-xs font-medium text-blue-600 border border-blue-200 bg-blue-50 px-1 rounded ml-1">
+                <div className="px-1 ml-1 text-xs font-medium text-blue-600 border border-blue-200 rounded-sm bg-blue-50">
                   beta
                 </div>
               </div>
             </Link>
           </div>
 
-          <nav className="hidden md:flex items-center gap-2">
+          <nav className="items-center hidden gap-2 md:flex">
             <Link
               href="/chat"
-              className="text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 px-4 py-2 rounded-md transition-colors inline-flex items-center gap-2"
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 transition-colors rounded-md hover:text-gray-900 hover:bg-gray-50"
             >
-              <ChatBubbleBottomCenterTextIcon className="h-5 w-5" />
+              <ChatBubbleBottomCenterTextIcon className="w-5 h-5" />
               Chat
             </Link>
             <Link
               href="/terminal"
-              className="text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 px-4 py-2 rounded-md transition-colors inline-flex items-center gap-2"
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 transition-colors rounded-md hover:text-gray-900 hover:bg-gray-50"
             >
-              <CommandLineIcon className="h-5 w-5" />
+              <CommandLineIcon className="w-5 h-5" />
               Terminal
             </Link>
           </nav>
 
-          <div className="ml-4 flex items-center gap-2">
+          <div className="flex items-center gap-2 ml-4">
             <UserProfile />
             <button
-              className="md:hidden p-2 rounded-md text-gray-700 hover:text-gray-900 hover:bg-gray-50"
+              className="p-2 text-gray-700 rounded-md md:hidden hover:text-gray-900 hover:bg-gray-50"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             >
               {isMobileMenuOpen ? (
-                <XMarkIcon className="h-5 w-5" />
+                <XMarkIcon className="w-5 h-5" />
               ) : (
-                <Bars3Icon className="h-5 w-5" />
+                <Bars3Icon className="w-5 h-5" />
               )}
             </button>
           </div>
@@ -149,22 +149,22 @@ export const Header = () => {
       </div>
 
       {isMobileMenuOpen && (
-        <div className="md:hidden border-t border-gray-200">
+        <div className="border-t border-gray-200 md:hidden">
           <div className="px-2 pt-2 pb-3 space-y-1">
             <Link
               href="/chat"
-              className="block text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 px-3 py-2 rounded-md inline-flex items-center gap-2"
+              className="inline-flex items-center block gap-2 px-3 py-2 text-sm font-medium text-gray-700 rounded-md hover:text-gray-900 hover:bg-gray-50"
               onClick={() => setIsMobileMenuOpen(false)}
             >
-              <ChatBubbleBottomCenterTextIcon className="h-5 w-5" />
+              <ChatBubbleBottomCenterTextIcon className="w-5 h-5" />
               Chat
             </Link>
             <Link
               href="/terminal"
-              className="block text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 px-3 py-2 rounded-md inline-flex items-center gap-2"
+              className="inline-flex items-center block gap-2 px-3 py-2 text-sm font-medium text-gray-700 rounded-md hover:text-gray-900 hover:bg-gray-50"
               onClick={() => setIsMobileMenuOpen(false)}
             >
-              <CommandLineIcon className="h-5 w-5" />
+              <CommandLineIcon className="w-5 h-5" />
               Terminal
             </Link>
           </div>

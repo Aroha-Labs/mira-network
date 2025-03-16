@@ -35,7 +35,7 @@ const AnalyticsSection: React.FC<AnalyticsSectionProps> = () => {
           <p className="text-sm text-gray-600">Inference calls</p>
           <div className="font-bold text-lg flex items-center">
             {isLoading ? (
-              <div className="animate-pulse bg-gray-300 h-6 w-12 rounded"></div>
+              <div className="animate-pulse bg-gray-300 h-6 w-12 rounded-sm"></div>
             ) : error ? (
               <div className="flex items-center text-red-500">
                 <span>Error</span>
@@ -56,7 +56,7 @@ const AnalyticsSection: React.FC<AnalyticsSectionProps> = () => {
                     <div className="bg-red-50 border border-red-200 text-red-800 text-sm rounded-lg p-3 shadow-lg w-72 whitespace-normal">
                       <div className="flex gap-2">
                         <svg
-                          className="h-5 w-5 text-red-500 flex-shrink-0"
+                          className="h-5 w-5 text-red-500 shrink-0"
                           viewBox="0 0 20 20"
                           fill="currentColor"
                         >

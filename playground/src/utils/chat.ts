@@ -116,7 +116,7 @@ export async function processStream(
 
           try {
             const parsed = JSON.parse(data);
-            console.log("Parsed SSE data:", parsed); // Debug log
+            // console.log("Parsed SSE data:", parsed); // Debug log
             if (parsed.content) {
               onMessage(parsed.content);
             }
@@ -191,6 +191,11 @@ interface ChatRequestBody {
   variables?: Record<string, string>;
   tools?: Tool[];
   stream: boolean;
+  model_provider?: {
+    base_url: string;
+    api_key: string;
+  } | null;
+  flow_id?: number;
 }
 
 interface FlowRequestBody {
@@ -224,25 +229,61 @@ export async function streamChatCompletion(
       return JSON.parse(JSON.stringify(toolDict));
     });
 
-    const body = flowId
-      ? ({
+    let body;
+    if (endpoint === "/v1/chat/completions") {
+      console.log("Direct chat completion", systemPrompt, options.variables, chatOptions.variables);
+      // Direct chat completion - include system prompt in messages
+      const messages = systemPrompt
+        ? [{ role: "system" as const, content: systemPrompt }, ...chatOptions.messages]
+        : chatOptions.messages;
+
+      // Replace variables in system prompt if both are present
+      if (systemPrompt && options.variables) {
+        console.log("Replacing variables in system prompt");
+        const systemMessage = messages[0];
+        let content = systemMessage.content;
+        Object.entries(options.variables).forEach(([key, value]) => {
+          content = content.replace(new RegExp(`{{${key}}}`, "g"), value);
+        });
+        console.log("Replaced variables in system prompt", content);
+        messages[0] = { ...systemMessage, content };
+      }
+
+      body = {
         ...chatOptions,
+        messages,
         tools: serializedTools,
         stream: true,
-      } as ChatRequestBody)
-      : ({
-        req: {
-          system_prompt: systemPrompt,
-          name: "Test Flow",
-        },
-        chat: {
+      } as ChatRequestBody;
+    } else {
+      // Flow request - use existing format
+      body = flowId
+        ? ({
           ...chatOptions,
           tools: serializedTools,
           stream: true,
-        },
-      } as FlowRequestBody);
+        } as ChatRequestBody)
+        : ({
+          req: {
+            system_prompt: systemPrompt,
+            name: "Test Flow",
+          },
+          chat: {
+            ...chatOptions,
+            tools: serializedTools,
+            stream: true,
+          },
+        } as FlowRequestBody);
+    }
 
-    const response = await fetch(`${api.defaults.baseURL}${endpoint}`, {
+    let url = `${api.defaults.baseURL}${endpoint}`;
+
+    if (flowId && endpoint === "/v1/chat/completions") {
+      console.log("Adding flow ID to URL");
+      url = `${url}?flow_id=${flowId}`;
+    }
+
+    const response = await fetch(url, {
       method: "POST",
       headers,
       body: JSON.stringify(body),
@@ -269,3 +310,45 @@ export async function streamChatCompletion(
     throw error;
   }
 }
+
+export interface VerificationRequest {
+  messages: Message[];
+  models: string[];
+  min_yes: number;
+}
+
+export interface VerificationResponse {
+  result: "yes" | "no";
+  results: {
+    machine: {
+      machine_uid: string;
+      network_ip: string;
+    }[];
+    result: "yes" | "no";
+    response: {
+      result: "yes" | "no";
+      content: string;
+    };
+    model: string;
+  }[];
+}
+
+export const verifyMessages = async (
+  request: VerificationRequest
+): Promise<VerificationResponse> => {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${api.defaults.baseURL}/v1/verify`, {
+    method: "POST",
+    headers: {
+      ...headers,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Verification failed: ${response.statusText}`);
+  }
+
+  return response.json();
+};

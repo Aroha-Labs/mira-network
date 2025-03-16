@@ -9,7 +9,7 @@ export const metadata: Metadata = {
     description: "Effortless AI workflows to power your next big idea",
     images: [
       {
-        url: "/icons/logo-dark.png",
+        url: "/icons/open-graph-image.png",
         width: 512,
         height: 512,
         alt: "Mira Console",

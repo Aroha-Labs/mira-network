@@ -10,11 +10,9 @@ const TokenCell = ({ log }: { log: ApiLog }) => {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <span className="border-b border-dotted border-gray-400">
-        {log.total_tokens}
-      </span>
+      <span className="border-b border-dotted border-gray-400">{log.total_tokens}</span>
       {isHovered && (
-        <div className="absolute z-10 bg-gradient-to-b from-gray-50 to-white border shadow-lg rounded-md p-3 text-sm w-48 top-1/2 right-full mr-2 transform -translate-y-1/2">
+        <div className="absolute z-10 bg-linear-to-b from-gray-50 to-white border shadow-lg rounded-md p-3 text-sm w-48 top-1/2 right-full mr-2 transform -translate-y-1/2">
           <div className="space-y-2">
             <div className="flex justify-between">
               <span>Prompt:</span>

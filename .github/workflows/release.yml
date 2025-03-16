@@ -39,6 +39,7 @@ jobs:
       - uses: dorny/paths-filter@v3
         id: filter
         with:
+          base: "main"
           filters: |
             router:
               - 'router/**'
@@ -51,14 +52,141 @@ jobs:
             sdk:
               - 'sdk/**'
 
-  create-tag:
+  sonarqube-router:
     needs: changes
+    if: needs.changes.outputs.router == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: "adopt"
+          java-version: "11"
+      - uses: sonarsource/sonarqube-scan-action@master
+        with:
+          projectBaseDir: router
+          args: >
+            -Dsonar.organization=aroha-labs
+            -Dsonar.projectKey=mira-client-router
+            -Dsonar.sources=.
+            -Dsonar.exclusions=**/tests/**,**/test/**
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+  sonarqube-service:
+    needs: changes
+    if: needs.changes.outputs.service == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: "adopt"
+          java-version: "11"
+      - uses: sonarsource/sonarqube-scan-action@master
+        with:
+          projectBaseDir: service
+          args: >
+            -Dsonar.organization=aroha-labs
+            -Dsonar.projectKey=mira-client-service
+            -Dsonar.sources=.
+            -Dsonar.exclusions=**/tests/**,**/test/**
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+  sonarqube-cli:
+    needs: changes
+    if: needs.changes.outputs.cli == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: "adopt"
+          java-version: "11"
+      - uses: sonarsource/sonarqube-scan-action@master
+        with:
+          projectBaseDir: cli
+          args: >
+            -Dsonar.organization=aroha-labs
+            -Dsonar.projectKey=mira-client-cli
+            -Dsonar.sources=.
+            -Dsonar.exclusions=**/tests/**,**/test/**
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+  sonarqube-playground:
+    needs: changes
+    if: needs.changes.outputs.playground == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: "adopt"
+          java-version: "11"
+      - uses: sonarsource/sonarqube-scan-action@master
+        with:
+          projectBaseDir: playground
+          args: >
+            -Dsonar.organization=aroha-labs
+            -Dsonar.projectKey=mira-client-playground
+            -Dsonar.sources=.
+            -Dsonar.exclusions=**/tests/**,**/test/**
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+  sonarqube-sdk:
+    needs: changes
+    if: needs.changes.outputs.sdk == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: "adopt"
+          java-version: "11"
+      - uses: sonarsource/sonarqube-scan-action@master
+        with:
+          projectBaseDir: sdk
+          args: >
+            -Dsonar.organization=aroha-labs
+            -Dsonar.projectKey=mira-client-sdk
+            -Dsonar.sources=.
+            -Dsonar.exclusions=**/tests/**,**/test/**
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+  create-tag:
+    needs: [
+        changes,
+        # sonarqube-router,
+        # sonarqube-service,
+        # sonarqube-cli,
+        # sonarqube-playground,
+        # sonarqube-sdk,
+      ]
     if: |
-      needs.changes.outputs.router == 'true' ||
-      needs.changes.outputs.service == 'true' ||
-      needs.changes.outputs.cli == 'true' ||
-      needs.changes.outputs.playground == 'true' ||
-      needs.changes.outputs.sdk == 'true'
+      (needs.changes.outputs.router == 'true' && needs.sonarqube-router.outputs.quality_gate == 'OK') ||
+      (needs.changes.outputs.service == 'true' && needs.sonarqube-service.outputs.quality_gate == 'OK') ||
+      (needs.changes.outputs.cli == 'true' && needs.sonarqube-cli.outputs.quality_gate == 'OK') ||
+      (needs.changes.outputs.playground == 'true' && needs.sonarqube-playground.outputs.quality_gate == 'OK') ||
+      (needs.changes.outputs.sdk == 'true' && needs.sonarqube-sdk.outputs.quality_gate == 'OK')
     timeout-minutes: 10
     runs-on: ubuntu-latest
     outputs:
@@ -107,6 +235,7 @@ jobs:
             echo "Failed to create or push tag"
             exit 1
           fi
+
       - name: Generate Release Notes
         id: release_notes
         env:
@@ -154,14 +283,14 @@ jobs:
                 messages: [
                   {
                     role: "system",
-                    content: "You are a technical writer creating release notes. Only describe changes that are explicitly present in the provided diff - do not add, assume, or infer any additional changes. Use clear, professional language and organize changes into relevant sections: New Features, Improvements, Bug Fixes, or Technical Updates. If a section has no changes, omit it entirely. Each note should directly correspond to a specific change in the diff."
+                    content: "You are a technical writer specializing in concise, clear release notes. Focus on user-facing changes and technical impacts. Format in Markdown with the following rules:\n- Group changes into ### sections: Features, Improvements, Fixes, or Infrastructure\n- Use bullet points for each change\n- Be specific but brief\n- Exclude trivial changes like formatting\n- Mention breaking changes first with a 🚨 prefix\n- Include PR/Issue numbers if present in commits"
                   },
                   {
                     role: "user",
-                    content: `Based on the following changes, generate release notes that strictly describe only the actual changes made:\n\n${diff}`
+                    content: `Generate release notes for these changes:\n\n${diff}`
                   }
                 ],
-                temperature: 0.3,
+                temperature: 0.2,
                 max_tokens: 1000
               });
               
@@ -204,8 +333,9 @@ jobs:
           body_path: release_notes_${{ steps.tag_version.outputs.new_tag }}.md
           draft: false
           prerelease: ${{ github.ref != 'refs/heads/main' }}
+
   publish-router:
-    needs: [changes, create-tag]
+    needs: [changes, create-tag, sonarqube-router]
     if: needs.changes.outputs.router == 'true'
     timeout-minutes: 15
     runs-on: ubuntu-latest
@@ -245,7 +375,7 @@ jobs:
         run: docker image prune -f
 
   publish-service:
-    needs: [changes, create-tag]
+    needs: [changes, create-tag, sonarqube-service]
     if: needs.changes.outputs.service == 'true'
     runs-on: ubuntu-latest
     env:
@@ -284,7 +414,7 @@ jobs:
         run: docker image prune -f
 
   publish-cli:
-    needs: [changes, create-tag]
+    needs: [changes, create-tag, sonarqube-cli]
     if: needs.changes.outputs.cli == 'true'
     runs-on: ubuntu-latest
     env:
@@ -319,7 +449,7 @@ jobs:
             ${{ runner.os }}-go-
 
   deploy-console-testnet:
-    needs: [changes, create-tag]
+    needs: [changes, create-tag, sonarqube-playground]
     if: needs.changes.outputs.playground == 'true'
     runs-on: ubuntu-latest
     env:
@@ -415,7 +545,7 @@ jobs:
                 -H "Authorization: Bearer ${{ steps.nyx-auth.outputs.token }}"
 
   sdk-lint:
-    needs: [changes, create-tag]
+    needs: [changes, create-tag, sonarqube-sdk]
     if: needs.changes.outputs.sdk == 'true'
     runs-on: ubuntu-latest
     defaults:
@@ -438,19 +568,6 @@ jobs:
       - name: Lint with Ruff
         run: pdm lint
 
-  sonarqube:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          # Disabling shallow clones is recommended for improving the relevancy of reporting
-          fetch-depth: 0
-      - name: SonarQube Scan
-        uses: SonarSource/sonarqube-scan-action@master
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-
   summary:
     needs:
       [
@@ -462,6 +579,11 @@ jobs:
         deploy-console-testnet,
         sdk-test,
         sdk-lint,
+        sonarqube-router,
+        sonarqube-service,
+        sonarqube-cli,
+        sonarqube-playground,
+        sonarqube-sdk,
       ]
     if: always()
     runs-on: ubuntu-latest

@@ -6,6 +6,8 @@ from src.router.models.logs import ApiLogs
 from src.router.db.session import get_session
 from src.router.core.security import verify_user
 from sqlalchemy import func
+from sqlalchemy.types import Float
+from datetime import datetime, timedelta
 
 router = APIRouter()
 
@@ -113,7 +115,12 @@ router = APIRouter()
                                 "payload": "What is the weather?",
                                 "request_payload": {
                                     "model": "gpt-4",
-                                    "messages": [{"role": "user", "content": "What is the weather?"}]
+                                    "messages": [
+                                        {
+                                            "role": "user",
+                                            "content": "What is the weather?",
+                                        }
+                                    ],
                                 },
                                 "ttft": 0.15,
                                 "response": "I cannot provide real-time weather information.",
@@ -124,50 +131,42 @@ router = APIRouter()
                                 "model": "gpt-4",
                                 "model_pricing": {
                                     "prompt_token": 0.00001,
-                                    "completion_token": 0.00002
+                                    "completion_token": 0.00002,
                                 },
                                 "machine_id": "machine_abc",
-                                "created_at": "2024-01-15T10:30:00Z"
+                                "created_at": "2024-01-15T10:30:00Z",
                             }
                         ],
                         "total": 150,
                         "page": 1,
-                        "page_size": 10
+                        "page_size": 10,
                     }
                 }
-            }
+            },
         },
         400: {
             "description": "Bad Request - Invalid parameters",
             "content": {
-                "application/json": {
-                    "example": {
-                        "detail": "Invalid order_by field"
-                    }
-                }
-            }
+                "application/json": {"example": {"detail": "Invalid order_by field"}}
+            },
         },
         401: {
             "description": "Unauthorized - Invalid or missing authentication",
             "content": {
                 "application/json": {
-                    "example": {
-                        "detail": "Could not validate credentials"
-                    }
+                    "example": {"detail": "Could not validate credentials"}
                 }
-            }
+            },
         },
         403: {
             "description": "Forbidden - Non-admin trying to access other user's logs",
             "content": {
                 "application/json": {
-                    "example": {
-                        "detail": "Only admins can query other users' logs"
-                    }
+                    "example": {"detail": "Only admins can query other users' logs"}
                 }
-            }
-        }
-    }
+            },
+        },
+    },
 )
 def list_all_logs(
     db: Session = Depends(get_session),
@@ -182,29 +181,45 @@ def list_all_logs(
     user_id: Optional[str] = None,
     order_by: Optional[str] = "created_at",
     order: Optional[str] = "desc",
+    flow_id: Optional[str] = None,
 ):
-    offset = (page - 1) * page_size
-
-    # Handle user_id filtering with admin check
+    # Check admin access
     if user_id:
         if "admin" not in user.roles:
             raise HTTPException(
                 status_code=403, detail="Only admins can query other users' logs"
             )
-        query = db.query(ApiLogs).filter(ApiLogs.user_id == user_id)
-    else:
-        query = db.query(ApiLogs).filter(ApiLogs.user_id == user.id)
 
+    offset = (page - 1) * page_size
+
+    query = db.query(ApiLogs)
+
+    # Handle user_id filtering and admin access
+    if "admin" in user.roles:
+        # Start with all logs for admin
+        if user_id:
+            # Admin filtering for specific user
+            query = query.filter(ApiLogs.user_id == user_id)
+    else:
+        # Non-admin only sees their own logs
+        query = query.filter(ApiLogs.user_id == user.id)
+
+    # Apply other filters
     if start_date:
         query = query.filter(ApiLogs.created_at >= start_date)
     if end_date:
         query = query.filter(ApiLogs.created_at <= end_date)
     if machine_id:
-        query = query.filter(ApiLogs.machine_id == machine_id)
+        query = query.filter(
+            ApiLogs.machine_id == machine_id
+        )  # Removed str() conversion
     if model:
         query = query.filter(ApiLogs.model == model)
     if api_key_id:
         query = query.filter(ApiLogs.api_key_id == api_key_id)
+    if flow_id:
+        # For flow_id, we don't need to check user ownership if admin
+        query = query.filter(ApiLogs.flow_id == flow_id)
 
     if order_by not in [
         "created_at",
@@ -281,25 +296,17 @@ def list_all_logs(
     responses={
         200: {
             "description": "Successfully retrieved total count",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "total": 1500
-                    }
-                }
-            }
+            "content": {"application/json": {"example": {"total": 1500}}},
         },
         401: {
             "description": "Unauthorized - Invalid or missing authentication",
             "content": {
                 "application/json": {
-                    "example": {
-                        "detail": "Could not validate credentials"
-                    }
+                    "example": {"detail": "Could not validate credentials"}
                 }
-            }
-        }
-    }
+            },
+        },
+    },
 )
 def total_inference_calls(
     db: Session = Depends(get_session),
@@ -309,3 +316,171 @@ def total_inference_calls(
         select(func.count()).select_from(ApiLogs).where(ApiLogs.user_id == user.id)
     ).first()
     return {"total": total}
+
+
+@router.get("/api-logs/metrics")
+def get_logs_metrics(
+    db: Session = Depends(get_session),
+    user: User = Depends(verify_user),
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    machine_id: Optional[int] = None,  # Type hint remains int
+    model: Optional[str] = None,
+    api_key_id: Optional[int] = None,
+    user_id: Optional[str] = None,
+    flow_id: Optional[str] = None,
+    time_bucket: str = "hour",  # hour, day, week, month
+):
+    """Get aggregated metrics without raw logs"""
+
+    # Get time bucket function
+    time_bucket_fn = {
+        "hour": lambda x: func.date_trunc("hour", x),
+        "day": lambda x: func.date_trunc("day", x),
+        "week": lambda x: func.date_trunc("week", x),
+        "month": lambda x: func.date_trunc("month", x),
+    }[time_bucket]
+
+    # Get default time range based on bucket
+    end_dt = datetime.fromisoformat(end_date) if end_date else datetime.utcnow()
+    if not start_date:
+        start_dt = end_dt - timedelta(
+            days={
+                "hour": 1,  # Last 24 hours
+                "day": 7,  # Last week
+                "week": 30,  # Last month
+                "month": 365,  # Last year
+            }[time_bucket]
+        )
+    else:
+        start_dt = datetime.fromisoformat(start_date)
+
+    # Build query with time bucket and date filtering
+    query = select(
+        time_bucket_fn(ApiLogs.created_at).label("timestamp"),
+        ApiLogs.model,
+        func.count().label("calls"),
+        func.coalesce(func.sum(ApiLogs.prompt_tokens), 0).label("prompt_tokens"),
+        func.coalesce(func.sum(ApiLogs.completion_tokens), 0).label(
+            "completion_tokens"
+        ),
+        func.coalesce(func.avg(ApiLogs.total_response_time), 0.0).label(
+            "avg_response_time"
+        ),
+        func.coalesce(func.avg(ApiLogs.ttft), 0.0).label("avg_ttft"),
+        func.coalesce(
+            func.sum(
+                ApiLogs.prompt_tokens
+                * func.cast(ApiLogs.model_pricing["prompt_token"].astext, Float)
+            ),
+            0.0,
+        ).label("prompt_cost"),
+        func.coalesce(
+            func.sum(
+                ApiLogs.completion_tokens
+                * func.cast(ApiLogs.model_pricing["completion_token"].astext, Float)
+            ),
+            0.0,
+        ).label("completion_cost"),
+    ).where(ApiLogs.created_at.between(start_dt, end_dt))
+
+    # Access control
+    if user_id:
+        if "admin" not in user.roles:
+            raise HTTPException(
+                status_code=403, detail="Only admins can query other users' logs"
+            )
+        query = query.where(ApiLogs.user_id == user_id)
+    else:
+        if "admin" not in user.roles:
+            query = query.where(ApiLogs.user_id == user.id)
+
+    # Apply filters
+    if start_date:
+        query = query.where(ApiLogs.created_at >= start_date)
+    if end_date:
+        query = query.where(ApiLogs.created_at <= end_date)
+    if machine_id:
+        query = query.where(ApiLogs.machine_id == str(machine_id))  # Convert to string
+    if model:
+        query = query.where(ApiLogs.model == model)
+    if api_key_id:
+        query = query.where(ApiLogs.api_key_id == api_key_id)
+    if flow_id:
+        query = query.where(ApiLogs.flow_id == flow_id)
+
+    # Add grouping and ordering
+    query = query.group_by(time_bucket_fn(ApiLogs.created_at), ApiLogs.model).order_by(
+        time_bucket_fn(ApiLogs.created_at)
+    )
+
+    # Execute the query once
+    results = db.execute(query).all()
+
+    # Process results safely
+    time_series = {}
+    model_distribution = {}
+
+    for row in results:
+        timestamp = row.timestamp.isoformat()
+        if timestamp not in time_series:
+            time_series[timestamp] = {
+                "timestamp": timestamp,
+                "calls": 0,
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "avg_response_time": 0.0,
+                "avg_ttft": 0.0,
+                "prompt_cost": 0.0,
+                "completion_cost": 0.0,
+            }
+
+        time_series[timestamp]["calls"] += row.calls or 0
+        time_series[timestamp]["prompt_tokens"] += row.prompt_tokens or 0
+        time_series[timestamp]["completion_tokens"] += row.completion_tokens or 0
+        time_series[timestamp]["avg_response_time"] = row.avg_response_time or 0.0
+        time_series[timestamp]["avg_ttft"] = row.avg_ttft or 0.0
+        time_series[timestamp]["prompt_cost"] += row.prompt_cost or 0.0
+        time_series[timestamp]["completion_cost"] += row.completion_cost or 0.0
+
+        if row.model not in model_distribution:
+            model_distribution[row.model] = {
+                "model": row.model,
+                "count": row.calls or 0,
+            }
+
+    # Safe summary calculations
+    total_calls = sum(ts["calls"] for ts in time_series.values())
+
+    return {
+        "summary": {
+            "total_calls": total_calls,
+            "total_tokens": sum(
+                (ts["prompt_tokens"] or 0) + (ts["completion_tokens"] or 0)
+                for ts in time_series.values()
+            ),
+            "avg_response_time": (
+                sum(
+                    (ts["avg_response_time"] or 0.0) * ts["calls"]
+                    for ts in time_series.values()
+                )
+                / total_calls
+                if total_calls > 0
+                else 0.0
+            ),
+            "avg_ttft": (
+                sum(
+                    (ts["avg_ttft"] or 0.0) * ts["calls"] for ts in time_series.values()
+                )
+                / total_calls
+                if total_calls > 0
+                else 0.0
+            ),
+            "total_cost": sum(
+                (ts["prompt_cost"] or 0.0) + (ts["completion_cost"] or 0.0)
+                for ts in time_series.values()
+            ),
+        },
+        "time_series": list(time_series.values()),
+        "model_distribution": list(model_distribution.values()),
+    }

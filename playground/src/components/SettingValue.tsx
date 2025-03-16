@@ -23,11 +23,7 @@ const ValueLabel = ({ type }: { type: string }) => (
   </span>
 );
 
-const SettingValue = ({
-  value,
-  level = 0,
-  showRaw = false,
-}: SettingValueProps) => {
+const SettingValue = ({ value, level = 0, showRaw = false }: SettingValueProps) => {
   const [isExpanded, setIsExpanded] = useState(level < 1);
   const valueType = Array.isArray(value) ? "array" : typeof value;
   const isExpandable = valueType === "object" || valueType === "array";
@@ -90,9 +86,7 @@ const RenderValue = ({
     return (
       <div className="flex items-center gap-2">
         <ValueLabel type="string" />
-        <span className="text-gray-800 break-all">
-          &quot;{value as string}&quot;
-        </span>
+        <span className="text-gray-800 break-all">&quot;{value as string}&quot;</span>
       </div>
     );
   }

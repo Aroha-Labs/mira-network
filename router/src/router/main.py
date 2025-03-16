@@ -7,7 +7,6 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from scalar_fastapi import get_scalar_api_reference
 import os
 
-
 app = FastAPI(
     title="Mira Client Dashboard",
     description="API documentation for Mira Client Dashboard",

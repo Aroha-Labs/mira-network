@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session, select
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlmodel import Session
 from src.router.core.types import User
 from src.router.models.tokens import ApiToken
 from src.router.schemas.tokens import ApiTokenRequest
@@ -14,7 +14,7 @@ router = APIRouter()
 @router.post(
     "/api-tokens",
     summary="Create API Token",
-    description="""Creates a new API token for the authenticated user.
+    description="""Creates a new API token for the authenticated user
 
 ### Authentication
 - Requires a valid authentication token
@@ -23,7 +23,8 @@ router = APIRouter()
 ### Request Body
 ```json
 {
-    "description": string | null  // Optional description for the token
+    "description": string | null,  // Optional description for the token
+    "meta_data": object | null     // Optional metadata for the token
 }
 ```
 
@@ -33,6 +34,7 @@ router = APIRouter()
     "id": int,              // Unique identifier for the token
     "token": string,        // The generated API token
     "description": string | null,
+    "meta_data": object,    // Metadata associated with the token
     "created_at": string    // ISO 8601 datetime
 }
 ```
@@ -71,20 +73,19 @@ router = APIRouter()
                         "id": 1,
                         "token": "sk-mira-a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6",
                         "description": "Development environment token",
-                        "created_at": "2024-01-15T10:30:00Z"
+                        "meta_data": {"env": "development"},
+                        "created_at": "2024-01-15T10:30:00Z",
                     }
                 }
-            }
+            },
         },
         401: {
             "description": "Unauthorized - Invalid or missing authentication",
             "content": {
                 "application/json": {
-                    "example": {
-                        "detail": "Could not validate credentials"
-                    }
+                    "example": {"detail": "Could not validate credentials"}
                 }
-            }
+            },
         },
         500: {
             "description": "Internal server error while creating token",
@@ -94,9 +95,9 @@ router = APIRouter()
                         "detail": "Database error occurred while creating token"
                     }
                 }
-            }
-        }
-    }
+            },
+        },
+    },
 )
 def create_api_token(
     request: ApiTokenRequest,
@@ -109,6 +110,7 @@ def create_api_token(
             user_id=user.id,
             token=token,
             description=request.description,
+            meta_data=request.meta_data,
         )
         db.add(api_token)
         db.commit()
@@ -121,6 +123,7 @@ def create_api_token(
         "id": api_token.id,
         "token": api_token.token,
         "description": api_token.description,
+        "meta_data": api_token.meta_data,
         "created_at": api_token.created_at,
     }
 
@@ -134,83 +137,90 @@ def create_api_token(
 - Requires a valid authentication token
 - Token must be passed in the Authorization header
 
+### Query Parameters
+- `page`: Page number (optional, default: 1)
+- `page_size`: Number of items per page (optional, default: 100)
+
 ### Response Format
 ```json
-[
-    {
-        "id": int,              // Unique identifier for the token
-        "token": string,        // The API token
-        "description": string | null,
-        "created_at": string    // ISO 8601 datetime
-    }
-]
+{
+    "items": [
+        {
+            "id": int,              // Unique identifier for the token
+            "token": string,        // The API token
+            "description": string | null,
+            "meta_data": object,    // Metadata associated with the token
+            "created_at": string    // ISO 8601 datetime
+        }
+    ],
+    "total": int,          // Total number of tokens
+    "page": int,           // Current page number
+    "page_size": int,      // Items per page
+    "total_pages": int     // Total number of pages
+}
 ```
-
-### Error Responses
-- `401 Unauthorized`:
-    ```json
-    {
-        "detail": "Could not validate credentials"
-    }
-    ```
 
 ### Notes
 - Only returns active (non-deleted) tokens
 - Tokens are ordered by creation date (newest first)
-- Deleted tokens are not included in the response
-- Empty array is returned if user has no active tokens""",
-    response_description="Returns an array of active API token details",
-    responses={
-        200: {
-            "description": "Successfully retrieved API tokens",
-            "content": {
-                "application/json": {
-                    "example": [
-                        {
-                            "id": 1,
-                            "token": "sk-mira-a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6",
-                            "description": "Production token",
-                            "created_at": "2024-01-15T10:30:00Z"
-                        },
-                        {
-                            "id": 2,
-                            "token": "sk-mira-b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7",
-                            "description": "Development token",
-                            "created_at": "2024-01-14T15:45:00Z"
-                        }
-                    ]
-                }
-            }
-        },
-        401: {
-            "description": "Unauthorized - Invalid or missing authentication",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "detail": "Could not validate credentials"
-                    }
-                }
-            }
-        }
-    }
+- For backward compatibility, if no pagination parameters are provided, 
+  returns all tokens in a flat array
+- Default page_size is 100 items""",
+    response_description="Returns paginated API token details",
 )
 def list_api_tokens(
-    db: Session = Depends(get_session), user: User = Depends(verify_user)
+    page: int = Query(None, ge=1, description="Page number"),
+    page_size: int = Query(None, ge=1, le=100, description="Items per page"),
+    db: Session = Depends(get_session),
+    user: User = Depends(verify_user),
 ):
-    tokens = (
+    query = (
         db.query(ApiToken)
         .filter(ApiToken.user_id == user.id, ApiToken.deleted_at.is_(None))
-        .all()
+        .order_by(ApiToken.created_at.desc())
     )
-    return [
-        {
-            "id": token.id,
-            "token": token.token,
-            "description": token.description,
-            "created_at": token.created_at,
-        }
-        for token in tokens
-    ]
+
+    # If no pagination parameters, return all tokens (backward compatibility)
+    if page is None and page_size is None:
+        tokens = query.all()
+        return [
+            {
+                "id": token.id,
+                "token": token.token,
+                "description": token.description,
+                "meta_data": token.meta_data,
+                "created_at": token.created_at,
+            }
+            for token in tokens
+        ]
+
+    # Default values for pagination
+    page = page or 1
+    page_size = page_size or 100
+
+    # Get total count
+    total = query.count()
+    total_pages = (total + page_size - 1) // page_size
+
+    # Apply pagination
+    tokens = query.offset((page - 1) * page_size).limit(page_size).all()
+
+    return {
+        "items": [
+            {
+                "id": token.id,
+                "token": token.token,
+                "description": token.description,
+                "meta_data": token.meta_data,
+                "created_at": token.created_at,
+            }
+            for token in tokens
+        ],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": total_pages,
+    }
 
 
 @router.delete(
@@ -257,36 +267,28 @@ def list_api_tokens(
             "description": "Successfully deleted API token",
             "content": {
                 "application/json": {
-                    "example": {
-                        "message": "Token deleted successfully"
-                    }
+                    "example": {"message": "Token deleted successfully"}
                 }
-            }
+            },
         },
         401: {
             "description": "Unauthorized - Invalid or missing authentication",
             "content": {
                 "application/json": {
-                    "example": {
-                        "detail": "Could not validate credentials"
-                    }
+                    "example": {"detail": "Could not validate credentials"}
                 }
-            }
+            },
         },
         404: {
             "description": "Token not found",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "detail": "Token not found"
-                    }
-                }
-            }
-        }
-    }
+            "content": {"application/json": {"example": {"detail": "Token not found"}}},
+        },
+    },
 )
 def delete_api_token(
-    token: str, db: Session = Depends(get_session), user: User = Depends(verify_user)
+    token: str,
+    db: Session = Depends(get_session),
+    user: User = Depends(verify_user),
 ):
     api_token = (
         db.query(ApiToken)
