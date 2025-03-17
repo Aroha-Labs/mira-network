@@ -482,7 +482,7 @@ jobs:
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
 
   sdk-test:
-      needs: [changes, create-tag]
+      needs: changes
       if: needs.changes.outputs.sdk == 'true'
       runs-on: ubuntu-latest
       strategy:

@@ -16,7 +16,6 @@ def client():
         api_key=os.getenv("STG_API_KEY"),
     )
 
-
 async def test_client_initialization():
     client = MiraClient(
         api_key=os.getenv("STG_API_KEY"),
