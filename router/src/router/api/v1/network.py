@@ -299,8 +299,10 @@ async def save_log(
     return api_log, user_credits_history
 
 
-async def handle_stream_chunk(chunk: bytes) -> AsyncGenerator[tuple[str, dict], None]:
-    """Handle individual chunks with proper error handling and parsing"""
+async def handle_stream_chunk(
+    chunk: str | bytes,
+) -> AsyncGenerator[tuple[str, dict], None]:
+    buffer = ""
     try:
         # Convert bytes to text
         if isinstance(chunk, bytes):
@@ -308,35 +310,58 @@ async def handle_stream_chunk(chunk: bytes) -> AsyncGenerator[tuple[str, dict], 
         else:
             text = str(chunk)
 
-        # Split into lines and process each
-        lines = text.split("\n")
-        for line in lines:
-            line = line.strip()
+        buffer += text
+
+        while True:
+            # Find the next complete SSE line
+            line_end = buffer.find("\n")
+            if line_end == -1:
+                break
+
+            line = buffer[:line_end].strip()
+            buffer = buffer[line_end + 1 :]
+
             if not line:
                 continue
 
             # Handle SSE format
             if line.startswith("data: "):
-                line = line[6:]
+                data = line[6:]
+                if data == "[DONE]":
+                    break
 
-            try:
-                # Try to parse as JSON
-                json_data = json.loads(line)
-                yield f"data: {json.dumps(json_data)}\n\n", json_data
-            except json.JSONDecodeError:
-                # If not JSON, send as raw data
-                if line.strip():
-                    yield f"data: {json.dumps({'raw': line})}\n\n", {"raw": line}
+                try:
+                    json_data = json.loads(data)
+
+                    # Yield both content chunks and usage data
+                    if (
+                        json_data.get("choices", [{}])[0]
+                        .get("delta", {})
+                        .get("content")
+                        or "usage" in json_data
+                    ):
+                        yield f"data: {json.dumps(json_data)}\n\n", json_data
+                except json.JSONDecodeError:
+                    logger.debug(f"Incomplete JSON chunk (expected): {data}")
+                    continue
+            else:
+                continue
+
     except Exception as e:
         logger.error(f"Stream chunk processing error: {str(e)}")
         yield f"data: {json.dumps({'error': str(e)})}\n\n", {"error": str(e)}
 
 
 async def stream_response(response) -> AsyncGenerator[tuple[str, dict], None]:
-    """Simple streaming response handler"""
+    """Stream response handler with proper chunk size and decoding"""
     try:
-        async for chunk in response.content.iter_chunked(1024):
-            async for message, data in handle_stream_chunk(chunk):
+        # Use 1024 bytes chunk size and decode to unicode, similar to requests
+        async for chunk in response.content.iter_any():
+            if isinstance(chunk, bytes):
+                text = chunk.decode("utf-8")
+            else:
+                text = str(chunk)
+            async for message, data in handle_stream_chunk(text):
                 yield message, data
     except Exception as e:
         logger.error(f"Streaming error: {str(e)}")
@@ -429,6 +454,7 @@ async def chatCompletionGenerate(
                     yield f"data: {json.dumps({'error': str(e)})}\n\n"
                 finally:
                     try:
+                        logger.info(f"Usage: {usage}")
                         # Save logs with proper error handling
                         api_log, user_credits_history = await save_log(
                             user=user,
