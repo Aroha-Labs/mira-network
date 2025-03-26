@@ -456,7 +456,7 @@ async def chatCompletionGenerate(
                     try:
                         logger.info(f"Usage: {usage}")
                         # Save logs with proper error handling
-                        api_log, user_credits_history = await save_log(
+                        await save_log(
                             user=user,
                             user_credits=user_credits,
                             req=req,
@@ -468,9 +468,7 @@ async def chatCompletionGenerate(
                             machine_id=machine_id or 0,
                             flow_id=flow_id,
                         )
-                        db.add(api_log)
-                        db.add(user_credits_history)
-                        await db.commit()
+
                     except Exception as log_error:
                         logger.error(f"Log saving error: {str(log_error)}")
 
@@ -508,7 +506,7 @@ async def chatCompletionGenerate(
             except (ValueError, TypeError):
                 machine_id = 0
 
-            api_log, user_credits_history = await save_log(
+            await save_log(
                 user=user,
                 user_credits=user_credits,
                 req=req,
@@ -520,10 +518,6 @@ async def chatCompletionGenerate(
                 machine_id=machine_id,
                 flow_id=flow_id,
             )
-
-            db.add(api_log)
-            db.add(user_credits_history)
-            await db.commit()
 
             return Response(
                 content=response_text,
