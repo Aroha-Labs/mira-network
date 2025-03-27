@@ -3,8 +3,6 @@ from typing import Optional, AsyncGenerator
 from fastapi import APIRouter, Depends, Response, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from src.router.models.user import UserCreditsHistory
-from src.router.models.logs import ApiLogs
 from src.router.utils.user import get_user_credits
 from src.router.utils.machine import get_machine_id
 from src.router.core.config import NODE_SERVICE_URL
@@ -32,13 +30,7 @@ from src.router.utils.opensearch import (
     OPENSEARCH_MODEL_USAGE_INDEX,
     OPENSEARCH_CREDITS_INDEX,
 )
-from aiohttp import (
-    ClientSession,
-    ClientTimeout,
-    ClientPayloadError,
-    ServerDisconnectedError,
-    TCPConnector,
-)
+from aiohttp import ClientSession, ClientTimeout, TCPConnector
 
 
 router = APIRouter()
@@ -179,54 +171,18 @@ async def save_log(
     completion_tokens = usage.get("completion_tokens", 0)
     total_tokens = usage.get("total_tokens", 0)
 
-    logger.info(f"Prompt tokens: {prompt_tokens}")
-    logger.info(f"Completion tokens: {completion_tokens}")
-    logger.info(f"Total tokens: {total_tokens}")
-
     prompt_tokens_cost = prompt_tokens * model_p.prompt_token
     completion_tokens_cost = completion_tokens * model_p.completion_token
-
-    logger.info(f"Prompt tokens cost: {prompt_tokens_cost}")
-    logger.info(f"Completion tokens cost: {completion_tokens_cost}")
 
     cost = prompt_tokens_cost + completion_tokens_cost
 
     # NEW: Use redis to manage user's credits instead of updating the db
     redis_key = f"user_credit:{user.id}"
     # new_credit = user_credits - cost
-    logger.info(f"Cost: {-cost}")
     await redis_client.incrbyfloat(redis_key, float(-cost))
 
     new_credit_bytes = await redis_client.get(redis_key)
     new_credit = float(new_credit_bytes.decode("utf-8")) if new_credit_bytes else 0.0
-
-    logger.info(f"New credit: {new_credit}")
-
-    # Log the request
-    api_log = ApiLogs(
-        user_id=user.id,
-        api_key_id=user.api_key_id,
-        payload=req.model_dump_json(),
-        request_payload=req.model_dump(),
-        ttft=ttfs,
-        response=result_text,
-        prompt_tokens=usage.get("prompt_tokens", 0),
-        completion_tokens=usage.get("completion_tokens", 0),
-        total_tokens=usage.get("total_tokens", 0),
-        total_response_time=time.time() - timeStart,
-        model=req.model,
-        model_pricing=model_pricing,
-        machine_id=str(machine_id),
-        flow_id=flow_id,
-    )
-
-    # Update user credit history
-    user_credits_history = UserCreditsHistory(
-        user_id=user.id,
-        amount=-cost,
-        description=f"Used {total_tokens} tokens. Prompt tokens: {prompt_tokens}, Completion tokens: {completion_tokens}",
-        created_at=datetime.now(timezone.utc).replace(tzinfo=None),
-    )
 
     # Prepare documents for OpenSearch
     model_usage_doc = {
@@ -295,8 +251,6 @@ async def save_log(
         )
     except Exception as e:
         logger.error(f"Log saving error: {str(e)}")
-
-    return api_log, user_credits_history
 
 
 async def handle_stream_chunk(
