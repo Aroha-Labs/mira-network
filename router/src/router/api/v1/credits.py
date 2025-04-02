@@ -4,6 +4,7 @@ from src.router.core.types import User
 from src.router.models.user import User as UserModel, UserCreditsHistory
 from src.router.db.session import get_session
 from src.router.core.security import verify_user
+from src.router.utils.nr import track
 
 router = APIRouter()
 
@@ -69,8 +70,17 @@ router = APIRouter()
 def get_user_credits(
     db: Session = Depends(get_session), user: User = Depends(verify_user)
 ):
+    track("get_user_credits_request", {"user_id": str(user.id)})
+    
     user_data = db.exec(select(UserModel).where(UserModel.user_id == user.id)).first()
-    return {"credits": user_data.credits if user_data else 0}
+    credits = user_data.credits if user_data else 0
+    
+    track("get_user_credits_response", {
+        "user_id": str(user.id),
+        "credits": credits
+    })
+    
+    return {"credits": credits}
 
 
 @router.get(
@@ -160,9 +170,17 @@ def get_user_credits(
 def get_user_credits_history(
     db: Session = Depends(get_session), user: User = Depends(verify_user)
 ):
+    track("get_user_credits_history_request", {"user_id": str(user.id)})
+    
     history = db.exec(
         select(UserCreditsHistory)
         .where(UserCreditsHistory.user_id == user.id)
         .order_by(UserCreditsHistory.created_at.desc())
     ).all()
+    
+    track("get_user_credits_history_response", {
+        "user_id": str(user.id),
+        "entries_count": len(history)
+    })
+    
     return history

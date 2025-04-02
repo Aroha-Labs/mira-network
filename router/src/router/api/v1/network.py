@@ -19,6 +19,7 @@ import json
 from src.router.utils.settings import get_setting_value
 from src.router.utils.settings import get_supported_models
 import asyncio
+from src.router.utils.nr import track
 
 router = APIRouter()
 
@@ -143,6 +144,8 @@ router = APIRouter()
     },
 )
 async def verify(req: VerifyRequest, db: Session = Depends(get_session)):
+    track("verify_request", {"models_count": len(req.models), "min_yes": req.min_yes})
+
     if len(req.models) < 1:
         raise HTTPException(status_code=400, detail="At least one model is required")
 
@@ -194,8 +197,10 @@ async def verify(req: VerifyRequest, db: Session = Depends(get_session)):
 
     yes_count = sum(1 for result in results if result["result"] == "yes")
     if yes_count >= req.min_yes:
+        track("verify_response", {"result": "yes", "yes_count": yes_count})
         return {"result": "yes", "results": results}
     else:
+        track("verify_response", {"result": "no", "yes_count": yes_count})
         return {"result": "no", "results": results}
 
 
@@ -267,7 +272,10 @@ class ModelListRes(BaseModel):
     },
 )
 async def list_models(db: Session = Depends(get_session)) -> ModelListRes:
+    track("list_models_request")
+
     supported_models = get_supported_models(db)
+    track("list_models_response", {"models_count": len(supported_models)})
     return {
         "object": "list",
         "data": [
@@ -551,6 +559,8 @@ async def generate(
     db: Session = Depends(get_session),
     flow_id: Optional[str] = None,
 ) -> Response:
+    track("generate_request", {"model": req.model, "stream": req.stream, "user_id": user.id})
+
     timeStart = time.time()
 
     user_row = db.exec(select(UserModel).where(UserModel.user_id == user.id)).first()
@@ -664,6 +674,16 @@ async def generate(
             flow_id=flow_id,
         )
 
+        track("generate_response", {
+            "model": original_req_model,
+            "prompt_tokens": usage.get("prompt_tokens", 0),
+            "completion_tokens": usage.get("completion_tokens", 0),
+            "total_tokens": usage.get("total_tokens", 0),
+            "response_time": time.time() - timeStart,
+            "ttft": ttfs,
+            "user_id": user.id
+        })
+
     if req.stream:
         res = StreamingResponse(generate(), media_type="text/event-stream")
     else:
@@ -685,6 +705,16 @@ async def generate(
             machine_id=machine.id,
             flow_id=flow_id,
         )
+
+        track("generate_response", {
+            "model": original_req_model,
+            "prompt_tokens": usage.get("prompt_tokens", 0),
+            "completion_tokens": usage.get("completion_tokens", 0),
+            "total_tokens": usage.get("total_tokens", 0),
+            "response_time": time.time() - timeStart,
+            "ttft": ttfs,
+            "user_id": user.id
+        })
 
         return Response(
             content=llmres.text,
