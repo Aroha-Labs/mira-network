@@ -9,7 +9,10 @@ from src.router.core.security import verify_user
 from sqlalchemy import func
 from sqlalchemy.types import Float
 from datetime import datetime, timedelta
-from src.router.utils.opensearch import opensearch_client, OPENSEARCH_MODEL_USAGE_INDEX
+from src.router.utils.opensearch import (
+    opensearch_client,
+    OPENSEARCH_LLM_USAGE_LOG_INDEX,
+)
 
 router = APIRouter()
 
@@ -256,7 +259,8 @@ async def list_all_logs(
 
         # Execute search
         response = opensearch_client.search(
-            index=OPENSEARCH_MODEL_USAGE_INDEX, body=query
+            index=OPENSEARCH_LLM_USAGE_LOG_INDEX,
+            body=query,
         )
 
         # Transform results
