@@ -7,6 +7,7 @@ from src.router.db.session import get_session
 from src.router.core.security import verify_user
 from datetime import datetime
 import os
+from src.router.utils.nr import track
 
 router = APIRouter()
 
@@ -104,6 +105,12 @@ def create_api_token(
     db: Session = Depends(get_session),
     user: User = Depends(verify_user),
 ):
+    track("create_api_token_request", {
+        "user_id": str(user.id),
+        "has_description": request.description is not None,
+        "has_metadata": request.meta_data is not None
+    })
+    
     token = f"sk-mira-{os.urandom(24).hex()}"
     try:
         api_token = ApiToken(
@@ -115,10 +122,20 @@ def create_api_token(
         db.add(api_token)
         db.commit()
         db.refresh(api_token)
+        
+        track("create_api_token_success", {
+            "user_id": str(user.id),
+            "token_id": api_token.id
+        })
+        
     except Exception as e:
         db.rollback()
-        print(e)
+        track("create_api_token_error", {
+            "user_id": str(user.id),
+            "error": str(e)
+        })
         raise HTTPException(status_code=500, detail=str(e))
+        
     return {
         "id": api_token.id,
         "token": api_token.token,
@@ -174,6 +191,13 @@ def list_api_tokens(
     db: Session = Depends(get_session),
     user: User = Depends(verify_user),
 ):
+    track("list_api_tokens_request", {
+        "user_id": str(user.id),
+        "page": page,
+        "page_size": page_size,
+        "use_pagination": page is not None and page_size is not None
+    })
+    
     query = (
         db.query(ApiToken)
         .filter(ApiToken.user_id == user.id, ApiToken.deleted_at.is_(None))
@@ -183,6 +207,13 @@ def list_api_tokens(
     # If no pagination parameters, return all tokens (backward compatibility)
     if page is None and page_size is None:
         tokens = query.all()
+        
+        track("list_api_tokens_response", {
+            "user_id": str(user.id),
+            "tokens_count": len(tokens),
+            "paginated": False
+        })
+        
         return [
             {
                 "id": token.id,
@@ -204,6 +235,15 @@ def list_api_tokens(
 
     # Apply pagination
     tokens = query.offset((page - 1) * page_size).limit(page_size).all()
+    
+    track("list_api_tokens_response", {
+        "user_id": str(user.id),
+        "tokens_count": len(tokens),
+        "total_tokens": total,
+        "page": page,
+        "total_pages": total_pages,
+        "paginated": True
+    })
 
     return {
         "items": [
@@ -290,15 +330,30 @@ def delete_api_token(
     db: Session = Depends(get_session),
     user: User = Depends(verify_user),
 ):
+    track("delete_api_token_request", {
+        "user_id": str(user.id),
+        "token_prefix": token[:12] if len(token) > 12 else token  # Just include prefix for safety
+    })
+    
     api_token = (
         db.query(ApiToken)
         .filter(ApiToken.token == token, ApiToken.user_id == user.id)
         .first()
     )
     if not api_token:
+        track("delete_api_token_error", {
+            "user_id": str(user.id),
+            "error": "token_not_found"
+        })
         raise HTTPException(status_code=404, detail="Token not found")
 
     api_token.deleted_at = datetime.utcnow()
     db.commit()
     db.refresh(api_token)
+    
+    track("delete_api_token_success", {
+        "user_id": str(user.id),
+        "token_id": api_token.id
+    })
+    
     return {"message": "Token deleted successfully"}
