@@ -55,6 +55,7 @@ def create_flow(
         system_prompt=flow.system_prompt,
         name=flow.name,
         variables=variables,
+        user_id=str(user.id),
     )
     db.add(new_flow)
     db.commit()
@@ -202,6 +203,12 @@ def get_flow(flow_id: str, db: Session = Depends(get_session)):
         "detail": "Could not validate credentials"
     }
     ```
+- `403 Forbidden`:
+    ```json
+    {
+        "detail": "Not authorized to modify this flow"
+    }
+    ```
 - `404 Not Found`:
     ```json
     {
@@ -212,7 +219,8 @@ def get_flow(flow_id: str, db: Session = Depends(get_session)):
 ### Notes
 - Variables are re-extracted from the updated system prompt
 - All fields must be provided (no partial updates)
-- Previous variables are replaced with newly extracted ones""",
+- Previous variables are replaced with newly extracted ones
+- Only the flow owner can update the flow""",
     response_description="Returns the updated flow object",
     responses={
         200: {
@@ -236,25 +244,56 @@ def get_flow(flow_id: str, db: Session = Depends(get_session)):
                 }
             },
         },
+        403: {
+            "description": "Forbidden - Not the flow owner",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Not authorized to modify this flow"}
+                }
+            },
+        },
         404: {
             "description": "Flow not found",
             "content": {"application/json": {"example": {"detail": "Flow not found"}}},
         },
     },
 )
-def update_flow(flow_id: str, flow: FlowRequest, db: Session = Depends(get_session)):
+def update_flow(
+    flow_id: str,
+    flow: FlowRequest,
+    db: Session = Depends(get_session),
+    user: User = Depends(verify_user),
+):
     track("update_flow_request", {
         "flow_id": flow_id,
-        "flow_name": flow.name
+        "flow_name": flow.name,
+        "user_id": str(user.id)
     })
     
     existing_flow = db.query(Flows).filter(Flows.id == flow_id).first()
     if not existing_flow:
-        track("update_flow_error", {"flow_id": flow_id, "error": "flow_not_found"})
+        track("update_flow_error", {
+            "flow_id": flow_id,
+            "error": "flow_not_found",
+            "user_id": str(user.id)
+        })
         raise HTTPException(status_code=404, detail="Flow not found")
+    
+    # Check if user is authorized to update this flow
+    if existing_flow.user_id != str(user.id):
+        track("update_flow_error", {
+            "flow_id": flow_id,
+            "error": "not_authorized",
+            "user_id": str(user.id),
+            "flow_owner_id": existing_flow.user_id
+        })
+        raise HTTPException(
+            status_code=403,
+            detail="Not authorized to modify this flow"
+        )
 
     # Save old values for tracking
-    old_variables_count = len(existing_flow.variables)
+    old_variables_count = len(existing_flow.variables or [])
     
     existing_flow.system_prompt = flow.system_prompt
     existing_flow.name = flow.name
@@ -267,7 +306,8 @@ def update_flow(flow_id: str, flow: FlowRequest, db: Session = Depends(get_sessi
         "flow_id": flow_id,
         "flow_name": existing_flow.name,
         "old_variables_count": old_variables_count,
-        "new_variables_count": len(existing_flow.variables)
+        "new_variables_count": len(existing_flow.variables or []),
+        "user_id": str(user.id)
     })
     
     return existing_flow
@@ -299,6 +339,12 @@ def update_flow(flow_id: str, flow: FlowRequest, db: Session = Depends(get_sessi
         "detail": "Could not validate credentials"
     }
     ```
+- `403 Forbidden`:
+    ```json
+    {
+        "detail": "Not authorized to delete this flow"
+    }
+    ```
 - `404 Not Found`:
     ```json
     {
@@ -308,7 +354,8 @@ def update_flow(flow_id: str, flow: FlowRequest, db: Session = Depends(get_sessi
 
 ### Notes
 - Operation cannot be undone
-- All associated data is permanently deleted""",
+- All associated data is permanently deleted
+- Only the flow owner can delete the flow""",
     response_description="Returns a success message",
     responses={
         200: {
@@ -327,19 +374,51 @@ def update_flow(flow_id: str, flow: FlowRequest, db: Session = Depends(get_sessi
                 }
             },
         },
+        403: {
+            "description": "Forbidden - Not the flow owner",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Not authorized to delete this flow"}
+                }
+            },
+        },
         404: {
             "description": "Flow not found",
             "content": {"application/json": {"example": {"detail": "Flow not found"}}},
         },
     },
 )
-def delete_flow(flow_id: str, db: Session = Depends(get_session)):
-    track("delete_flow_request", {"flow_id": flow_id})
+def delete_flow(
+    flow_id: str,
+    db: Session = Depends(get_session),
+    user: User = Depends(verify_user)
+):
+    track("delete_flow_request", {
+        "flow_id": flow_id,
+        "user_id": str(user.id)
+    })
     
     existing_flow = db.query(Flows).filter(Flows.id == flow_id).first()
     if not existing_flow:
-        track("delete_flow_error", {"flow_id": flow_id, "error": "flow_not_found"})
+        track("delete_flow_error", {
+            "flow_id": flow_id,
+            "error": "flow_not_found",
+            "user_id": str(user.id)
+        })
         raise HTTPException(status_code=404, detail="Flow not found")
+    
+    # Check if user is authorized to delete this flow
+    if existing_flow.user_id != str(user.id):
+        track("delete_flow_error", {
+            "flow_id": flow_id,
+            "error": "not_authorized",
+            "user_id": str(user.id),
+            "flow_owner_id": existing_flow.user_id
+        })
+        raise HTTPException(
+            status_code=403,
+            detail="Not authorized to delete this flow"
+        )
     
     flow_name = existing_flow.name
     
@@ -348,7 +427,8 @@ def delete_flow(flow_id: str, db: Session = Depends(get_session)):
     
     track("delete_flow_success", {
         "flow_id": flow_id,
-        "flow_name": flow_name
+        "flow_name": flow_name,
+        "user_id": str(user.id)
     })
     
     return {"message": "Flow deleted successfully"}
