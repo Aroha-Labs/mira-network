@@ -8,6 +8,7 @@ from src.router.core.security import verify_user
 from sqlalchemy import func
 from sqlalchemy.types import Float
 from datetime import datetime, timedelta
+from src.router.utils.nr import track
 
 router = APIRouter()
 
@@ -183,13 +184,52 @@ def list_all_logs(
     order: Optional[str] = "desc",
     flow_id: Optional[str] = None,
 ):
+    track("list_logs_request", {
+        "user_id": str(user.id),
+        "page": page,
+        "page_size": page_size,
+        "is_admin": "admin" in user.roles,
+        "has_filters": any([start_date, end_date, machine_id, model, api_key_id, user_id, flow_id])
+    })
+    
     # Check admin access
     if user_id:
         if "admin" not in user.roles:
+            track("list_logs_error", {
+                "user_id": str(user.id),
+                "error": "permission_denied",
+                "requested_user_id": user_id
+            })
             raise HTTPException(
                 status_code=403, detail="Only admins can query other users' logs"
             )
 
+    # Additional error tracking
+    if order_by not in [
+        "created_at",
+        "total_response_time",
+        "total_tokens",
+        "prompt_tokens",
+        "completion_tokens",
+        "ttft",
+        "model",
+        "machine_id",
+    ]:
+        track("list_logs_error", {
+            "user_id": str(user.id),
+            "error": "invalid_order_by",
+            "order_by": order_by
+        })
+        raise HTTPException(status_code=400, detail="Invalid order_by field")
+    
+    if order not in ["asc", "desc"]:
+        track("list_logs_error", {
+            "user_id": str(user.id),
+            "error": "invalid_order_direction",
+            "order": order
+        })
+        raise HTTPException(status_code=400, detail="Invalid order direction")
+    
     offset = (page - 1) * page_size
 
     query = db.query(ApiLogs)
@@ -256,6 +296,13 @@ def list_all_logs(
 
     filtered_logs = list(map(exclude_model_from_pricing, logs))
 
+    track("list_logs_response", {
+        "user_id": str(user.id),
+        "total_logs": total_logs,
+        "returned_logs": len(filtered_logs),
+        "page": page
+    })
+    
     return {
         "logs": filtered_logs,
         "total": total_logs,
@@ -312,9 +359,17 @@ def total_inference_calls(
     db: Session = Depends(get_session),
     user: User = Depends(verify_user),
 ):
+    track("total_inference_calls_request", {"user_id": str(user.id)})
+    
     total = db.exec(
         select(func.count()).select_from(ApiLogs).where(ApiLogs.user_id == user.id)
     ).first()
+    
+    track("total_inference_calls_response", {
+        "user_id": str(user.id),
+        "total_calls": total
+    })
+    
     return {"total": total}
 
 
@@ -331,7 +386,23 @@ def get_logs_metrics(
     flow_id: Optional[str] = None,
     time_bucket: str = "hour",  # hour, day, week, month
 ):
-    """Get aggregated metrics without raw logs"""
+    track("logs_metrics_request", {
+        "user_id": str(user.id),
+        "is_admin": "admin" in user.roles,
+        "time_bucket": time_bucket,
+        "has_filters": any([start_date, end_date, machine_id, model, api_key_id, user_id, flow_id])
+    })
+    
+    # Handle permission errors
+    if user_id and "admin" not in user.roles:
+        track("logs_metrics_error", {
+            "user_id": str(user.id),
+            "error": "permission_denied",
+            "requested_user_id": user_id
+        })
+        raise HTTPException(
+            status_code=403, detail="Only admins can query other users' logs"
+        )
 
     # Get time bucket function
     time_bucket_fn = {
@@ -452,6 +523,13 @@ def get_logs_metrics(
     # Safe summary calculations
     total_calls = sum(ts["calls"] for ts in time_series.values())
 
+    track("logs_metrics_response", {
+        "user_id": str(user.id),
+        "total_calls": total_calls,
+        "time_series_points": len(time_series),
+        "model_count": len(model_distribution)
+    })
+    
     return {
         "summary": {
             "total_calls": total_calls,

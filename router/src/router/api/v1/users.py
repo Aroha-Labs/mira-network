@@ -4,6 +4,7 @@ from src.router.core.types import User
 from src.router.models.user import User as UserModel
 from src.router.db.session import get_session
 from src.router.core.security import verify_token
+from src.router.utils.nr import track
 
 router = APIRouter()
 
@@ -90,7 +91,13 @@ def get_current_user(
         - The user parameter comes from the verify_token dependency
         - Returns None instead of raising an error if the user is not found
     """
+    track("get_current_user_request", {"user_id": str(user.id)})
+    
     user_data = db.exec(select(UserModel).where(UserModel.user_id == user.id)).first()
+    
     if not user_data:
+        track("get_current_user_not_found", {"user_id": str(user.id)})
         return None
+        
+    track("get_current_user_success", {"user_id": str(user.id)})
     return user_data
