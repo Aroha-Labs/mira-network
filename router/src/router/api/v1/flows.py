@@ -280,7 +280,10 @@ def update_flow(
         raise HTTPException(status_code=404, detail="Flow not found")
     
     # Check if user is authorized to update this flow
-    if existing_flow.user_id != str(user.id):
+    is_admin = False
+    is_admin = 'admin' in user.roles
+    
+    if existing_flow.user_id != str(user.id) and not is_admin:
         track("update_flow_error", {
             "flow_id": flow_id,
             "error": "not_authorized",
@@ -307,7 +310,8 @@ def update_flow(
         "flow_name": existing_flow.name,
         "old_variables_count": old_variables_count,
         "new_variables_count": len(existing_flow.variables or []),
-        "user_id": str(user.id)
+        "user_id": str(user.id),
+        "is_admin_action": is_admin and existing_flow.user_id != str(user.id)
     })
     
     return existing_flow
@@ -408,7 +412,10 @@ def delete_flow(
         raise HTTPException(status_code=404, detail="Flow not found")
     
     # Check if user is authorized to delete this flow
-    if existing_flow.user_id != str(user.id):
+    is_admin = False
+    is_admin = 'admin' in user.roles
+    
+    if existing_flow.user_id != str(user.id) and not is_admin:
         track("delete_flow_error", {
             "flow_id": flow_id,
             "error": "not_authorized",
@@ -428,7 +435,8 @@ def delete_flow(
     track("delete_flow_success", {
         "flow_id": flow_id,
         "flow_name": flow_name,
-        "user_id": str(user.id)
+        "user_id": str(user.id),
+        "is_admin_action": is_admin and existing_flow.user_id != str(user.id)
     })
     
     return {"message": "Flow deleted successfully"}

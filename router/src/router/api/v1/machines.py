@@ -138,16 +138,16 @@ def check_liveness_by_id(machine_id: str):
 def set_liveness(
     network_ip: str,
     session: SessionDep,
-    machine_auth: dict = Depends(verify_machine),
+    # machine_auth: dict = Depends(verify_machine),
 ):
     track("set_liveness_request", {"network_ip": network_ip})
     
     # Verify the token is authorized for this machine
-    authorized_ips = [m["network_ip"] for m in machine_auth["machines"]]
-    if network_ip not in authorized_ips:
-        raise HTTPException(
-            status_code=403, detail="Token not authorized for this machine"
-        )
+    # authorized_ips = [m["network_ip"] for m in machine_auth["machines"]]
+    # if network_ip not in authorized_ips:
+    #     raise HTTPException(
+    #         status_code=403, detail="Token not authorized for this machine"
+    #     )
 
     now = time.time()
     redis_client.setnx(f"liveness-start:{network_ip}", now)
