@@ -31,7 +31,9 @@ redis_pool = aioredis.ConnectionPool(
 )
 
 # Use connection pools for client initialization
-redis_client = aioredis.Redis(connection_pool=redis_pool)
+redis_client = aioredis.Redis(
+    connection_pool=redis_pool, ssl=os.getenv("REDIS_SSL")
+)
 # redis_client_async = aioredis.Redis(connection_pool=redis_pool_async)
 
 SETTINGS_CACHE_KEY = "system_settings:{name}"
