@@ -1,7 +1,7 @@
 """add user_id to flows table
 
 Revision ID: 828ec7299bbd
-Revises: 493837a3f007
+Revises: 71fb79bd3089
 Create Date: 2025-04-04 14:27:59.298766
 
 """
