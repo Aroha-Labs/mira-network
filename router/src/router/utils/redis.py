@@ -17,12 +17,16 @@ import json
 #     health_check_interval=30,
 # )
 
-redis_pool = aioredis.ConnectionPool(
-    host=os.getenv("REDIS_HOST"),
-    port=int(os.getenv("REDIS_PORT", 6379)),
-    username=os.getenv("REDIS_USERNAME"),
-    password=os.getenv("REDIS_PASSWORD"),
-    db=int(os.getenv("REDIS_DB", 0)),
+use_ssl = os.getenv("REDIS_SSL", "False").lower() == "true"
+
+
+if use_ssl:
+    redis_url = f"rediss://{os.getenv('REDIS_HOST')}:{os.getenv('REDIS_PORT')}"
+else:
+    redis_url = f"redis://{os.getenv('REDIS_USERNAME')}:{os.getenv('REDIS_PASSWORD')}@{os.getenv('REDIS_HOST')}:{os.getenv('REDIS_PORT')}/{os.getenv('REDIS_DB')}"
+
+redis_pool = aioredis.ConnectionPool.from_url(
+    url=redis_url,
     max_connections=200,
     socket_timeout=5,
     socket_connect_timeout=5,
@@ -31,9 +35,7 @@ redis_pool = aioredis.ConnectionPool(
 )
 
 # Use connection pools for client initialization
-redis_client = aioredis.Redis(
-    connection_pool=redis_pool, ssl=True
-)
+redis_client = aioredis.Redis(connection_pool=redis_pool)
 # redis_client_async = aioredis.Redis(connection_pool=redis_pool_async)
 
 SETTINGS_CACHE_KEY = "system_settings:{name}"
