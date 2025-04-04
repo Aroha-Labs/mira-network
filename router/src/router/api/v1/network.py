@@ -7,7 +7,7 @@ from src.router.utils.user import get_user_credits
 from src.router.utils.machine import get_machine_id
 from src.router.core.config import NODE_SERVICE_URL
 from src.router.core.settings_types import SETTINGS_MODELS
-from src.router.core.types import ModelPricing, User
+from src.router.core.types import User
 from src.router.db.session import DBSession
 from src.router.core.security import verify_user
 from src.router.utils.network import get_random_machines
@@ -26,8 +26,8 @@ from src.router.api.v1.docs.network import (
     verify_doc,
 )
 from src.router.utils.opensearch import (
+    OPENSEARCH_LLM_USAGE_LOG_INDEX,
     opensearch_client,
-    OPENSEARCH_MODEL_USAGE_INDEX,
     OPENSEARCH_CREDITS_INDEX,
 )
 from aiohttp import ClientSession, ClientTimeout, TCPConnector
@@ -158,12 +158,6 @@ async def save_log(
             status_code=500, detail="Supported model not found in settings"
         )
 
-    model_pricing = ModelPricing(
-        model=req.model,
-        prompt_token=model_p.prompt_token,
-        completion_token=model_p.completion_token,
-    )
-
     req.model = original_req_model
 
     # Calculate cost and reduce user credits
@@ -185,7 +179,7 @@ async def save_log(
     new_credit = float(new_credit_bytes.decode("utf-8")) if new_credit_bytes else 0.0
 
     # Prepare documents for OpenSearch
-    model_usage_doc = {
+    llm_usage_doc = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "user_id": user.id,
         "api_key_id": user.api_key_id,
@@ -237,8 +231,8 @@ async def save_log(
             asyncio.get_event_loop().run_in_executor(
                 None,
                 lambda: opensearch_client.index(
-                    index=OPENSEARCH_MODEL_USAGE_INDEX,
-                    body=model_usage_doc,
+                    index=OPENSEARCH_LLM_USAGE_LOG_INDEX,
+                    body=llm_usage_doc,
                 ),
             ),
             asyncio.get_event_loop().run_in_executor(
@@ -379,7 +373,6 @@ async def chatCompletionGenerate(
                         headers={"Accept-Encoding": "identity"},
                     )
                     llmres.raise_for_status()
-                    logger.info(f"Received response with status {llmres.status}")
 
                     machine_ip = llmres.headers.get("x-machine-ip", "")
                     if not machine_ip:
@@ -395,11 +388,9 @@ async def chatCompletionGenerate(
                     async for message, data in stream_response(llmres):
                         if ttfs is None:
                             ttfs = time.time() - timeStart
-                            logger.info(f"TTFS: {ttfs:.2f}s")
 
                         if "usage" in data:
                             usage = data["usage"]
-                            logger.info(f"Usage: {usage}")
 
                         yield message
 
@@ -408,7 +399,6 @@ async def chatCompletionGenerate(
                     yield f"data: {json.dumps({'error': str(e)})}\n\n"
                 finally:
                     try:
-                        logger.info(f"Usage: {usage}")
                         # Save logs with proper error handling
                         await save_log(
                             user=user,
@@ -427,7 +417,6 @@ async def chatCompletionGenerate(
                         logger.error(f"Log saving error: {str(log_error)}")
 
         if req.stream:
-            logger.info("Starting streaming response")
             return StreamingResponse(
                 generate(),
                 media_type="text/event-stream",

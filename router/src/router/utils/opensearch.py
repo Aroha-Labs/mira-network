@@ -6,6 +6,7 @@ from src.router.core.config import (
 )
 
 OPENSEARCH_MODEL_USAGE_INDEX = "mira-model-usage"
+OPENSEARCH_LLM_USAGE_LOG_INDEX = "mira-llm-usage-log"
 OPENSEARCH_CREDITS_INDEX = "mira-credits-history"
 
 opensearch_client = OpenSearch(
