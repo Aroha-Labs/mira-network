@@ -12,6 +12,7 @@ from src.router.models.user import User
 from src.router.db.session import get_session
 from src.router.core.security import verify_token
 from pydantic import BaseModel, Field
+from src.router.utils.nr import track
 
 
 router = APIRouter()
@@ -85,8 +86,16 @@ def create_thread(
     session: Session = Depends(get_session),
     current_user: User = Depends(verify_token),
 ):
-    """Create a new thread explicitly"""
+    track("create_thread_request", {
+        "user_id": str(current_user.id),
+        "has_metadata": thread.metadata is not None and len(thread.metadata) > 0
+    })
+    
     if not thread.title:
+        track("create_thread_error", {
+            "user_id": str(current_user.id),
+            "error": "missing_title"
+        })
         raise HTTPException(
             status_code=400, detail="Title is required for explicit thread creation"
         )
@@ -99,6 +108,12 @@ def create_thread(
     session.add(db_thread)
     session.commit()
     session.refresh(db_thread)
+    
+    track("create_thread_success", {
+        "user_id": str(current_user.id),
+        "thread_id": str(db_thread.id)
+    })
+    
     return db_thread
 
 
@@ -109,7 +124,12 @@ def list_threads(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=10, le=100),
 ):
-    """List all threads for the current user"""
+    track("list_threads_request", {
+        "user_id": str(current_user.id),
+        "skip": skip,
+        "limit": limit
+    })
+    
     query = (
         select(Thread)
         .where(Thread.user_id == str(current_user.id))
@@ -118,12 +138,18 @@ def list_threads(
         .order_by(Thread.updated_at.desc())
     )
     threads = session.exec(query).all()
+    
     # Convert thread_metadata to dict before returning
     for thread in threads:
-        # Handle both MetaData and dict cases
         thread.thread_metadata = (
             dict(thread.thread_metadata) if thread.thread_metadata else {}
         )
+    
+    track("list_threads_response", {
+        "user_id": str(current_user.id),
+        "threads_count": len(threads)
+    })
+    
     return threads
 
 
@@ -133,14 +159,35 @@ def get_thread(
     session: Session = Depends(get_session),
     current_user: User = Depends(verify_token),
 ):
-    """Get a specific thread"""
+    track("get_thread_request", {
+        "user_id": str(current_user.id),
+        "thread_id": str(thread_id)
+    })
+    
     thread = session.get(Thread, thread_id)
     if not thread:
+        track("get_thread_error", {
+            "user_id": str(current_user.id),
+            "thread_id": str(thread_id),
+            "error": "thread_not_found"
+        })
         raise HTTPException(status_code=404, detail="Thread not found")
+        
     if str(thread.user_id) != str(current_user.id):
+        track("get_thread_error", {
+            "user_id": str(current_user.id),
+            "thread_id": str(thread_id),
+            "error": "unauthorized_access"
+        })
         raise HTTPException(
             status_code=403, detail="Not authorized to access this thread"
         )
+    
+    track("get_thread_success", {
+        "user_id": str(current_user.id),
+        "thread_id": str(thread_id)
+    })
+    
     return thread
 
 
@@ -150,11 +197,26 @@ def archive_thread(
     session: Session = Depends(get_session),
     current_user: User = Depends(verify_token),
 ):
-    """Archive a thread"""
+    track("archive_thread_request", {
+        "user_id": str(current_user.id),
+        "thread_id": str(thread_id)
+    })
+    
     thread = session.get(Thread, thread_id)
     if not thread:
+        track("archive_thread_error", {
+            "user_id": str(current_user.id),
+            "thread_id": str(thread_id),
+            "error": "thread_not_found"
+        })
         raise HTTPException(status_code=404, detail="Thread not found")
+        
     if str(thread.user_id) != str(current_user.id):
+        track("archive_thread_error", {
+            "user_id": str(current_user.id),
+            "thread_id": str(thread_id),
+            "error": "unauthorized_access"
+        })
         raise HTTPException(
             status_code=403, detail="Not authorized to access this thread"
         )
@@ -162,6 +224,12 @@ def archive_thread(
     thread.is_archived = True
     session.add(thread)
     session.commit()
+    
+    track("archive_thread_success", {
+        "user_id": str(current_user.id),
+        "thread_id": str(thread_id)
+    })
+    
     return {"status": "success"}
 
 
@@ -171,6 +239,15 @@ async def create_message(
     current_user: User = Depends(verify_token),
     session: Session = Depends(get_session),
 ):
+    track("create_message_request", {
+        "user_id": str(current_user.id),
+        "role": message.role,
+        "has_thread_id": message.thread_id is not None,
+        "has_parent": message.parent_message_id is not None,
+        "has_model": message.model is not None,
+        "stream": message.stream
+    })
+    
     # If no thread_id, create a new thread
     if not message.thread_id:
         thread = Thread(
@@ -188,12 +265,28 @@ async def create_message(
         session.add(thread)
         session.commit()
         session.refresh(thread)
+        
+        track("create_thread_from_message", {
+            "user_id": str(current_user.id),
+            "thread_id": str(thread.id)
+        })
     else:
         # Get existing thread
         thread = session.get(Thread, message.thread_id)
         if not thread:
+            track("create_message_error", {
+                "user_id": str(current_user.id),
+                "thread_id": str(message.thread_id) if message.thread_id else None,
+                "error": "thread_not_found"
+            })
             raise HTTPException(status_code=404, detail="Thread not found")
+            
         if str(thread.user_id) != str(current_user.id):
+            track("create_message_error", {
+                "user_id": str(current_user.id),
+                "thread_id": str(thread.id),
+                "error": "unauthorized_access"
+            })
             raise HTTPException(
                 status_code=403, detail="Not authorized to access this thread"
             )
@@ -216,9 +309,23 @@ async def create_message(
     session.add(thread)
     session.commit()
     session.refresh(db_message)
+    
+    track("message_created", {
+        "user_id": str(current_user.id),
+        "thread_id": str(thread.id),
+        "message_id": str(db_message.id),
+        "role": db_message.role
+    })
 
     # If model is specified, generate AI response
     if message.model:
+        track("ai_message_request", {
+            "user_id": str(current_user.id),
+            "thread_id": str(thread.id),
+            "model": message.model,
+            "stream": message.stream
+        })
+        
         from src.router.api.v1.network import generate
         from fastapi.responses import StreamingResponse, Response
         import json
@@ -357,11 +464,28 @@ def list_messages(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=50, le=100),
 ):
-    """Get messages in a thread"""
+    track("list_messages_request", {
+        "user_id": str(current_user.id),
+        "thread_id": str(thread_id),
+        "skip": skip,
+        "limit": limit
+    })
+    
     thread = session.get(Thread, thread_id)
     if not thread:
+        track("list_messages_error", {
+            "user_id": str(current_user.id),
+            "thread_id": str(thread_id),
+            "error": "thread_not_found"
+        })
         raise HTTPException(status_code=404, detail="Thread not found")
+        
     if str(thread.user_id) != str(current_user.id):
+        track("list_messages_error", {
+            "user_id": str(current_user.id),
+            "thread_id": str(thread_id),
+            "error": "unauthorized_access"
+        })
         raise HTTPException(
             status_code=403, detail="Not authorized to access this thread"
         )
@@ -374,6 +498,13 @@ def list_messages(
         .order_by(Message.created_at)
     )
     messages = session.exec(query).all()
+    
+    track("list_messages_response", {
+        "user_id": str(current_user.id),
+        "thread_id": str(thread_id),
+        "messages_count": len(messages)
+    })
+    
     return messages
 
 

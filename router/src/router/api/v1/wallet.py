@@ -4,7 +4,7 @@ from sqlalchemy import select
 import uuid
 from supabase import create_client, Client
 import hashlib
-
+from src.router.utils.nr import track
 
 from src.router.db.session import get_session
 from src.router.models.wallet import Wallet
@@ -44,16 +44,24 @@ def create_wallet(
     db: Session = Depends(get_session),
     user: User = Depends(verify_user),
 ) -> Wallet:
-    """Create a new wallet for the current user."""
+    track("create_wallet_request", {
+        "user_id": str(user.id),
+        "chain": wallet_data.chain
+    })
+    
     # Check if wallet address already exists
     existing_wallet = db.exec(select(Wallet).where(Wallet.user_id == str(user.id)))
     if existing_wallet.one_or_none():
+        track("create_wallet_error", {
+            "user_id": str(user.id),
+            "error": "wallet_already_exists"
+        })
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Wallet address already registered",
         )
 
-    # Create new wallet using model_dump() to properly handle default values
+    # Create new wallet
     new_wallet = Wallet(
         id=uuid.uuid4(),
         address=wallet_data.address,
@@ -66,6 +74,12 @@ def create_wallet(
     db.add(new_wallet)
     db.commit()
     db.refresh(new_wallet)
+    
+    track("create_wallet_success", {
+        "user_id": str(user.id),
+        "wallet_id": str(new_wallet.id),
+        "chain": new_wallet.chain
+    })
 
     return new_wallet
 
@@ -75,17 +89,30 @@ def get_wallets(
     db: Session = Depends(get_session),
     user: User = Depends(verify_user),
 ) -> Wallet | None:
-    """Get all wallets for the current user."""
+    track("get_wallets_request", {"user_id": str(user.id)})
+    
     try:
         result = db.exec(
             select(Wallet)
             .where(Wallet.user_id == str(user.id))
             .order_by(desc(Wallet.created_at))
         )
-
-        return result.one()
+        
+        wallet = result.one()
+        if wallet:
+            track("get_wallets_success", {
+                "user_id": str(user.id),
+                "wallet_id": str(wallet.id)
+            })
+        else:
+            track("get_wallets_not_found", {"user_id": str(user.id)})
+            
+        return wallet
     except Exception as e:
-        print(e)
+        track("get_wallets_error", {
+            "user_id": str(user.id),
+            "error": str(e)
+        })
         return None
 
 
@@ -95,13 +122,27 @@ def get_wallet(
     db: Session = Depends(get_session),
     user: User = Depends(verify_user),
 ) -> Wallet:
-    """Get a specific wallet by ID."""
-
+    track("get_wallet_request", {
+        "user_id": str(user.id),
+        "wallet_id": wallet_id
+    })
+    
     wallet = db.exec(select(Wallet).where(Wallet.id == wallet_id))
     if not wallet or wallet.one().user_id != str(user.id):
+        track("get_wallet_error", {
+            "user_id": str(user.id),
+            "wallet_id": wallet_id,
+            "error": "wallet_not_found_or_unauthorized"
+        })
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Wallet not found"
         )
+        
+    track("get_wallet_success", {
+        "user_id": str(user.id),
+        "wallet_id": wallet_id
+    })
+    
     return wallet.one()
 
 
@@ -111,16 +152,29 @@ def delete_wallet(
     db: Session = Depends(get_session),
     user: User = Depends(verify_user),
 ) -> dict:
-    """Delete a wallet."""
-
+    track("delete_wallet_request", {
+        "user_id": str(user.id),
+        "wallet_id": wallet_id
+    })
+    
     wallet = db.exec(select(Wallet).where(Wallet.id == wallet_id))
     if not wallet or wallet.one().user_id != str(user.id):
+        track("delete_wallet_error", {
+            "user_id": str(user.id),
+            "wallet_id": wallet_id,
+            "error": "wallet_not_found_or_unauthorized"
+        })
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Wallet not found"
         )
 
     db.delete(wallet.one())
     db.commit()
+    
+    track("delete_wallet_success", {
+        "user_id": str(user.id),
+        "wallet_id": wallet_id
+    })
 
     return {"message": "Wallet deleted successfully"}
 
@@ -138,7 +192,9 @@ def wallet_login(
     login_data: WalletLoginRequest,
     db: Session = Depends(get_session),
 ) -> WalletLoginResponse:
-    """Login or register a user using their wallet signature."""
+    track("wallet_login_request", {
+        "address": login_data.address[:8] + "..." # Only track address prefix for safety
+    })
 
     # Normalize the wallet address
     wallet_address = login_data.address.lower()
@@ -150,7 +206,7 @@ def wallet_login(
     wallet = result.first()
 
     if not wallet:
-        # Get or create Supabase user
+        # Registration path
         try:
             # Sign in the user to get session
             auth_response = supabase.auth.sign_up(
@@ -171,18 +227,25 @@ def wallet_login(
             )
             db.add(new_wallet)
             db.commit()
-
+            
+            track("wallet_registration_success", {
+                "user_id": auth_response.user.id,
+                "wallet_id": str(new_wallet.id)
+            })
+            
         except Exception as e:
+            track("wallet_registration_error", {"error": str(e)})
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Error creating Supabase user: {str(e)}",
             ) from e
     else:
+        # Login path
         try:
             # Sign in with password
             auth_response = supabase.auth.sign_in_with_password(
                 {
-                    "email": f"{wallet_address}@wallet.mira.network",
+                    "email": wallet_email,
                     "password": wallet_password,
                 }
             )
@@ -190,8 +253,11 @@ def wallet_login(
             # Update wallet last login
             wallet.updated_at = datetime.utcnow()
             db.commit()
-
+            
+            track("wallet_login_success", {"user_id": auth_response.user.id})
+            
         except Exception as e:
+            track("wallet_login_error", {"error": str(e)})
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Error signing in user: {str(e)}",
