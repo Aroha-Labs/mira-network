@@ -25,8 +25,7 @@ RUN pdm install --prod
 # Copy the current directory contents into the container at /app
 COPY . /app
 
-# Make port 34523 available to the world outside this container
-EXPOSE 34523
+EXPOSE 80
 
 # run the application
 CMD ["pdm", "run", "prod"]

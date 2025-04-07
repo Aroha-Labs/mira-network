@@ -6,6 +6,7 @@ import { format } from "date-fns";
 import Loading from "src/components/PageLoading";
 import api from "src/lib/axios";
 import { ArrowUpIcon, ArrowDownIcon } from "@heroicons/react/24/outline";
+import { useState } from "react";
 
 interface CreditHistory {
   id: number;
@@ -15,16 +16,32 @@ interface CreditHistory {
   created_at: string;
 }
 
-const fetchCreditHistory = async (): Promise<CreditHistory[]> => {
-  const response = await api.get("/user-credits-history");
+interface PaginatedResponse {
+  items: CreditHistory[];
+  total: number;
+  page: number;
+  size: number;
+  pages: number;
+}
+
+const fetchCreditHistory = async (
+  page: number = 1,
+  size: number = 20
+): Promise<PaginatedResponse> => {
+  const response = await api.get(`/user-credits-history?page=${page}&size=${size}`);
   return response.data;
 };
 
 const CreditHistoryPage = () => {
   const { data: userSession } = useSession();
-  const { data, error, isLoading } = useQuery({
-    queryKey: ["creditHistory"],
-    queryFn: fetchCreditHistory,
+  const [page, setPage] = useState(1);
+  const {
+    data: history,
+    error,
+    isLoading,
+  } = useQuery({
+    queryKey: ["creditHistory", page],
+    queryFn: () => fetchCreditHistory(page),
     enabled: !!userSession?.access_token,
   });
 
@@ -40,15 +57,6 @@ const CreditHistoryPage = () => {
     );
   }
 
-  // Calculate total credits and usage
-  const totalCredits =
-    data?.reduce((sum, entry) => sum + (entry.amount > 0 ? entry.amount : 0), 0) || 0;
-  const totalUsage =
-    data?.reduce(
-      (sum, entry) => sum + (entry.amount < 0 ? Math.abs(entry.amount) : 0),
-      0
-    ) || 0;
-
   return (
     <div className="space-y-6 container mx-auto p-6 max-w-4xl">
       {/* Header */}
@@ -57,36 +65,6 @@ const CreditHistoryPage = () => {
         <p className="mt-1 text-sm text-gray-500">
           Track your credit usage and transactions
         </p>
-      </div>
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white rounded-lg shadow-xs border border-gray-200 p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-50 rounded-lg">
-              <ArrowDownIcon className="h-6 w-6 text-blue-600" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-500">Total Credits Added</p>
-              <p className="text-xl font-semibold text-gray-900">
-                {totalCredits.toFixed(4)}
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-lg shadow-xs border border-gray-200 p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-red-50 rounded-lg">
-              <ArrowUpIcon className="h-6 w-6 text-red-600" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-500">Total Usage</p>
-              <p className="text-xl font-semibold text-gray-900">
-                {totalUsage.toFixed(4)}
-              </p>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Timeline View */}
@@ -99,10 +77,10 @@ const CreditHistoryPage = () => {
         <div className="p-6">
           <div className="flow-root">
             <ul role="list" className="-mb-8">
-              {data?.map((entry, idx) => (
+              {history?.items.map((entry, idx) => (
                 <li key={entry.id}>
                   <div className="relative pb-8">
-                    {idx !== data.length - 1 && (
+                    {idx !== history.items.length - 1 && (
                       <span
                         className="absolute left-5 top-5 -ml-px h-full w-0.5 bg-gray-200"
                         aria-hidden="true"
@@ -167,6 +145,64 @@ const CreditHistoryPage = () => {
             </ul>
           </div>
         </div>
+
+        {/* Pagination Controls */}
+        {history && history.pages > 0 && (
+          <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6">
+            <div className="flex flex-1 justify-between sm:hidden">
+              <button
+                onClick={() => setPage((page) => Math.max(1, page - 1))}
+                disabled={page === 1}
+                className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => setPage((page) => Math.min(history.pages, page + 1))}
+                disabled={page === history.pages}
+                className="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
+            <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm text-gray-700">
+                  Showing{" "}
+                  <span className="font-medium">{(page - 1) * history.size + 1}</span> to{" "}
+                  <span className="font-medium">
+                    {Math.min(page * history.size, history.total)}
+                  </span>{" "}
+                  of <span className="font-medium">{history.total}</span> results
+                </p>
+              </div>
+              <div>
+                <nav
+                  className="isolate inline-flex -space-x-px rounded-md shadow-sm"
+                  aria-label="Pagination"
+                >
+                  {Array.from({ length: history.pages }, (_, i) => i + 1).map(
+                    (pageNum) => (
+                      <button
+                        key={pageNum}
+                        onClick={() => setPage(pageNum)}
+                        className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${
+                          pageNum === page
+                            ? "z-10 bg-indigo-600 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                            : "text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:outline-offset-0"
+                        } ${pageNum === 1 ? "rounded-l-md" : ""} ${
+                          pageNum === history.pages ? "rounded-r-md" : ""
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    )
+                  )}
+                </nav>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

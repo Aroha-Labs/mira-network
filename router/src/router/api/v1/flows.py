@@ -1,32 +1,29 @@
 import re
-from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Response
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException
 from src.router.models.logs import ApiLogs
-from sqlmodel import Session, select, func, text
-from src.router.api.v1.network import generate
+from sqlmodel import select, func
+from src.router.api.v1.network import chatCompletionGenerate
 from src.router.core.security import verify_user
 from src.router.core.types import User
-from src.router.schemas.ai import AiRequest, Message, Function, Tool
+from src.router.schemas.ai import AiRequest, Message
 from src.router.models.flows import Flows
 from src.router.schemas.flows import (
     FlowRequest,
     FlowChatCompletion,
-    FlowAnalytics,
-    TimeRange,
-    ModelStats,
-    TimeSeriesEntry,
     FlowStats,
 )
-from src.router.db.session import get_session
-from src.router.utils.network import get_random_machines, PROXY_PORT
-import requests
-import json
+from src.router.db.session import DBSession
 from src.router.api.v1.docs.flows import (
     CREATE_FLOW_DOCS,
     LIST_FLOWS_DOCS,
 )
 from datetime import datetime, timedelta
-from src.router.utils.nr import track
+from src.router.utils.redis import redis_client
+import json
+from src.router.utils.logger import logger
+from async_lru import alru_cache
+import traceback
 
 router = APIRouter()
 
@@ -38,9 +35,9 @@ def extract_variables(system_prompt: str) -> List[str]:
 
 
 @router.post("/flows", **CREATE_FLOW_DOCS)
-def create_flow(
+async def create_flow(
     flow: FlowRequest,
-    db: Session = Depends(get_session),
+    db: DBSession,
     user: User = Depends(verify_user),
 ):
     track("create_flow_request", {
@@ -58,27 +55,15 @@ def create_flow(
         user_id=str(user.id),
     )
     db.add(new_flow)
-    db.commit()
-    db.refresh(new_flow)
-    
-    track("create_flow_success", {
-        "user_id": str(user.id),
-        "flow_id": str(new_flow.id),
-        "flow_name": new_flow.name
-    })
-    
+    await db.commit()
+    await db.refresh(new_flow)
     return new_flow
 
 
 @router.get("/flows", **LIST_FLOWS_DOCS)
-def list_all_flows(db: Session = Depends(get_session)):
-    flows = db.query(Flows).all()
-    
-    track("list_flows_response", {
-        "flows_count": len(flows)
-    })
-    
-    return flows
+async def list_all_flows(db: DBSession):
+    flows = await db.exec(select(Flows))
+    return flows.all()
 
 
 @router.get(
@@ -149,10 +134,9 @@ def list_all_flows(db: Session = Depends(get_session)):
         },
     },
 )
-def get_flow(flow_id: str, db: Session = Depends(get_session)):
-    track("get_flow_request", {"flow_id": flow_id})
-    
-    flow = db.exec(select(Flows).where(Flows.id == flow_id)).first()
+async def get_flow(flow_id: str, db: DBSession):
+    flow = await db.exec(select(Flows).where(Flows.id == flow_id))
+    flow = flow.first()
     if not flow:
         track("get_flow_error", {"flow_id": flow_id, "error": "flow_not_found"})
         raise HTTPException(status_code=404, detail="Flow not found")
@@ -258,19 +242,11 @@ def get_flow(flow_id: str, db: Session = Depends(get_session)):
         },
     },
 )
-def update_flow(
-    flow_id: str,
-    flow: FlowRequest,
-    db: Session = Depends(get_session),
-    user: User = Depends(verify_user),
-):
-    track("update_flow_request", {
-        "flow_id": flow_id,
-        "flow_name": flow.name,
-        "user_id": str(user.id)
-    })
-    
-    existing_flow = db.query(Flows).filter(Flows.id == flow_id).first()
+async def update_flow(flow_id: str, flow: FlowRequest, db: DBSession):
+    # existing_flow = db.query(Flows).filter(Flows.id == flow_id).first()
+    existing_flow = await db.exec(select(Flows).where(Flows.id == int(flow_id)))
+    existing_flow = existing_flow.first()
+
     if not existing_flow:
         track("update_flow_error", {
             "flow_id": flow_id,
@@ -302,18 +278,8 @@ def update_flow(
     existing_flow.name = flow.name
     existing_flow.variables = extract_variables(flow.system_prompt)
 
-    db.commit()
-    db.refresh(existing_flow)
-    
-    track("update_flow_success", {
-        "flow_id": flow_id,
-        "flow_name": existing_flow.name,
-        "old_variables_count": old_variables_count,
-        "new_variables_count": len(existing_flow.variables or []),
-        "user_id": str(user.id),
-        "is_admin_action": is_admin and existing_flow.user_id != str(user.id)
-    })
-    
+    await db.commit()
+    await db.refresh(existing_flow)
     return existing_flow
 
 
@@ -392,17 +358,10 @@ def update_flow(
         },
     },
 )
-def delete_flow(
-    flow_id: str,
-    db: Session = Depends(get_session),
-    user: User = Depends(verify_user)
-):
-    track("delete_flow_request", {
-        "flow_id": flow_id,
-        "user_id": str(user.id)
-    })
-    
-    existing_flow = db.query(Flows).filter(Flows.id == flow_id).first()
+async def delete_flow(flow_id: str, db: DBSession):
+    existing_flow = await db.exec(select(Flows).where(Flows.id == int(flow_id)))
+    existing_flow = existing_flow.first()
+
     if not existing_flow:
         track("delete_flow_error", {
             "flow_id": flow_id,
@@ -410,36 +369,30 @@ def delete_flow(
             "user_id": str(user.id)
         })
         raise HTTPException(status_code=404, detail="Flow not found")
-    
-    # Check if user is authorized to delete this flow
-    is_admin = False
-    is_admin = 'admin' in user.roles
-    
-    if existing_flow.user_id != str(user.id) and not is_admin:
-        track("delete_flow_error", {
-            "flow_id": flow_id,
-            "error": "not_authorized",
-            "user_id": str(user.id),
-            "flow_owner_id": existing_flow.user_id
-        })
-        raise HTTPException(
-            status_code=403,
-            detail="Not authorized to delete this flow"
-        )
-    
-    flow_name = existing_flow.name
-    
-    db.delete(existing_flow)
-    db.commit()
-    
-    track("delete_flow_success", {
-        "flow_id": flow_id,
-        "flow_name": flow_name,
-        "user_id": str(user.id),
-        "is_admin_action": is_admin and existing_flow.user_id != str(user.id)
-    })
-    
+
+    await db.delete(existing_flow)
+    await db.commit()
+    await redis_client.delete(f"flow:{flow_id}")
+    get_cached_flow.cache_clear()
     return {"message": "Flow deleted successfully"}
+
+
+@alru_cache(maxsize=100, ttl=3600)  # 1 hour TTL
+async def get_cached_flow(flow_id: int) -> Optional[Flows]:
+    """Get flow from cache with TTL, using async_lru package"""
+    logger.info(f"Cache miss for flow_id: {flow_id}")
+
+    # Try to get from Redis first
+    flow_key = f"flow:{flow_id}"
+    cached_flow = await redis_client.get(flow_key)
+
+    if cached_flow:
+        logger.info(f"Redis cache hit for flow_id: {flow_id}")
+        flow_dict = json.loads(cached_flow)
+        return Flows(**flow_dict)
+
+    logger.info(f"Complete cache miss for flow_id: {flow_id}")
+    return None
 
 
 @router.post(
@@ -651,19 +604,17 @@ Server-sent events with the following data structure:
 async def generate_with_flow_id(
     flow_id: str,
     req: FlowChatCompletion,
-    db: Session = Depends(get_session),
+    db: DBSession,
     user: User = Depends(verify_user),
 ):
-    track("flow_completion_request", {
-        "flow_id": flow_id,
-        "model": req.model,
-        "user_id": str(user.id),
-        "stream": req.stream,
-        "messages_count": len(req.messages),
-        "has_tools": req.tools is not None and len(req.tools) > 0
-    })
-    
-    # Handle error cases with tracking
+    # get user credits
+    user_credits = await redis_client.get(f"user_credit:{user.id}")
+    logger.info(f"User credits: {user_credits}")
+
+    if float(user_credits) <= 0:
+        raise HTTPException(status_code=402, detail="Insufficient credits")
+
+    logger.info(f"Generating with flow ID: {flow_id}")
     if any(msg.role == "system" for msg in req.messages):
         track("flow_completion_error", {
             "flow_id": flow_id,
@@ -675,7 +626,29 @@ async def generate_with_flow_id(
             detail="System message is not allowed in request",
         )
 
-    flow = db.exec(select(Flows).where(Flows.id == flow_id)).first()
+    # Cast flow_id to integer before querying
+    try:
+        flow_id_int = int(flow_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid flow ID format")
+
+    # Try LRU cache first, then Redis, then database
+
+    flow = await get_cached_flow(flow_id_int)
+    logger.info(f"Flow lru cache: {get_cached_flow.cache_info()}")
+    if not flow:
+        flow = await db.exec(select(Flows).where(Flows.id == flow_id_int))
+        flow = flow.one_or_none()
+        if flow:
+            flow_dict = {
+                "id": flow.id,
+                "name": flow.name,
+                "system_prompt": flow.system_prompt,
+                "variables": flow.variables,
+            }
+            await redis_client.set(f"flow:{flow_id_int}", json.dumps(flow_dict))
+            get_cached_flow.cache_clear()  # Clear LRU cache to update with new value
+
     if not flow:
         track("flow_completion_error", {
             "flow_id": flow_id,
@@ -695,7 +668,8 @@ async def generate_with_flow_id(
                 "user_id": str(user.id)
             })
             raise HTTPException(
-                status_code=400, detail="Variables are required but none were provided"
+                status_code=400,
+                detail="Variables are required but none were provided",
             )
         missing_vars = [var for var in required_vars if var not in req.variables]
         if missing_vars:
@@ -724,153 +698,29 @@ async def generate_with_flow_id(
         "variables_count": len(required_vars) if required_vars else 0
     })
 
-    response = await generate(
-        req=AiRequest(
-            model=req.model,
-            messages=req.messages,
-            stream=req.stream,
-            model_provider=None,
-            tools=req.tools,
-            tool_choice=req.tool_choice,
-        ),
-        flow_id=flow_id,
-        user=user,
-        db=db,
-    )
-    
-    # Note: The usage metrics will be tracked in the generate function
-    # but we can add a completion event here
-    track("flow_completion_success", {
-        "flow_id": flow_id,
-        "model": req.model,
-        "user_id": str(user.id)
-    })
+    try:
+        response = await chatCompletionGenerate(
+            req=AiRequest(
+                model=req.model,
+                messages=req.messages,
+                stream=req.stream,
+                model_provider=None,
+                tools=req.tools,
+                tool_choice=req.tool_choice,
+            ),
+            flow_id=flow_id,
+            user=user,
+            db=db,
+        )
+    except Exception as e:
+        # Get full traceback
+        error_trace = traceback.format_exc()
+        logger.error(
+            f"Error generating with flow ID {flow_id}:\n"
+            f"Error: {str(e)}\n"
+            f"Traceback:\n{error_trace}"
+        )
+
+        raise HTTPException(status_code=500, detail=str(e))
 
     return response
-
-
-@router.get(
-    "/flows/{flow_id}/stats",
-    response_model=FlowStats,
-    summary="Get Flow Stats",
-    description="Get basic usage statistics and time series data for a specific flow",
-)
-async def get_flow_stats(
-    flow_id: str,
-    db: Session = Depends(get_session),
-    user: User = Depends(verify_user),
-) -> FlowStats:
-    track("flow_stats_request", {
-        "flow_id": flow_id,
-        "user_id": str(user.id)
-    })
-    
-    # Verify flow exists
-    flow = db.exec(select(Flows).where(Flows.id == flow_id)).first()
-    if not flow:
-        track("flow_stats_error", {
-            "flow_id": flow_id,
-            "error": "flow_not_found",
-            "user_id": str(user.id)
-        })
-        raise HTTPException(status_code=404, detail="Flow not found")
-
-    # Get the latest log entry for this flow
-    log = db.exec(
-        select(ApiLogs)
-        .where(ApiLogs.flow_id == flow_id)
-        .order_by(ApiLogs.created_at.desc())
-        .limit(1)
-    ).first()
-
-    if not log:
-        track("flow_stats_error", {
-            "flow_id": flow_id,
-            "error": "no_stats_available",
-            "user_id": str(user.id)
-        })
-        raise HTTPException(status_code=404, detail="No stats available for this flow")
-
-    # Get time series data for the last 24 hours
-    end_date = datetime.utcnow()
-    start_date = end_date - timedelta(hours=24)
-
-    time_series = db.exec(
-        select(
-            func.date_trunc("hour", ApiLogs.created_at).label("timestamp"),
-            func.sum(ApiLogs.total_tokens).label("tokens"),
-            func.sum(ApiLogs.prompt_tokens).label("prompt_tokens"),
-            func.sum(ApiLogs.completion_tokens).label("completion_tokens"),
-            ApiLogs.model_pricing,
-        )
-        .where(
-            ApiLogs.flow_id == flow_id,
-            ApiLogs.created_at >= start_date,
-            ApiLogs.created_at <= end_date,
-        )
-        .group_by(
-            func.date_trunc("hour", ApiLogs.created_at),
-            ApiLogs.model_pricing,
-        )
-        .order_by(func.date_trunc("hour", ApiLogs.created_at))
-    ).all()
-
-    # Process time series data
-    time_series_data = []
-    for entry in time_series:
-        try:
-            model_pricing = entry.model_pricing
-            if (
-                model_pricing
-                and hasattr(model_pricing, "prompt_token")
-                and hasattr(model_pricing, "completion_token")
-            ):
-                cost = entry.prompt_tokens * float(
-                    model_pricing.prompt_token
-                ) + entry.completion_tokens * float(model_pricing.completion_token)
-            else:
-                cost = 0.0
-        except (AttributeError, ValueError):
-            cost = 0.0
-
-        time_series_data.append(
-            {"timestamp": entry.timestamp, "tokens": entry.tokens, "cost": cost}
-        )
-
-    # Get current stats from the latest log
-    current_pricing = {}
-    if (
-        log.model_pricing
-        and hasattr(log.model_pricing, "prompt_token")
-        and hasattr(log.model_pricing, "completion_token")
-    ):
-        current_pricing = {
-            "prompt_token": float(log.model_pricing.prompt_token),
-            "completion_token": float(log.model_pricing.completion_token),
-        }
-        total_cost = (
-            log.prompt_tokens * current_pricing["prompt_token"]
-            + log.completion_tokens * current_pricing["completion_token"]
-        )
-    else:
-        total_cost = 0.0
-
-    track("flow_stats_success", {
-        "flow_id": flow_id,
-        "user_id": str(user.id),
-        "model": log.model,
-        "total_tokens": log.total_tokens,
-        "time_series_entries": len(time_series)
-    })
-
-    return FlowStats(
-        total_tokens=log.total_tokens,
-        prompt_tokens=log.prompt_tokens,
-        completion_tokens=log.completion_tokens,
-        total_cost=total_cost,
-        model=log.model,
-        model_pricing=current_pricing,
-        total_response_time=log.total_response_time,
-        ttft=log.ttft,
-        time_series=time_series_data,
-    )

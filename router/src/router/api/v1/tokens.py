@@ -1,13 +1,16 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlmodel import Session
+from sqlmodel import func, select
 from src.router.core.types import User
 from src.router.models.tokens import ApiToken
 from src.router.schemas.tokens import ApiTokenRequest
-from src.router.db.session import get_session
+from src.router.db.session import DBSession
 from src.router.core.security import verify_user
 from datetime import datetime
 import os
-from src.router.utils.nr import track
+from src.router.utils.redis import redis_client
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -100,9 +103,9 @@ router = APIRouter()
         },
     },
 )
-def create_api_token(
+async def create_api_token(
     request: ApiTokenRequest,
-    db: Session = Depends(get_session),
+    db: DBSession,
     user: User = Depends(verify_user),
 ):
     track("create_api_token_request", {
@@ -120,29 +123,20 @@ def create_api_token(
             meta_data=request.meta_data,
         )
         db.add(api_token)
-        db.commit()
-        db.refresh(api_token)
-        
-        track("create_api_token_success", {
-            "user_id": str(user.id),
-            "token_id": api_token.id
-        })
-        
+        await db.commit()
+        await db.refresh(api_token)
+
+        return {
+            "id": api_token.id,
+            "token": api_token.token,
+            "description": api_token.description,
+            "meta_data": api_token.meta_data,
+            "created_at": api_token.created_at,
+        }
     except Exception as e:
-        db.rollback()
-        track("create_api_token_error", {
-            "user_id": str(user.id),
-            "error": str(e)
-        })
-        raise HTTPException(status_code=500, detail=str(e))
-        
-    return {
-        "id": api_token.id,
-        "token": api_token.token,
-        "description": api_token.description,
-        "meta_data": api_token.meta_data,
-        "created_at": api_token.created_at,
-    }
+        await db.rollback()
+        logger.error(f"Error creating API token: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to create API token")
 
 
 @router.get(
@@ -185,10 +179,10 @@ def create_api_token(
 - Default page_size is 100 items""",
     response_description="Returns paginated API token details",
 )
-def list_api_tokens(
-    page: int = Query(None, ge=1, description="Page number"),
-    page_size: int = Query(None, ge=1, le=100, description="Items per page"),
-    db: Session = Depends(get_session),
+async def list_api_tokens(
+    db: DBSession,
+    page: int = Query(1, ge=1, description="Page number"),
+    page_size: int = Query(10, ge=1, le=100, description="Items per page"),
     user: User = Depends(verify_user),
 ):
     track("list_api_tokens_request", {
@@ -199,51 +193,24 @@ def list_api_tokens(
     })
     
     query = (
-        db.query(ApiToken)
-        .filter(ApiToken.user_id == user.id, ApiToken.deleted_at.is_(None))
-        .order_by(ApiToken.created_at.desc())
+        select(ApiToken)
+        .where(ApiToken.user_id == user.id)
+        .where(ApiToken.deleted_at == None)  # noqa: E711
+    )
+    count_query = (
+        select(func.count())
+        .select_from(ApiToken)
+        .where(ApiToken.user_id == user.id)
+        .where(ApiToken.deleted_at == None)  # noqa: E711
     )
 
-    # If no pagination parameters, return all tokens (backward compatibility)
-    if page is None and page_size is None:
-        tokens = query.all()
-        
-        track("list_api_tokens_response", {
-            "user_id": str(user.id),
-            "tokens_count": len(tokens),
-            "paginated": False
-        })
-        
-        return [
-            {
-                "id": token.id,
-                "token": token.token,
-                "description": token.description,
-                "meta_data": token.meta_data,
-                "created_at": token.created_at,
-            }
-            for token in tokens
-        ]
-
-    # Default values for pagination
-    page = page or 1
-    page_size = page_size or 100
-
-    # Get total count
-    total = query.count()
-    total_pages = (total + page_size - 1) // page_size
+    total_res = await db.exec(count_query)
+    total = total_res.one()
+    total_pages = total + page_size - 1
 
     # Apply pagination
-    tokens = query.offset((page - 1) * page_size).limit(page_size).all()
-    
-    track("list_api_tokens_response", {
-        "user_id": str(user.id),
-        "tokens_count": len(tokens),
-        "total_tokens": total,
-        "page": page,
-        "total_pages": total_pages,
-        "paginated": True
-    })
+    tokens_res = await db.exec(query.offset((page - 1) * page_size).limit(page_size))
+    tokens = tokens_res.all()
 
     return {
         "items": [
@@ -325,21 +292,19 @@ def list_api_tokens(
         },
     },
 )
-def delete_api_token(
+async def delete_api_token(
     token: str,
-    db: Session = Depends(get_session),
+    db: DBSession,
     user: User = Depends(verify_user),
 ):
-    track("delete_api_token_request", {
-        "user_id": str(user.id),
-        "token_prefix": token[:12] if len(token) > 12 else token  # Just include prefix for safety
-    })
-    
-    api_token = (
-        db.query(ApiToken)
-        .filter(ApiToken.token == token, ApiToken.user_id == user.id)
-        .first()
+    api_token_res = await db.exec(
+        select(ApiToken)
+        .where(ApiToken.token == token)
+        .where(ApiToken.user_id == user.id)
     )
+
+    api_token = api_token_res.one_or_none()
+
     if not api_token:
         track("delete_api_token_error", {
             "user_id": str(user.id),
@@ -348,12 +313,13 @@ def delete_api_token(
         raise HTTPException(status_code=404, detail="Token not found")
 
     api_token.deleted_at = datetime.utcnow()
-    db.commit()
-    db.refresh(api_token)
-    
-    track("delete_api_token_success", {
-        "user_id": str(user.id),
-        "token_id": api_token.id
-    })
-    
+    await db.commit()
+    await db.refresh(api_token)
+
+    # Invalidate the cache
+    try:
+        await redis_client.delete(f"token:{token}")
+    except Exception as e:
+        logger.error(f"Error invalidating token cache: {e}")
+
     return {"message": "Token deleted successfully"}

@@ -11,3 +11,7 @@ cli/bin
 node_modules/
 android/
 ios/
+
+k6-tests/*.json
+
+.env.local

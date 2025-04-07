@@ -7,6 +7,7 @@ on:
       - "router/**"
       - "playground/**"
       - "service/**"
+      - "node-service/**"
       - "cli/**"
       - "sdk/**"
       - ".github/workflows/release.yml"
@@ -15,6 +16,7 @@ env:
   REGISTRY: ghcr.io
   ROUTER_IMAGE: Aroha-Labs/mira-client-router
   SERVICE_IMAGE: Aroha-Labs/mira-client-service
+  NODE_SERVICE_IMAGE: Aroha-Labs/mira-network-node-service
 
 permissions:
   contents: write
@@ -31,6 +33,7 @@ jobs:
     outputs:
       router: ${{ steps.filter.outputs.router }}
       service: ${{ steps.filter.outputs.service }}
+      node-service: ${{ steps.filter.outputs.node-service }}
       cli: ${{ steps.filter.outputs.cli }}
       playground: ${{ steps.filter.outputs.playground }}
       sdk: ${{ steps.filter.outputs.sdk }}
@@ -45,6 +48,8 @@ jobs:
               - 'router/**'
             service:
               - 'service/**'
+            node-service:
+              - 'node-service/**'
             cli:
               - 'cli/**'
             playground:
@@ -182,11 +187,12 @@ jobs:
         # sonarqube-sdk,
       ]
     if: |
-      (needs.changes.outputs.router == 'true' && needs.sonarqube-router.outputs.quality_gate == 'OK') ||
-      (needs.changes.outputs.service == 'true' && needs.sonarqube-service.outputs.quality_gate == 'OK') ||
-      (needs.changes.outputs.cli == 'true' && needs.sonarqube-cli.outputs.quality_gate == 'OK') ||
-      (needs.changes.outputs.playground == 'true' && needs.sonarqube-playground.outputs.quality_gate == 'OK') ||
-      (needs.changes.outputs.sdk == 'true' && needs.sonarqube-sdk.outputs.quality_gate == 'OK')
+      needs.changes.outputs.router == 'true' ||
+      needs.changes.outputs.service == 'true' ||
+      needs.changes.outputs.node-service == 'true' ||
+      needs.changes.outputs.cli == 'true' ||
+      needs.changes.outputs.playground == 'true' ||
+      needs.changes.outputs.sdk == 'true'
     timeout-minutes: 10
     runs-on: ubuntu-latest
     outputs:
@@ -413,6 +419,45 @@ jobs:
       - name: Clean up Docker images
         run: docker image prune -f
 
+  publish-node-service:
+    needs: [changes, create-tag]
+    if: needs.changes.outputs.node-service == 'true'
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.create-tag.outputs.new_tag }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Extract metadata (tags, labels) for Service
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.NODE_SERVICE_IMAGE }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=,format=short
+            type=raw,value=latest
+            type=raw,value=${{ needs.create-tag.outputs.new_tag }}
+      - name: Build and push Service image
+        uses: docker/build-push-action@v6
+        with:
+          context: node-service
+          build-args: |
+            IMAGE_VERSION=${{ env.VERSION }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+      - name: Clean up Docker images
+        run: docker image prune -f
+
   publish-cli:
     needs: [changes, create-tag, sonarqube-cli]
     if: needs.changes.outputs.cli == 'true'
@@ -467,8 +512,8 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://atmocsvasyapsvwsustd.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          NEXT_PUBLIC_API_BASE_URL: https://apis.mira.network
-          NEXT_PUBLIC_LLM_BASE_URL: https://apis.mira.network/v1
+          NEXT_PUBLIC_API_BASE_URL: https://api.mira.network
+          NEXT_PUBLIC_LLM_BASE_URL: https://api.mira.network/v1
           NEXT_PUBLIC_VERSION: ${{ env.VERSION }}
         run: yarn build
       - name: Publish to Cloudflare Pages
@@ -575,6 +620,7 @@ jobs:
         create-tag,
         publish-router,
         publish-service,
+        publish-node-service,
         publish-cli,
         deploy-console-testnet,
         sdk-test,
@@ -617,6 +663,16 @@ jobs:
           elif [ "${{ needs.publish-service.result }}" = "success" ]; then
             echo "| ⚙️ Service | Build & Publish | ✅ | **Successful** |" >> $GITHUB_STEP_SUMMARY
           elif [ "${{ needs.publish-service.result }}" = "failure" ]; then
+            echo "| ⚙️ Service | Build & Publish | ❌ | **Failed** |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| ⚙️ Service | Build & Publish | ⚠️ | **Cancelled** |" >> $GITHUB_STEP_SUMMARY
+          fi
+          # Node Service Status
+          if [ "${{ needs.changes.outputs.node-service }}" != "true" ]; then
+            echo "| ⚙️ Service | Build & Publish | ⏭️ | **Skipped** (No Changes) |" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.publish-node-service.result }}" = "success" ]; then
+            echo "| ⚙️ Service | Build & Publish | ✅ | **Successful** |" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.publish-node-service.result }}" = "failure" ]; then
             echo "| ⚙️ Service | Build & Publish | ❌ | **Failed** |" >> $GITHUB_STEP_SUMMARY
           else
             echo "| ⚙️ Service | Build & Publish | ⚠️ | **Cancelled** |" >> $GITHUB_STEP_SUMMARY

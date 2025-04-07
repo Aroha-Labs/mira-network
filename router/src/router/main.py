@@ -6,6 +6,23 @@ import uvicorn
 from prometheus_fastapi_instrumentator import Instrumentator
 from scalar_fastapi import get_scalar_api_reference
 import os
+from src.router.utils.redis import cleanup
+from fastapi.responses import JSONResponse
+from fastapi.middleware import Middleware
+from contextlib import asynccontextmanager
+from src.router.db.session import async_engine
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    try:
+        yield
+    # Shutdown
+    finally:
+        await cleanup()
+        await async_engine.dispose()
+
 
 app = FastAPI(
     title="Mira Client Dashboard",
@@ -30,18 +47,20 @@ app = FastAPI(
         "scopeSeparator": " ",
         "scopes": {"read": "Read access", "write": "Write access"},
     },
+    lifespan=lifespan,
+    default_response_class=JSONResponse,
+    middleware=[
+        Middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+    ],
 )
 
 Instrumentator().instrument(app).expose(app)
-
-# CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # Include routers
 app.include_router(v1_router)
@@ -51,17 +70,17 @@ app.include_router(admin_router, prefix="/admin")
 
 
 @app.get("/")
-def read_root():
+async def read_root():
     return {"message": "Welcome to the FastAPI service"}
 
 
 @app.get("/health")
-def health_check():
+async def health_check():
     return {"status": "ok", "version": os.getenv("VERSION", "0.0.0")}
 
 
 @app.get("/docs", include_in_schema=False)
-def docs():
+async def docs():
     return get_scalar_api_reference(
         openapi_url="/openapi.json",
         title=app.title,

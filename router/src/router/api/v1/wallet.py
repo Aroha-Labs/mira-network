@@ -1,12 +1,12 @@
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlmodel import select
 import uuid
 from supabase import create_client, Client
 import hashlib
 from src.router.utils.nr import track
 
-from src.router.db.session import get_session
+from src.router.db.session import DBSession
 from src.router.models.wallet import Wallet
 from src.router.models.user import User
 from src.router.core.security import verify_user
@@ -18,7 +18,7 @@ from src.router.schemas.wallet import (
 )
 from src.router.core.config import SUPABASE_URL, SUPABASE_PUBLIC_KEY, JWT_SECRET
 
-from sqlmodel import Session, desc
+from sqlmodel import desc
 
 if not SUPABASE_URL or not SUPABASE_PUBLIC_KEY:
     raise ValueError(
@@ -39,9 +39,9 @@ router = APIRouter()
 
 
 @router.post("/wallets", response_model=WalletResponse)
-def create_wallet(
+async def create_wallet(
     wallet_data: WalletCreate,
-    db: Session = Depends(get_session),
+    db: DBSession,
     user: User = Depends(verify_user),
 ) -> Wallet:
     track("create_wallet_request", {
@@ -50,7 +50,9 @@ def create_wallet(
     })
     
     # Check if wallet address already exists
-    existing_wallet = db.exec(select(Wallet).where(Wallet.user_id == str(user.id)))
+    existing_wallet = await db.exec(
+        select(Wallet).where(Wallet.user_id == str(user.id))
+    )
     if existing_wallet.one_or_none():
         track("create_wallet_error", {
             "user_id": str(user.id),
@@ -72,109 +74,60 @@ def create_wallet(
     )
 
     db.add(new_wallet)
-    db.commit()
-    db.refresh(new_wallet)
-    
-    track("create_wallet_success", {
-        "user_id": str(user.id),
-        "wallet_id": str(new_wallet.id),
-        "chain": new_wallet.chain
-    })
+    await db.commit()
+    await db.refresh(new_wallet)
 
     return new_wallet
 
 
 @router.get("/wallets", response_model=WalletResponse | None)
-def get_wallets(
-    db: Session = Depends(get_session),
+async def get_wallets(
+    db: DBSession,
     user: User = Depends(verify_user),
 ) -> Wallet | None:
-    track("get_wallets_request", {"user_id": str(user.id)})
-    
-    try:
-        result = db.exec(
-            select(Wallet)
-            .where(Wallet.user_id == str(user.id))
-            .order_by(desc(Wallet.created_at))
-        )
-        
-        wallet = result.one()
-        if wallet:
-            track("get_wallets_success", {
-                "user_id": str(user.id),
-                "wallet_id": str(wallet.id)
-            })
-        else:
-            track("get_wallets_not_found", {"user_id": str(user.id)})
-            
-        return wallet
-    except Exception as e:
-        track("get_wallets_error", {
-            "user_id": str(user.id),
-            "error": str(e)
-        })
-        return None
+    """Get all wallets for the current user."""
+    result = await db.exec(
+        select(Wallet)
+        .where(Wallet.user_id == str(user.id))
+        .order_by(desc(Wallet.created_at))
+    )
+    return result.one()
 
 
 @router.get("/wallets/{wallet_id}", response_model=WalletResponse)
-def get_wallet(
+async def get_wallet(
     wallet_id: str,
-    db: Session = Depends(get_session),
+    db: DBSession,
     user: User = Depends(verify_user),
 ) -> Wallet:
-    track("get_wallet_request", {
-        "user_id": str(user.id),
-        "wallet_id": wallet_id
-    })
-    
-    wallet = db.exec(select(Wallet).where(Wallet.id == wallet_id))
-    if not wallet or wallet.one().user_id != str(user.id):
-        track("get_wallet_error", {
-            "user_id": str(user.id),
-            "wallet_id": wallet_id,
-            "error": "wallet_not_found_or_unauthorized"
-        })
+    """Get a specific wallet by ID."""
+
+    wallet = await db.exec(select(Wallet).where(Wallet.id == wallet_id))
+    wallet = wallet.one()
+    if not wallet or wallet.user_id != str(user.id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Wallet not found"
         )
-        
-    track("get_wallet_success", {
-        "user_id": str(user.id),
-        "wallet_id": wallet_id
-    })
-    
-    return wallet.one()
+    return wallet
 
 
 @router.delete("/wallets/{wallet_id}")
-def delete_wallet(
+async def delete_wallet(
     wallet_id: str,
-    db: Session = Depends(get_session),
+    db: DBSession,
     user: User = Depends(verify_user),
 ) -> dict:
-    track("delete_wallet_request", {
-        "user_id": str(user.id),
-        "wallet_id": wallet_id
-    })
-    
-    wallet = db.exec(select(Wallet).where(Wallet.id == wallet_id))
-    if not wallet or wallet.one().user_id != str(user.id):
-        track("delete_wallet_error", {
-            "user_id": str(user.id),
-            "wallet_id": wallet_id,
-            "error": "wallet_not_found_or_unauthorized"
-        })
+    """Delete a wallet."""
+
+    wallet = await db.exec(select(Wallet).where(Wallet.id == wallet_id))
+    wallet = wallet.one()
+    if not wallet or wallet.user_id != str(user.id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Wallet not found"
         )
 
-    db.delete(wallet.one())
-    db.commit()
-    
-    track("delete_wallet_success", {
-        "user_id": str(user.id),
-        "wallet_id": wallet_id
-    })
+    await db.delete(wallet)
+    await db.commit()
 
     return {"message": "Wallet deleted successfully"}
 
@@ -188,9 +141,9 @@ def get_wallet_password(wallet_address: str) -> str:
 
 
 @router.post("/wallet/login", response_model=WalletLoginResponse)
-def wallet_login(
+async def wallet_login(
     login_data: WalletLoginRequest,
-    db: Session = Depends(get_session),
+    db: DBSession,
 ) -> WalletLoginResponse:
     track("wallet_login_request", {
         "address": login_data.address[:8] + "..." # Only track address prefix for safety
@@ -202,7 +155,7 @@ def wallet_login(
     wallet_email = f"{wallet_address}@wallet.mira.network"
 
     # Check if wallet exists in our database
-    result = db.exec(select(Wallet).where(Wallet.address == wallet_address))
+    result = await db.exec(select(Wallet).where(Wallet.address == wallet_address))
     wallet = result.first()
 
     if not wallet:
@@ -225,14 +178,9 @@ def wallet_login(
                 created_at=datetime.utcnow(),
                 updated_at=datetime.utcnow(),
             )
-            db.add(new_wallet)
-            db.commit()
-            
-            track("wallet_registration_success", {
-                "user_id": auth_response.user.id,
-                "wallet_id": str(new_wallet.id)
-            })
-            
+            await db.add(new_wallet)
+            await db.commit()
+
         except Exception as e:
             track("wallet_registration_error", {"error": str(e)})
             raise HTTPException(
@@ -252,10 +200,8 @@ def wallet_login(
 
             # Update wallet last login
             wallet.updated_at = datetime.utcnow()
-            db.commit()
-            
-            track("wallet_login_success", {"user_id": auth_response.user.id})
-            
+            await db.commit()
+
         except Exception as e:
             track("wallet_login_error", {"error": str(e)})
             raise HTTPException(

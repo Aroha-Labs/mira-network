@@ -1,9 +1,5 @@
 import logging
-from sqlalchemy import DDL, event
-from sqlalchemy.orm import Session
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import text
-from .user import User
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -41,6 +37,7 @@ CREATE TRIGGER user_credits_trigger
     EXECUTE FUNCTION notify_low_credits();
 """
 
+
 def setup_credit_triggers(engine):
     """Setup the PostgreSQL triggers and functions for credit monitoring."""
     try:
@@ -48,10 +45,10 @@ def setup_credit_triggers(engine):
         with engine.connect() as conn:
             logger.debug("Creating trigger function...")
             conn.execute(text(CREDIT_TRIGGER_FUNCTION))
-            
+
             logger.debug("Creating trigger...")
             conn.execute(text(CREATE_TRIGGER))
-            
+
             conn.commit()
             logger.info("Credit monitoring triggers setup successfully")
     except Exception as e:

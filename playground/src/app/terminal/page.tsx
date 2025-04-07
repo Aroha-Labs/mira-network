@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, ComponentPropsWithoutRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, UseQueryOptions } from "@tanstack/react-query";
 import {
   StopIcon,
@@ -25,9 +25,7 @@ import MetricsModal from "src/components/MetricsModal";
 import Link from "next/link";
 import { useSession } from "src/hooks/useSession";
 import { MessageVerification } from "src/components/MessageVerification";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import { ClipboardIcon } from "@heroicons/react/24/outline";
+import ReactMarkdown from "src/components/ReactMarkdown";
 
 // Update the Flow interface
 interface Flow {
@@ -124,8 +122,6 @@ const createFlow = async (data: { system_prompt: string; name: string }) => {
     throw error;
   }
 };
-
-type CodeProps = ComponentPropsWithoutRef<"code"> & { inline?: boolean };
 
 export default function Workbench() {
   const { data: userSession } = useSession();
@@ -1234,37 +1230,7 @@ export default function Workbench() {
                 <div className="p-4">
                   {previewMessage ? (
                     <div className="prose max-w-none">
-                      <ReactMarkdown
-                        remarkPlugins={[remarkGfm]}
-                        components={{
-                          pre: ({ node, children, ...props }) => (
-                            <div className="relative group">
-                              <pre {...props}>{children}</pre>
-                              <button
-                                onClick={() => {
-                                  const preElement = children?.toString() || "";
-                                  navigator.clipboard.writeText(preElement);
-                                }}
-                                className="absolute p-1 text-gray-200 transition-opacity bg-gray-700 rounded-sm opacity-0 top-2 right-2 group-hover:opacity-100"
-                              >
-                                <ClipboardIcon className="w-4 h-4" />
-                              </button>
-                            </div>
-                          ),
-                          code: ({
-                            inline,
-                            className,
-                            children,
-                            ...props
-                          }: CodeProps) => (
-                            <code className={className} {...props}>
-                              {children}
-                            </code>
-                          ),
-                        }}
-                      >
-                        {previewMessage.content}
-                      </ReactMarkdown>
+                      <ReactMarkdown>{previewMessage.content}</ReactMarkdown>
                     </div>
                   ) : (
                     <div className="flex flex-col items-center justify-center h-[calc(100vh-17rem)] text-gray-500">

@@ -1,4 +1,3 @@
-import socket
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.responses import PlainTextResponse, StreamingResponse
 import csv
@@ -13,6 +12,8 @@ import logging
 import json
 import requests
 from config import Env
+from machine_registry import register_machine, get_local_ip
+import sys
 
 app = FastAPI()
 
@@ -102,6 +103,27 @@ model_providers = {
 
 
 def get_model_provider(
+    model: str,
+    model_provider: ModelProvider | None,
+) -> tuple[ModelProvider, str]:
+    if model == "":
+        raise HTTPException(status_code=400, detail="Model is required")
+
+    if model_provider is not None:
+        return model_provider, model
+
+    provider_name, model_name = model.split("/", 1)
+
+    if not model_name or model_name == "":
+        raise HTTPException(status_code=400, detail="Invalid model name")
+
+    if provider_name not in model_providers:
+        raise HTTPException(status_code=400, detail="Invalid model provider")
+
+    return model_providers[provider_name], model_name
+
+
+async def get_model_provider_async(
     model: str,
     model_provider: ModelProvider | None,
 ) -> tuple[ModelProvider, str]:
@@ -226,6 +248,133 @@ def get_llm_completion(
         raise HTTPException(status_code=500, detail=f"Error calling LLM API: {str(e)}")
 
 
+async def get_llm_completion_async(
+    model: str,
+    model_provider: ModelProvider,
+    messages: list[Message],
+    stream: bool = False,
+    tools: list[Tool] = None,
+    tool_choice: str = "auto",
+):
+    """
+    Get completion from LLM with support for function/tool calling across different providers
+    """
+    payload = {
+        "model": model,
+        "messages": [msg.model_dump() for msg in messages],
+        "stream": stream,
+    }
+
+    if model_provider.provider_name == "openrouter":
+        payload["provider"] = {
+            "ignore": [
+                "Azure",
+                "DeepInfra",
+                "Nebius",
+                "InferenceNet",
+                "Novita",
+                "Lambda",
+            ],
+        }
+    # Add tools/functions if provided
+    if tools:
+        if model_provider.provider_name == "anthropic":
+            payload["tools"] = [tool.model_dump() for tool in tools]
+        else:
+            payload["tools"] = [tool.model_dump() for tool in tools]
+            if tool_choice != "auto":
+                payload["tool_choice"] = tool_choice
+
+    try:
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {model_provider.api_key}",
+            "Accept-Encoding": "identity",
+        }
+
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(connect=60.0, read=180.0, write=60.0, pool=240.0),
+            transport=httpx.AsyncHTTPTransport(retries=5),
+        ) as client:
+            try:
+                req = await client.post(
+                    url=f"{model_provider.base_url}/chat/completions",
+                    headers=headers,
+                    json=payload,
+                )
+                req.raise_for_status()
+                
+                if stream:
+                    return StreamingResponse(
+                        req.aiter_bytes(chunk_size=1024),
+                        media_type="text/event-stream",
+                    )
+
+                # Convert provider-specific response to OpenAI format if needed
+                response_data = req.json()
+                if model_provider.provider_name == "anthropic":
+                    # Convert Anthropic response to OpenAI format
+                    if "tool_calls" in response_data.get("content", []):
+                        response_data["choices"][0]["message"]["function_call"] = {
+                            "name": response_data["content"][0]["tool_calls"][0][
+                                "function"
+                            ]["name"],
+                            "arguments": response_data["content"][0]["tool_calls"][0][
+                                "function"
+                            ]["arguments"],
+                        }
+
+                return Response(
+                    content=json.dumps(response_data),
+                    status_code=req.status_code,
+                    headers=dict(req.headers),
+                )
+                
+            except httpx.TimeoutException as e:
+                import traceback
+                logging.error(f"Timeout error calling {model_provider.provider_name} API: {e}")
+                logging.error(f"Timeout details: connect={client.timeout.connect}, read={client.timeout.read}, write={client.timeout.write}, pool={client.timeout.pool}")
+                logging.error("Timeout traceback: " + traceback.format_exc())
+                raise HTTPException(status_code=504, detail=f"Timeout error calling {model_provider.provider_name} API: {str(e)}")
+                
+            except httpx.HTTPStatusError as e:
+                import traceback
+                logging.error(f"HTTP status error from {model_provider.provider_name} API: {e.response.status_code} - {e.response.text}")
+                logging.error("HTTP error traceback: " + traceback.format_exc())
+                
+                # Try to parse the error response
+                error_detail = str(e)
+                try:
+                    error_json = e.response.json()
+                    if "error" in error_json:
+                        error_detail = f"{error_json.get('error', {}).get('message', str(e))}"
+                except:
+                    pass
+                    
+                raise HTTPException(
+                    status_code=e.response.status_code, 
+                    detail=f"Error from {model_provider.provider_name} API: {error_detail}"
+                )
+                
+            except httpx.RequestError as e:
+                import traceback
+                logging.error(f"Request error calling {model_provider.provider_name} API: {e}")
+                logging.error("Request error traceback: " + traceback.format_exc())
+                raise HTTPException(status_code=500, detail=f"Request error calling {model_provider.provider_name} API: {str(e)}")
+                
+            except json.JSONDecodeError as e:
+                import traceback
+                logging.error(f"JSON decode error from {model_provider.provider_name} API response: {e}")
+                logging.error("JSON error traceback: " + traceback.format_exc())
+                raise HTTPException(status_code=500, detail=f"Invalid JSON response from {model_provider.provider_name} API")
+                
+    except Exception as e:
+        import traceback
+        logging.error(f"Unexpected error calling {model_provider.provider_name} API: {e}")
+        logging.error("Unexpected error traceback: " + traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Unexpected error calling {model_provider.provider_name} API: {str(e)}")
+
+
 @app.get("/health")
 async def health() -> Dict[str, str]:
     return {"status": "ok", "version": os.getenv("VERSION", "0.0.0")}
@@ -280,19 +429,38 @@ async def generate(req: AiRequest):
             status_code=400, detail="At least one user message is required"
         )
 
-    model_provider, model = get_model_provider(req.model, req.model_provider)
+    model_provider, model = await get_model_provider_async(
+        req.model, req.model_provider
+    )
 
     # Convert Message objects to dictionaries
     messages = [{"role": msg.role, "content": msg.content} for msg in req.messages]
 
-    return get_llm_completion(
-        model,
-        model_provider,
-        messages=[Message(**msg) for msg in messages],
-        stream=req.stream,
-        tools=req.tools,
-        tool_choice=req.tool_choice,
-    )
+    try:
+        response = await get_llm_completion_async(
+            model,
+            model_provider,
+            messages=[Message(**msg) for msg in messages],
+            stream=req.stream,
+            tools=req.tools,
+            tool_choice=req.tool_choice,
+        )
+    except Exception as e:
+        import traceback
+
+        logging.error(f"Error generating response: {e}")
+        logging.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Error generating response: {e}")
+
+    # Add MACHINE_IP to response headers with None check
+    if Env.MACHINE_IP:
+        response.headers["x-machine-ip"] = Env.MACHINE_IP
+    else:
+        # Fallback to local IP if MACHINE_IP is not set
+        local_ip = get_local_ip()
+        response.headers["x-machine-ip"] = local_ip
+
+    return response
 
 
 @app.get("/v1/models", tags=["network"])
@@ -408,23 +576,32 @@ async def update_liveness(machine_ip: str):
         await asyncio.sleep(3)
 
 
-def get_local_ip():
-    """Returns the local IP address of the container running on AWS Fargate"""
-    try:
-        hostname = socket.gethostname()
-        print("hostname", hostname)
-        local_ip = socket.gethostbyname(hostname)
-        return local_ip
-    except Exception as e:
-        return str(e)
-
-
 @app.on_event("startup")
 async def startup_event():
     # Get the machine IP from environment or determine the local IP
     MACHINE_IP = Env.MACHINE_IP
     if MACHINE_IP is None:
         MACHINE_IP = get_local_ip()
+        logging.info(f"Determined local IP: {MACHINE_IP}")
 
-    # Start the liveness update task
-    asyncio.create_task(update_liveness(MACHINE_IP))
+    # Register the machine with the router and get an API token (with retries)
+    logging.info("Starting machine registration process...")
+    machine_token = await register_machine(ROUTER_BASE_URL)
+
+    if machine_token:
+        logging.info("Machine registered successfully and token acquired")
+        os.environ["MACHINE_API_TOKEN"] = machine_token
+        Env.MACHINE_API_TOKEN = machine_token
+        logging.info(f"Using machine name: {Env.MACHINE_NAME}")
+
+        # Start the liveness update task only if registration succeeded
+        asyncio.create_task(update_liveness(MACHINE_IP))
+    else:
+        # Registration failed, exit the application
+        logging.critical(
+            "Failed to register machine or acquire token after multiple attempts"
+        )
+        logging.critical("Machine registration is required to run the service")
+        logging.critical("Shutting down...")
+        # Exit with non-zero status to indicate failure
+        sys.exit(1)

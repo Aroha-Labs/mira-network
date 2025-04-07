@@ -5,7 +5,7 @@
 groups = ["default"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:ea547acefeef48e1ea407ba034414c8b90e1afeceb0be1011874f9404e3dc292"
+content_hash = "sha256:5f6380f279b06b1516f1bcc48b133a6914f5917c411e3a989468f98d030d7863"
 
 [[metadata.targets]]
 requires_python = "==3.11.*"
@@ -210,6 +210,20 @@ files = [
 ]
 
 [[package]]
+name = "newrelic"
+version = "10.7.0"
+requires_python = ">=3.7"
+summary = "New Relic Python Agent"
+groups = ["default"]
+files = [
+    {file = "newrelic-10.7.0-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:877b53049be9dfb3ad2845f00c57a3eb1aadeaec700f09a8f6c7fec1f6e71c2b"},
+    {file = "newrelic-10.7.0-cp311-cp311-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:f02916527900f6d209682d3dd77c964fb38ca7d84c31a293085e4a84fa35957d"},
+    {file = "newrelic-10.7.0-cp311-cp311-musllinux_1_2_aarch64.whl", hash = "sha256:683b5158203e28e46b348f9657054eb25cfb7367e21524a457235d9c5a5cc4ed"},
+    {file = "newrelic-10.7.0-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:dac3003f22e1edd564f7d7556c84f1fb2f61140c46040befa626bdc8f69a4a89"},
+    {file = "newrelic-10.7.0.tar.gz", hash = "sha256:ac9716c115ddcf54b54115391a84ed2c318ae943b4f598b4d0248cd6edb12414"},
+]
+
+[[package]]
 name = "openai"
 version = "1.61.0"
 requires_python = ">=3.8"
@@ -314,6 +328,17 @@ dependencies = [
 files = [
     {file = "starlette-0.41.3-py3-none-any.whl", hash = "sha256:44cedb2b7c77a9de33a8b74b2b90e9f50d11fcf25d8270ea525ad71a25374ff7"},
     {file = "starlette-0.41.3.tar.gz", hash = "sha256:0e4ab3d16522a255be6b28260b938eae2482f98ce5cc934cb08dce8dc3ba5835"},
+]
+
+[[package]]
+name = "tenacity"
+version = "9.0.0"
+requires_python = ">=3.8"
+summary = "Retry code until it succeeds"
+groups = ["default"]
+files = [
+    {file = "tenacity-9.0.0-py3-none-any.whl", hash = "sha256:93de0c98785b27fcf659856aa9f54bfbd399e29969b0621bc7f762bd441b4539"},
+    {file = "tenacity-9.0.0.tar.gz", hash = "sha256:807f37ca97d62aa361264d497b0e31e92b8027044942bfa756160d908320d73b"},
 ]
 
 [[package]]
