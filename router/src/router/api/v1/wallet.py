@@ -86,12 +86,21 @@ async def get_wallets(
     user: User = Depends(verify_user),
 ) -> Wallet | None:
     """Get all wallets for the current user."""
+    track("get_wallets_request", {"user_id": str(user.id)})
+    
     result = await db.exec(
         select(Wallet)
         .where(Wallet.user_id == str(user.id))
         .order_by(desc(Wallet.created_at))
     )
-    return result.one()
+    wallet = result.one()
+    
+    track("get_wallets_response", {
+        "user_id": str(user.id),
+        "found_wallet": wallet is not None
+    })
+    
+    return wallet
 
 
 @router.get("/wallets/{wallet_id}", response_model=WalletResponse)
@@ -101,13 +110,28 @@ async def get_wallet(
     user: User = Depends(verify_user),
 ) -> Wallet:
     """Get a specific wallet by ID."""
+    track("get_wallet_request", {
+        "user_id": str(user.id),
+        "wallet_id": wallet_id
+    })
 
     wallet = await db.exec(select(Wallet).where(Wallet.id == wallet_id))
     wallet = wallet.one()
     if not wallet or wallet.user_id != str(user.id):
+        track("get_wallet_error", {
+            "user_id": str(user.id),
+            "wallet_id": wallet_id,
+            "error": "wallet_not_found"
+        })
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Wallet not found"
         )
+        
+    track("get_wallet_response", {
+        "user_id": str(user.id),
+        "wallet_id": wallet_id
+    })
+    
     return wallet
 
 
@@ -118,16 +142,30 @@ async def delete_wallet(
     user: User = Depends(verify_user),
 ) -> dict:
     """Delete a wallet."""
+    track("delete_wallet_request", {
+        "user_id": str(user.id),
+        "wallet_id": wallet_id
+    })
 
     wallet = await db.exec(select(Wallet).where(Wallet.id == wallet_id))
     wallet = wallet.one()
     if not wallet or wallet.user_id != str(user.id):
+        track("delete_wallet_error", {
+            "user_id": str(user.id),
+            "wallet_id": wallet_id,
+            "error": "wallet_not_found"
+        })
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Wallet not found"
         )
 
     await db.delete(wallet)
     await db.commit()
+    
+    track("delete_wallet_success", {
+        "user_id": str(user.id),
+        "wallet_id": wallet_id
+    })
 
     return {"message": "Wallet deleted successfully"}
 

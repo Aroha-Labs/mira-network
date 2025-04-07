@@ -13,7 +13,7 @@ from src.router.utils.opensearch import (
     opensearch_client,
     OPENSEARCH_LLM_USAGE_LOG_INDEX,
 )
-
+from src.router.utils.nr import track
 router = APIRouter()
 
 
@@ -190,22 +190,15 @@ async def list_all_logs(
     order: Literal["asc", "desc"] = Query(default="desc"),
     flow_id: Optional[str] = Query(default=None),
 ):
-    """
-    List all logs with proper type validation
-
-    Args:
-        page: Page number (starts at 1)
-        page_size: Number of items per page (1-100)
-        start_date: Filter logs after this date (ISO format)
-        end_date: Filter logs before this date (ISO format)
-        machine_id: Filter by machine ID
-        model: Filter by model name
-        api_key_id: Filter by API key ID
-        user_id: Filter by user ID
-        order_by: Field to sort by
-        order: Sort order (asc/desc)
-        flow_id: Filter by flow ID
-    """
+    track("list_api_logs_request", {
+        "user_id": str(user.id),
+        "page": page,
+        "page_size": page_size,
+        "is_admin": "admin" in user.roles,
+        "has_filters": any([start_date, end_date, machine_id, model, api_key_id, user_id, flow_id]),
+        "requested_user_id": user_id
+    })
+    
     try:
         # Build OpenSearch query
         must_conditions = [{"term": {"doc_type": "model_usage"}}]
@@ -213,6 +206,11 @@ async def list_all_logs(
         # Access control
         if user_id:
             if "admin" not in user.roles:
+                track("list_api_logs_error", {
+                    "user_id": str(user.id),
+                    "error": "permission_denied",
+                    "requested_user_id": user_id
+                })
                 raise HTTPException(
                     status_code=403, detail="Only admins can query other users' logs"
                 )
@@ -295,6 +293,13 @@ async def list_all_logs(
 
         total_hits = response["hits"]["total"]["value"]
         total_pages = (total_hits + page_size - 1) // page_size
+        
+        track("list_api_logs_response", {
+            "user_id": str(user.id),
+            "total_hits": total_hits,
+            "logs_returned": len(logs),
+            "pages": total_pages
+        })
 
         return {
             "logs": logs,
@@ -305,6 +310,10 @@ async def list_all_logs(
         }
 
     except Exception as e:
+        track("list_api_logs_error", {
+            "user_id": str(user.id),
+            "error": str(e)
+        })
         logger.error(f"Error in list_all_logs: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
@@ -354,10 +363,26 @@ async def list_all_logs(
     },
 )
 async def total_inference_calls(db: DBSession, user: User = Depends(verify_user)):
-    total = await db.exec(
-        select(func.count()).select_from(ApiLogs).where(ApiLogs.user_id == user.id)
-    )
-    return {"total": total.first()}
+    track("total_inference_calls_request", {"user_id": str(user.id)})
+    
+    try:
+        total = await db.exec(
+            select(func.count()).select_from(ApiLogs).where(ApiLogs.user_id == user.id)
+        )
+        total_count = total.first()
+        
+        track("total_inference_calls_response", {
+            "user_id": str(user.id),
+            "total_count": total_count
+        })
+        
+        return {"total": total_count}
+    except Exception as e:
+        track("total_inference_calls_error", {
+            "user_id": str(user.id),
+            "error": str(e)
+        })
+        raise HTTPException(status_code=500, detail=f"Error fetching inference calls: {str(e)}")
 
 
 @router.get("/api-logs/metrics")

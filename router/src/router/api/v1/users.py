@@ -46,7 +46,15 @@ router = APIRouter()
     },
 )
 async def get_current_user(db: DBSession, user: User = Depends(verify_token)):
+    track("get_current_user_request", {"user_id": str(user.id)})
+    
     user_credits = await get_user_credits(user.id, db)
     data = user.model_dump()
     data["credits"] = user_credits
+    
+    track("get_current_user_response", {
+        "user_id": str(user.id),
+        "credits": user_credits
+    })
+    
     return data

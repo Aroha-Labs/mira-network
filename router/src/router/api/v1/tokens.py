@@ -9,6 +9,7 @@ from src.router.core.security import verify_user
 from datetime import datetime
 import os
 from src.router.utils.redis import redis_client
+from src.router.utils.nr import track
 
 logger = logging.getLogger(__name__)
 
