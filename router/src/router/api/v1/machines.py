@@ -1,17 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session, select
+from fastapi import APIRouter, Depends, HTTPException, Response
+import logging
+from sqlmodel import select
+from src.router.db.session import DBSession
 from src.router.core.security import verify_user, verify_machine
 from src.router.core.types import User
-from src.router.db.session import get_session
 import time
 from src.router.models.machines import Machine
-from typing import Annotated
 from src.router.utils.redis import redis_client, get_online_machines
 from src.router.utils.nr import track
 
 router = APIRouter()
-
-SessionDep = Annotated[Session, Depends(get_session)]
 
 
 @router.get(
@@ -36,22 +34,14 @@ Checks if a specific machine is currently online and responding.
     response_description="Returns the machine's current status",
     deprecated=True,
 )
-def check_liveness(network_ip: str, session: SessionDep):
-    track("check_liveness_request", {"network_ip": network_ip})
-    
+async def check_liveness(network_ip: str):
     # Check if machine is in Redis liveness records
-    status = "offline"
-    for key in redis_client.scan_iter(match="liveness:*"):
-        if redis_client.hget(key, "network_ip") == network_ip:
-            status = "online"
-            break
-    
-    track("check_liveness_response", {
-        "network_ip": network_ip,
-        "status": status
-    })
-    
-    return {"network_ip": network_ip, "status": status}
+    async for key in redis_client.scan_iter(match="liveness:*"):
+        nip = await redis_client.hget(key, "network_ip")
+        if nip == network_ip:
+            return {"network_ip": network_ip, "status": "online"}
+
+    return {"network_ip": network_ip, "status": "offline"}
 
 
 @router.get(
@@ -71,18 +61,13 @@ def check_liveness(network_ip: str, session: SessionDep):
 ```""",
     response_description="Returns the machine's current status",
 )
-def check_liveness_by_id(machine_id: str):
-    track("check_liveness_by_id_request", {"machine_id": machine_id})
-    
+async def check_liveness_by_id(machine_id: str):
     # Direct check in Redis using machine_id
-    status = "online" if redis_client.exists(f"liveness:{machine_id}") else "offline"
-    
-    track("check_liveness_by_id_response", {
-        "machine_id": machine_id,
-        "status": status
-    })
-    
-    return {"machine_id": machine_id, "status": status}
+    exists = await redis_client.exists(f"liveness:{machine_id}")
+    if exists:
+        return {"machine_id": machine_id, "status": "online"}
+
+    return {"machine_id": machine_id, "status": "offline"}
 
 
 @router.post(
@@ -91,7 +76,7 @@ def check_liveness_by_id(machine_id: str):
     description="""Updates the liveness status of a machine.
 
 ### Path Parameters
-- `machine_uid`: UUID of the machine to update
+- `network_ip`: Network IP address of the machine to update
 
 ### Response Format
 ```json
@@ -135,9 +120,10 @@ def check_liveness_by_id(machine_id: str):
         },
     },
 )
-def set_liveness(
+async def set_liveness(
     network_ip: str,
-    session: SessionDep,
+    response: Response,
+    db: DBSession,
     machine_auth: dict = Depends(verify_machine),
 ):
     track("set_liveness_request", {"network_ip": network_ip})
@@ -149,15 +135,9 @@ def set_liveness(
             status_code=403, detail="Token not authorized for this machine"
         )
 
-    now = time.time()
-    redis_client.setnx(f"liveness-start:{network_ip}", now)
-    created_at = float(redis_client.get(f"liveness-start:{network_ip}"))
-    ttl = int((now - created_at) + 12)
-    redis_client.expire(f"liveness-start:{network_ip}", ttl)
-
-    machine = session.exec(
-        select(Machine).where(Machine.network_ip == network_ip)
-    ).first()
+    # First look up the machine to get its ID
+    machine = await db.exec(select(Machine).where(Machine.network_ip == network_ip))
+    machine = machine.first()
 
     if not machine:
         track("set_liveness_error", {
@@ -166,22 +146,38 @@ def set_liveness(
         })
         raise HTTPException(status_code=404, detail="Machine not found")
 
-    redis_client.hset(
-        f"liveness:{machine.id}",
+    now = time.time()
+    machine_id = str(machine.id)
+    liveness_key = f"liveness:{machine_id}"
+    ttl = 12  # seconds
+
+    # Set the liveness data with a fixed TTL
+    await redis_client.hset(
+        liveness_key,
         mapping={
             "network_ip": network_ip,
             "timestamp": now,
         },
     )
 
-    redis_client.expire(f"liveness:{machine.id}", 6)
-    
-    track("set_liveness_success", {
-        "network_ip": network_ip,
-        "machine_id": str(machine.id)
-    })
+    # Map machine_id to network_ip
+    await redis_client.set(f"machine_id:{network_ip}", machine_id)
 
-    return {"network_ip": network_ip, "status": "online"}
+    await redis_client.expire(liveness_key, ttl)
+
+    # Add debug headers
+    response.headers["X-Liveness-Timestamp"] = str(now)
+    response.headers["X-Liveness-TTL"] = str(ttl)
+
+    logging.debug(f"Updated liveness for machine {machine_id} (IP: {network_ip})")
+
+    return {
+        "machine_id": machine_id,
+        "network_ip": network_ip,
+        "status": "online",
+        "timestamp": now,
+        "ttl": ttl,
+    }
 
 
 @router.get(
@@ -190,8 +186,8 @@ def set_liveness(
     description="""Retrieves a list of all registered machines with their current status.
     By default, disabled machines are excluded. Only admins can request disabled machines.""",
 )
-def list_all_machines(
-    session: SessionDep,
+async def list_all_machines(
+    db: DBSession,
     include_disabled: bool = False,
     user: User = Depends(verify_user),
 ):
@@ -215,17 +211,10 @@ def list_all_machines(
     if not include_disabled:
         query = query.where(Machine.disabled == False)  # noqa: E712
 
-    machines = session.exec(query).all()
-    online_machines = get_online_machines()
-    
-    online_count = sum(1 for machine in machines if str(machine.id) in online_machines)
-    
-    track("list_machines_response", {
-        "user_id": str(user.id),
-        "machines_count": len(machines),
-        "online_count": online_count,
-        "offline_count": len(machines) - online_count
-    })
+    machines = await db.exec(query)
+    machines = machines.all()
+
+    online_machines = await get_online_machines()
 
     return [
         {

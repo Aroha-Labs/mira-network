@@ -1,14 +1,18 @@
-from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session, select
+from src.router.utils.logger import logger
+from typing import Optional, Literal
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlmodel import select
 from src.router.core.types import User
 from src.router.models.logs import ApiLogs
-from src.router.db.session import get_session
+from src.router.db.session import DBSession
 from src.router.core.security import verify_user
 from sqlalchemy import func
 from sqlalchemy.types import Float
 from datetime import datetime, timedelta
-from src.router.utils.nr import track
+from src.router.utils.opensearch import (
+    opensearch_client,
+    OPENSEARCH_LLM_USAGE_LOG_INDEX,
+)
 
 router = APIRouter()
 
@@ -169,146 +173,140 @@ router = APIRouter()
         },
     },
 )
-def list_all_logs(
-    db: Session = Depends(get_session),
+async def list_all_logs(
+    db: DBSession,
     user: User = Depends(verify_user),
-    page: int = 1,
-    page_size: int = 10,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
-    machine_id: Optional[str] = None,
-    model: Optional[str] = None,
-    api_key_id: Optional[int] = None,
-    user_id: Optional[str] = None,
-    order_by: Optional[str] = "created_at",
-    order: Optional[str] = "desc",
-    flow_id: Optional[str] = None,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=10, ge=1, le=100),
+    start_date: Optional[datetime] = Query(default=None),
+    end_date: Optional[datetime] = Query(default=None),
+    machine_id: Optional[str] = Query(default=None),
+    model: Optional[str] = Query(default=None),
+    api_key_id: Optional[int] = Query(default=None),
+    user_id: Optional[str] = Query(default=None),
+    order_by: Literal["created_at", "model", "machine_id"] = Query(
+        default="created_at"
+    ),
+    order: Literal["asc", "desc"] = Query(default="desc"),
+    flow_id: Optional[str] = Query(default=None),
 ):
-    track("list_logs_request", {
-        "user_id": str(user.id),
-        "page": page,
-        "page_size": page_size,
-        "is_admin": "admin" in user.roles,
-        "has_filters": any([start_date, end_date, machine_id, model, api_key_id, user_id, flow_id])
-    })
-    
-    # Check admin access
-    if user_id:
-        if "admin" not in user.roles:
-            track("list_logs_error", {
-                "user_id": str(user.id),
-                "error": "permission_denied",
-                "requested_user_id": user_id
-            })
-            raise HTTPException(
-                status_code=403, detail="Only admins can query other users' logs"
+    """
+    List all logs with proper type validation
+
+    Args:
+        page: Page number (starts at 1)
+        page_size: Number of items per page (1-100)
+        start_date: Filter logs after this date (ISO format)
+        end_date: Filter logs before this date (ISO format)
+        machine_id: Filter by machine ID
+        model: Filter by model name
+        api_key_id: Filter by API key ID
+        user_id: Filter by user ID
+        order_by: Field to sort by
+        order: Sort order (asc/desc)
+        flow_id: Filter by flow ID
+    """
+    try:
+        # Build OpenSearch query
+        must_conditions = [{"term": {"doc_type": "model_usage"}}]
+
+        # Access control
+        if user_id:
+            if "admin" not in user.roles:
+                raise HTTPException(
+                    status_code=403, detail="Only admins can query other users' logs"
+                )
+            must_conditions.append({"match": {"user_id": user_id}})
+        else:
+            if "admin" not in user.roles:
+                must_conditions.append({"match": {"user_id": user.id}})
+
+        # Add filters
+        if start_date:
+            must_conditions.append(
+                {"range": {"timestamp": {"gte": start_date.isoformat()}}}
+            )
+        if end_date:
+            must_conditions.append(
+                {"range": {"timestamp": {"lte": end_date.isoformat()}}}
+            )
+        if machine_id:
+            must_conditions.append({"term": {"machine_id": machine_id}})
+        if model:
+            must_conditions.append({"match": {"model": model}})
+        if api_key_id:
+            must_conditions.append({"term": {"api_key_id": api_key_id}})
+        if flow_id:
+            must_conditions.append({"term": {"flow_id": flow_id}})
+
+        # Calculate pagination
+        start = (page - 1) * page_size
+
+        # Build the full query
+        query = {
+            "query": {"bool": {"must": must_conditions}},
+            "sort": [
+                {
+                    order_by if order_by != "created_at" else "timestamp": {
+                        "order": order
+                    }
+                }
+            ],
+            "from": start,
+            "size": page_size,
+            "track_total_hits": True,
+        }
+
+        # Execute search
+        response = opensearch_client.search(
+            index=OPENSEARCH_LLM_USAGE_LOG_INDEX,
+            body=query,
+        )
+
+        # Transform results
+        logs = []
+        for hit in response["hits"]["hits"]:
+            source = hit["_source"]
+            logs.append(
+                {
+                    "id": hit["_id"],
+                    "user_id": source.get("user_id"),
+                    "api_key_id": source.get("api_key_id"),
+                    "payload": source.get("request"),
+                    "request_payload": source.get("request"),
+                    "ttft": source.get("ttft"),
+                    "response": source.get("response"),
+                    "prompt_tokens": source.get("prompt_tokens"),
+                    "completion_tokens": source.get("completion_tokens"),
+                    "total_tokens": source.get("total_tokens"),
+                    "total_response_time": source.get("total_response_time"),
+                    "model": source.get("model"),
+                    "model_pricing": {
+                        "prompt_token": source.get("costs", {}).get("prompt_token", 0),
+                        "completion_token": source.get("costs", {}).get(
+                            "completion_token", 0
+                        ),
+                    },
+                    "machine_id": source.get("machine_id"),
+                    "created_at": source.get("timestamp"),
+                    "flow_id": source.get("flow_id"),
+                }
             )
 
-    # Additional error tracking
-    if order_by not in [
-        "created_at",
-        "total_response_time",
-        "total_tokens",
-        "prompt_tokens",
-        "completion_tokens",
-        "ttft",
-        "model",
-        "machine_id",
-    ]:
-        track("list_logs_error", {
-            "user_id": str(user.id),
-            "error": "invalid_order_by",
-            "order_by": order_by
-        })
-        raise HTTPException(status_code=400, detail="Invalid order_by field")
-    
-    if order not in ["asc", "desc"]:
-        track("list_logs_error", {
-            "user_id": str(user.id),
-            "error": "invalid_order_direction",
-            "order": order
-        })
-        raise HTTPException(status_code=400, detail="Invalid order direction")
-    
-    offset = (page - 1) * page_size
+        total_hits = response["hits"]["total"]["value"]
+        total_pages = (total_hits + page_size - 1) // page_size
 
-    query = db.query(ApiLogs)
+        return {
+            "logs": logs,
+            "total": total_hits,
+            "page": page,
+            "page_size": page_size,
+            "pages": total_pages,
+        }
 
-    # Handle user_id filtering and admin access
-    if "admin" in user.roles:
-        # Start with all logs for admin
-        if user_id:
-            # Admin filtering for specific user
-            query = query.filter(ApiLogs.user_id == user_id)
-    else:
-        # Non-admin only sees their own logs
-        query = query.filter(ApiLogs.user_id == user.id)
-
-    # Apply other filters
-    if start_date:
-        query = query.filter(ApiLogs.created_at >= start_date)
-    if end_date:
-        query = query.filter(ApiLogs.created_at <= end_date)
-    if machine_id:
-        query = query.filter(
-            ApiLogs.machine_id == machine_id
-        )  # Removed str() conversion
-    if model:
-        query = query.filter(ApiLogs.model == model)
-    if api_key_id:
-        query = query.filter(ApiLogs.api_key_id == api_key_id)
-    if flow_id:
-        # For flow_id, we don't need to check user ownership if admin
-        query = query.filter(ApiLogs.flow_id == flow_id)
-
-    if order_by not in [
-        "created_at",
-        "total_response_time",
-        "total_tokens",
-        "prompt_tokens",
-        "completion_tokens",
-        "ttft",
-        "model",
-        "machine_id",
-    ]:
-        raise HTTPException(status_code=400, detail="Invalid order_by field")
-    if order == "desc":
-        query = query.order_by(getattr(ApiLogs, order_by).desc())
-    elif order == "asc":
-        query = query.order_by(getattr(ApiLogs, order_by).asc())
-    else:
-        raise HTTPException(status_code=400, detail="Invalid order direction")
-    logs = query.offset(offset).limit(page_size).all()
-    total_logs = query.count()
-
-    def exclude_model_from_pricing(log):
-        l = log.dict()
-        model_pricing = l.get("model_pricing")
-
-        if model_pricing is None:
-            return l
-
-        if model_pricing.get("model") is not None:
-            model_pricing.pop("model")
-
-        l["model_pricing"] = model_pricing
-        return l
-
-    filtered_logs = list(map(exclude_model_from_pricing, logs))
-
-    track("list_logs_response", {
-        "user_id": str(user.id),
-        "total_logs": total_logs,
-        "returned_logs": len(filtered_logs),
-        "page": page
-    })
-    
-    return {
-        "logs": filtered_logs,
-        "total": total_logs,
-        "page": page,
-        "page_size": page_size,
-    }
+    except Exception as e:
+        logger.error(f"Error in list_all_logs: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get(
@@ -355,27 +353,16 @@ def list_all_logs(
         },
     },
 )
-def total_inference_calls(
-    db: Session = Depends(get_session),
-    user: User = Depends(verify_user),
-):
-    track("total_inference_calls_request", {"user_id": str(user.id)})
-    
-    total = db.exec(
+async def total_inference_calls(db: DBSession, user: User = Depends(verify_user)):
+    total = await db.exec(
         select(func.count()).select_from(ApiLogs).where(ApiLogs.user_id == user.id)
-    ).first()
-    
-    track("total_inference_calls_response", {
-        "user_id": str(user.id),
-        "total_calls": total
-    })
-    
-    return {"total": total}
+    )
+    return {"total": total.first()}
 
 
 @router.get("/api-logs/metrics")
-def get_logs_metrics(
-    db: Session = Depends(get_session),
+async def get_logs_metrics(
+    db: DBSession,
     user: User = Depends(verify_user),
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
@@ -427,8 +414,10 @@ def get_logs_metrics(
         start_dt = datetime.fromisoformat(start_date)
 
     # Build query with time bucket and date filtering
+    time_bucket_col = time_bucket_fn(ApiLogs.created_at).label("timestamp")
+
     query = select(
-        time_bucket_fn(ApiLogs.created_at).label("timestamp"),
+        time_bucket_col,
         ApiLogs.model,
         func.count().label("calls"),
         func.coalesce(func.sum(ApiLogs.prompt_tokens), 0).label("prompt_tokens"),
@@ -480,13 +469,12 @@ def get_logs_metrics(
     if flow_id:
         query = query.where(ApiLogs.flow_id == flow_id)
 
-    # Add grouping and ordering
-    query = query.group_by(time_bucket_fn(ApiLogs.created_at), ApiLogs.model).order_by(
-        time_bucket_fn(ApiLogs.created_at)
-    )
+    # Group by timestamp and model, use the time_bucket_col directly
+    query = query.group_by(time_bucket_col, ApiLogs.model).order_by(time_bucket_col)
 
-    # Execute the query once
-    results = db.execute(query).all()
+    # Rest of the function remains the same
+    results = await db.exec(query)
+    results = results.all()
 
     # Process results safely
     time_series = {}

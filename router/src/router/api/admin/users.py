@@ -2,16 +2,22 @@ from typing import Any, List, Dict, Optional
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import func
-from sqlmodel import Session, select
+from sqlmodel import select, func
 from src.router.schemas.credits import AddCreditRequest
-from src.router.core.security import supabase, verify_admin
+from src.router.core.security import verify_admin, SupabaseClient
 from src.router.models.user import UserCreditsHistory
-from src.router.db.session import get_session
+from src.router.db.session import DBSession
 from enum import Enum
 from gotrue.types import User
 from datetime import datetime, timezone
 from src.router.models.user import User as UserModel  # rename to avoid conflict
+from src.router.utils.redis import redis_client  # new import for redis
+from src.router.utils.opensearch import (
+    opensearch_client,
+    OPENSEARCH_CREDITS_INDEX,
+)
+from src.router.utils.logger import logger
+import asyncio
 
 router = APIRouter()
 
@@ -44,16 +50,19 @@ class SortField(str, Enum):
     EMAIL = "email"
     FULL_NAME = "full_name"
 
+
 class SortOrder(str, Enum):
     ASC = "asc"
     DESC = "desc"
+
 
 @router.get(
     "/users",
     summary="List Users",
     description="Retrieve a paginated list of users with optional search, sort, and filters.",
 )
-def list_users(
+async def list_users(
+    db: DBSession,
     page: int = 1,
     per_page: int = 10,
     search: str = "",
@@ -63,13 +72,13 @@ def list_users(
     max_credits: Optional[float] = None,
     provider: Optional[str] = None,
     user: User = Depends(verify_admin),
-    db: Session = Depends(get_session),
 ):
     def apply_filters(query):
         if search:
             search_pattern = f"%{search}%"
             query = query.where(
-                (UserModel.full_name.ilike(search_pattern)) | (UserModel.email.ilike(search_pattern))
+                (UserModel.full_name.ilike(search_pattern))
+                | (UserModel.email.ilike(search_pattern))
             )
         if min_credits is not None:
             query = query.where(UserModel.credits >= min_credits)
@@ -80,7 +89,7 @@ def list_users(
         return query
 
     offset = (page - 1) * per_page
-    
+
     # Main query for users
     query = apply_filters(select(UserModel))
 
@@ -95,9 +104,10 @@ def list_users(
 
     # Count query
     count_query = apply_filters(select(func.count()).select_from(UserModel))
-    total_users = db.exec(count_query).first()
+    total_users = await db.exec(count_query)
+    total_users = total_users.one()
 
-    users = db.exec(query.offset(offset).limit(per_page))
+    users = await db.exec(query.offset(offset).limit(per_page))
 
     return {
         "users": users.all(),
@@ -173,11 +183,12 @@ def process_user_claims(claims: dict) -> dict:
 )
 async def add_or_update_user_claim(
     req: UserClaimWebhook,
-    db: Session = Depends(get_session),
+    db: DBSession,
 ):
     # Process user information
     user_data = process_user_claims(req.claims)
-    user = db.exec(select(UserModel).where(UserModel.user_id == req.user_id)).first()
+    user_res = await db.exec(select(UserModel).where(UserModel.user_id == req.user_id))
+    user = user_res.first()
 
     if user:
         user.email = user_data["email"]
@@ -185,8 +196,8 @@ async def add_or_update_user_claim(
         user.avatar_url = user_data["avatar_url"]
         user.provider = user_data["provider"]
         user.meta = user_data["meta"]
-        user.updated_at = datetime.now(timezone.utc)
-        user.last_login_at = datetime.now(timezone.utc)
+        user.updated_at = datetime.utcnow()
+        user.last_login_at = datetime.utcnow()
     else:
         # Create new user with all required fields
         user = UserModel(
@@ -198,16 +209,16 @@ async def add_or_update_user_claim(
             provider=user_data.get("provider", ""),
             meta=user_data.get("meta", {}),
             credits=user_data.get("credits", 0),
-            last_login_at=datetime.now(timezone.utc),
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            last_login_at=datetime.utcnow(),
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
         )
         db.add(user)
 
     if user.custom_claim:
         req.claims.update({"user_roles": user.custom_claim.get("roles", [])})
 
-    db.commit()
+    await db.commit()
 
     data = {"user_id": req.user_id, "claims": req.claims}
     return data
@@ -227,19 +238,21 @@ class UserClaim(BaseModel):
     summary="Add or Update User Claim",
     description="Add or update a custom claim for a user.",
 )
-def user_claim_webhook(
+async def user_claim_webhook(
     user_id: str,
     claim: UserClaim,
-    db: Session = Depends(get_session),
+    db: DBSession,
     user=Depends(verify_admin),
 ) -> Dict[str, Any]:
-    user = db.exec(select(UserModel).where(UserModel.user_id == user_id)).first()
+    user_res = await db.exec(select(UserModel).where(UserModel.user_id == user_id))
+    user = user_res.first()
+
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
     user.custom_claim = claim.model_dump()
-    db.commit()
-    db.refresh(user)
+    await db.commit()
+    await db.refresh(user)
     return {"user_id": user.user_id, "custom_claim": user.custom_claim}
 
 
@@ -248,12 +261,14 @@ def user_claim_webhook(
     summary="Get User Claim",
     description="Retrieve the custom claim for a user.",
 )
-def get_user_claim(
+async def get_user_claim(
     user_id: str,
-    db: Session = Depends(get_session),
+    db: DBSession,
     user=Depends(verify_admin),
 ) -> dict:
-    user = db.exec(select(UserModel).where(UserModel.user_id == user_id)).first()
+    user_res = await db.exec(select(UserModel).where(UserModel.user_id == user_id))
+    user = user_res.first()
+
     if not user:
         return {}
     return {
@@ -267,44 +282,96 @@ def get_user_claim(
 @router.get(
     "/user-credits/{user_id}",
     summary="Get User Credits",
-    description="Retrieve the credits for a user.",
+    description="Retrieve the credits for a user. Redis is treated as the source of truth.",
 )
-def get_user_credits_by_id(
+async def get_user_credits_by_id(
     user_id: str,
-    db: Session = Depends(get_session),
+    db: DBSession,
     user=Depends(verify_admin),
 ):
-    user_data = db.exec(select(UserModel).where(UserModel.user_id == user_id)).first()
-    if not user_data:
-        return {"credits": 0}
-    return {"credits": user_data.credits}
+    redis_key = f"user_credit:{user_id}"
+    current_credit = await redis_client.get(redis_key)
+    if current_credit is None:
+        user_data_res = await db.exec(
+            select(UserModel).where(UserModel.user_id == user_id)
+        )
+        user_data = user_data_res.first()
+        if not user_data:
+            return {"credits": 0}
+        current_credit = user_data.credits
+        await redis_client.set(redis_key, current_credit)
+    else:
+        current_credit = float(current_credit)
+    return {"credits": current_credit}
 
 
 @router.post("/add-credit")
-def add_credit(
+async def add_credit(
     request: AddCreditRequest,
-    db: Session = Depends(get_session),
+    db: DBSession,
     user=Depends(verify_admin),
 ):
-    user_data = db.exec(
+    user_data_res = await db.exec(
         select(UserModel).where(UserModel.user_id == request.user_id)
-    ).first()
+    )
+    user_data = user_data_res.first()
 
     if not user_data:
         raise HTTPException(status_code=404, detail="User not found")
 
-    user_data.credits += request.amount
+    redis_key = f"user_credit:{request.user_id}"
+    current_credit = await redis_client.get(redis_key)
+    if current_credit is None:
+        current_credit = user_data.credits
+    else:
+        current_credit = float(current_credit)
+
+    new_credit = current_credit + request.amount
+    await redis_client.incrbyfloat(redis_key, request.amount)
+
+    # Update DB using value from redis
+    user_data.credits = new_credit
     user_data.updated_at = datetime.utcnow()
 
     credit_history = UserCreditsHistory(
         user_id=request.user_id,
         amount=request.amount,
         description=request.description,
+        created_at=datetime.utcnow(),
     )
-    db.add(credit_history)
-    db.commit()
 
-    return {"credits": user_data.credits}
+    # Prepare credit history document for OpenSearch
+    credit_history_doc = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "user_id": request.user_id,
+        "doc_type": "credit_history",
+        "amount": request.amount,
+        "previous_balance": current_credit,
+        "new_balance": new_credit,
+        "description": request.description,
+        "type": "manual_credit_add",
+        "admin_user_id": user.id,
+    }
+
+    db.add(credit_history)
+    try:
+        # Send document to OpenSearch asynchronously and commit DB transaction
+        await asyncio.gather(
+            asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: opensearch_client.index(
+                    index=OPENSEARCH_CREDITS_INDEX,
+                    body=credit_history_doc,
+                ),
+            ),
+            db.commit(),
+        )
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Error adding credit or sending to OpenSearch: {e}")
+        raise HTTPException(status_code=500, detail=f"Error adding credit: {e}")
+
+    return {"credits": new_credit}
 
 
 @router.post(
@@ -312,15 +379,16 @@ def add_credit(
     summary="Update Users from Supabase",
     description="Pull user details from Supabase and update the users table.",
 )
-def update_users_from_supabase(
+async def update_users_from_supabase(
+    db: DBSession,
+    supabase: SupabaseClient,
     user: User = Depends(verify_admin),
-    db: Session = Depends(get_session),
 ):
     # get all users from supabase and update the users table
     users = []
     page = 1
     while True:
-        page_users = supabase.auth.admin.list_users(page=page, per_page=100)
+        page_users = await supabase.auth.admin.list_users(page=page, per_page=100)
         users.extend(page_users)
         if len(page_users) < 100:
             break
@@ -342,9 +410,10 @@ def update_users_from_supabase(
             "updated_at": datetime.utcnow(),
         }
 
-        user = db.exec(
+        user_res = await db.exec(
             select(UserModel).where(UserModel.user_id == supabase_user.id)
-        ).first()
+        )
+        user = user_res.first()
 
         if user:
             for key, value in user_data.items():
@@ -353,5 +422,5 @@ def update_users_from_supabase(
             user = UserModel(user_id=supabase_user.id, **user_data)
             db.add(user)
 
-    db.commit()
+    await db.commit()
     return {"status": "success"}

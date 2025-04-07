@@ -1,151 +1,51 @@
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, AsyncGenerator
 from fastapi import APIRouter, Depends, Response, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from sqlmodel import Session, select, update
+from src.router.utils.user import get_user_credits
+from src.router.utils.machine import get_machine_id
+from src.router.core.config import NODE_SERVICE_URL
 from src.router.core.settings_types import SETTINGS_MODELS
-from src.router.core.types import ModelPricing, User
-from src.router.models.logs import ApiLogs
-from src.router.db.session import get_session
+from src.router.core.types import User
+from src.router.db.session import DBSession
 from src.router.core.security import verify_user
-from src.router.utils.network import get_random_machines, PROXY_PORT
-from src.router.models.user import User as UserModel, UserCreditsHistory
+from src.router.utils.network import get_random_machines
 from src.router.schemas.ai import AiRequest, VerifyRequest
-import requests
 import time
 import httpx
 import json
 from src.router.utils.settings import get_setting_value
 from src.router.utils.settings import get_supported_models
 import asyncio
-from src.router.utils.nr import track
+from src.router.utils.redis import redis_client  # new import for redis
+from src.router.utils.logger import logger
+from src.router.api.v1.docs.network import (
+    chatCompletionGenerateDoc,
+    list_models_doc,
+    verify_doc,
+)
+from src.router.utils.opensearch import (
+    OPENSEARCH_LLM_USAGE_LOG_INDEX,
+    opensearch_client,
+    OPENSEARCH_CREDITS_INDEX,
+)
+from aiohttp import ClientSession, ClientTimeout, TCPConnector
+
 
 router = APIRouter()
+
+transport = httpx.AsyncHTTPTransport(retries=3)
 
 
 @router.post(
     "/v1/verify",
     summary="Verify Model Response",
-    description="""Verifies responses from multiple AI models against a given prompt.
-
-### Authentication
-- No authentication required
-- Rate limiting may apply
-
-### Request Body
-```json
-{
-    "messages": [
-        {
-            "role": "user" | "assistant" | "system",
-            "content": string
-        }
-    ],
-    "models": string[],  // List of model identifiers to verify with
-    "min_yes": int      // Minimum number of 'yes' responses required
-}
-```
-
-### Response Format
-```json
-{
-    "result": "yes" | "no",
-    "results": [
-        {
-            "machine": {
-                "machine_uid": string,
-                "network_ip": string
-            },
-            "result": "yes" | "no",
-            "response": {
-                // Raw response from the model
-                "result": "yes" | "no",
-                // Additional model-specific response data
-            }
-        }
-    ]
-}
-```
-
-### Error Responses
-- `400 Bad Request`:
-    ```json
-    {
-        "detail": "At least one model is required"
-    }
-    ```
-    ```json
-    {
-        "detail": "Minimum yes must be at least 1"
-    }
-    ```
-    ```json
-    {
-        "detail": "Minimum yes must be less than or equal to the number of models"
-    }
-    ```
-
-### Notes
-- Distributes verification requests across available machines
-- Returns aggregated results from all models
-- Overall result is 'yes' if at least min_yes models return 'yes'
-- Each model's individual response is included in the results array""",
-    response_description="Returns verification results from all models",
-    responses={
-        200: {
-            "description": "Successfully verified responses",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "result": "yes",
-                        "results": [
-                            {
-                                "machine": {
-                                    "machine_uid": "machine_123",
-                                    "network_ip": "10.0.0.1",
-                                },
-                                "result": "yes",
-                                "response": {"result": "yes", "confidence": 0.95},
-                            },
-                            {
-                                "machine": {
-                                    "machine_uid": "machine_456",
-                                    "network_ip": "10.0.0.2",
-                                },
-                                "result": "no",
-                                "response": {"result": "no", "confidence": 0.75},
-                            },
-                        ],
-                    }
-                }
-            },
-        },
-        400: {
-            "description": "Invalid request parameters",
-            "content": {
-                "application/json": {
-                    "examples": {
-                        "no_models": {
-                            "value": {"detail": "At least one model is required"}
-                        },
-                        "invalid_min_yes": {
-                            "value": {"detail": "Minimum yes must be at least 1"}
-                        },
-                        "min_yes_too_high": {
-                            "value": {
-                                "detail": "Minimum yes must be less than or equal to the number of models"
-                            }
-                        },
-                    }
-                }
-            },
-        },
-    },
+    description=verify_doc["description"],
+    response_description=verify_doc["response_description"],
+    responses=verify_doc["responses"],
 )
-async def verify(req: VerifyRequest, db: Session = Depends(get_session)):
-    track("verify_request", {"models_count": len(req.models), "min_yes": req.min_yes})
-
+async def verify(req: VerifyRequest, db: DBSession):
     if len(req.models) < 1:
         raise HTTPException(status_code=400, detail="At least one model is required")
 
@@ -158,7 +58,7 @@ async def verify(req: VerifyRequest, db: Session = Depends(get_session)):
             detail="Minimum yes must be less than or equal to the number of models",
         )
 
-    supported_models = get_supported_models(db)
+    supported_models = await get_supported_models()
 
     # Validate and transform all models
     transformed_models = []
@@ -169,8 +69,8 @@ async def verify(req: VerifyRequest, db: Session = Depends(get_session)):
         transformed_models.append({"original": model, "id": model_config.id})
 
     async def process_model(model, idx):
-        machine = get_random_machines(1)
-        proxy_url = f"http://{machine[0].network_ip}:{PROXY_PORT}/v1/verify"
+        machine = await get_random_machines(db, 1)
+        proxy_url = f"http://{machine[0].network_ip}:34523/v1/verify"
         async with httpx.AsyncClient(timeout=httpx.Timeout(60.0)) as client:
             response = await client.post(
                 proxy_url,
@@ -217,78 +117,28 @@ class ModelListRes(BaseModel):
 @router.get(
     "/v1/models",
     summary="List Available Models",
-    description="""Retrieves a list of all supported language models in the system.
-
-### Authentication
-- No authentication required
-- Rate limiting may apply
-
-### Response Format
-```json
-{
-    "object": "list",
-    "data": [
-        {
-            "id": string,     // Model identifier
-            "object": "model" // Always "model"
-        }
-    ]
-}
-```
-
-### Example Models
-- `openrouter/meta-llama/llama-3.3-70b-instruct`
-- `openai/gpt-4`
-- `openrouter/anthropic/claude-3.5-sonnet`
-
-### Notes
-- Models are fetched from system settings
-- Availability may vary based on system configuration
-- Model list is cached and periodically updated
-- Returns all models regardless of user access level""",
+    description=list_models_doc["description"],
     response_description="Returns an array of available model information",
-    responses={
-        200: {
-            "description": "Successfully retrieved models list",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "object": "list",
-                        "data": [
-                            {
-                                "id": "openrouter/meta-llama/llama-3.3-70b-instruct",
-                                "object": "model",
-                            },
-                            {"id": "openai/gpt-4", "object": "model"},
-                            {
-                                "id": "openrouter/anthropic/claude-3.5-sonnet",
-                                "object": "model",
-                            },
-                        ],
-                    }
-                }
-            },
-        }
-    },
+    responses=list_models_doc["responses"],
 )
-async def list_models(db: Session = Depends(get_session)) -> ModelListRes:
-    track("list_models_request")
+async def list_models() -> ModelListRes:
+    supported_models = await get_supported_models()
 
-    supported_models = get_supported_models(db)
-    track("list_models_response", {"models_count": len(supported_models)})
-    return {
-        "object": "list",
-        "data": [
-            {"id": model_id, "object": "model"}
+    # Create a properly typed response
+    response = ModelListRes(
+        object="list",
+        data=[
+            ModelListResItem(id=model_id, object="model")
             for model_id, _ in supported_models.items()
         ],
-    }
+    )
+
+    return response
 
 
-def save_log(
-    db: Session,
+async def save_log(
     user: User,
-    user_row: UserModel,
+    user_credits: float,
     req: AiRequest,
     original_req_model: str,
     result_text: str,
@@ -297,9 +147,8 @@ def save_log(
     timeStart: float,
     machine_id: int,
     flow_id: Optional[str] = None,
-) -> None:
-    sm = get_setting_value(
-        db,
+):
+    sm = await get_setting_value(
         "SUPPORTED_MODELS",
         SETTINGS_MODELS["SUPPORTED_MODELS"],
     )
@@ -311,33 +160,7 @@ def save_log(
             status_code=500, detail="Supported model not found in settings"
         )
 
-    model_pricing = ModelPricing(
-        model=req.model,
-        prompt_token=model_p.prompt_token,
-        completion_token=model_p.completion_token,
-    )
-
     req.model = original_req_model
-
-    # Log the request
-    api_log = ApiLogs(
-        user_id=user.id,
-        api_key_id=user.api_key_id,
-        payload=req.model_dump_json(),
-        request_payload=req.model_dump(),
-        ttft=ttfs,
-        response=result_text,
-        prompt_tokens=usage.get("prompt_tokens", 0),
-        completion_tokens=usage.get("completion_tokens", 0),
-        total_tokens=usage.get("total_tokens", 0),
-        total_response_time=time.time() - timeStart,
-        model=req.model,
-        model_pricing=model_pricing,
-        machine_id=str(machine_id),
-        flow_id=flow_id,
-    )
-
-    db.add(api_log)
 
     # Calculate cost and reduce user credits
     prompt_tokens = usage.get("prompt_tokens", 0)
@@ -349,377 +172,308 @@ def save_log(
 
     cost = prompt_tokens_cost + completion_tokens_cost
 
-    db.exec(
-        update(UserModel)
-        .where(UserModel.user_id == user.id)
-        .values(
-            credits=user_row.credits - cost,
-            updated_at=datetime.now(timezone.utc),
+    # NEW: Use redis to manage user's credits instead of updating the db
+    redis_key = f"user_credit:{user.id}"
+    # new_credit = user_credits - cost
+    await redis_client.incrbyfloat(redis_key, float(-cost))
+
+    new_credit_bytes = await redis_client.get(redis_key)
+    new_credit = float(new_credit_bytes.decode("utf-8")) if new_credit_bytes else 0.0
+
+    # Prepare documents for OpenSearch
+    llm_usage_doc = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "user_id": user.id,
+        "api_key_id": user.api_key_id,
+        "model": req.model,
+        "original_model": original_req_model,
+        "prompt_tokens": usage.get("prompt_tokens", 0),
+        "completion_tokens": usage.get("completion_tokens", 0),
+        "total_tokens": usage.get("total_tokens", 0),
+        "ttft": ttfs,
+        "total_response_time": time.time() - timeStart,
+        "machine_id": str(machine_id),
+        "flow_id": flow_id,
+        "cost": cost,
+        "request": req.model_dump(),
+        "response": result_text,
+        "doc_type": "model_usage",
+    }
+
+    credit_history_doc = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "user_id": user.id,
+        "doc_type": "credit_history",
+        "amount": -cost,
+        "previous_balance": user_credits,
+        "new_balance": str(new_credit),
+        "model": original_req_model,
+        "machine_id": str(machine_id),
+        "flow_id": flow_id,
+        "tokens": {
+            "prompt": prompt_tokens,
+            "completion": completion_tokens,
+            "total": total_tokens,
+        },
+        "costs": {
+            "prompt": prompt_tokens_cost,
+            "completion": completion_tokens_cost,
+            "total": cost,
+        },
+        "metrics": {
+            "ttft": ttfs,
+            "total_response_time": time.time() - timeStart,
+        },
+        "description": f"Used {total_tokens} tokens. Prompt tokens: {prompt_tokens}, Completion tokens: {completion_tokens}",
+    }
+
+    try:
+        # Send both documents to OpenSearch asynchronously
+        await asyncio.gather(
+            asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: opensearch_client.index(
+                    index=OPENSEARCH_LLM_USAGE_LOG_INDEX,
+                    body=llm_usage_doc,
+                ),
+            ),
+            asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: opensearch_client.index(
+                    index=OPENSEARCH_CREDITS_INDEX,
+                    body=credit_history_doc,
+                ),
+            ),
         )
-    )
+    except Exception as e:
+        logger.error(f"Log saving error: {str(e)}")
 
-    # Update user credit history
-    user_credits_history = UserCreditsHistory(
-        user_id=user.id,
-        amount=-cost,
-        description=f"Used {total_tokens} tokens. Prompt tokens: {prompt_tokens}, Completion tokens: {completion_tokens}",
-    )
-    db.add(user_credits_history)
 
-    db.commit()
+async def handle_stream_chunk(
+    chunk: str | bytes,
+) -> AsyncGenerator[tuple[str, dict], None]:
+    buffer = ""
+    try:
+        # Convert bytes to text
+        if isinstance(chunk, bytes):
+            text = chunk.decode("utf-8")
+        else:
+            text = str(chunk)
+
+        buffer += text
+
+        while True:
+            # Find the next complete SSE line
+            line_end = buffer.find("\n")
+            if line_end == -1:
+                break
+
+            line = buffer[:line_end].strip()
+            buffer = buffer[line_end + 1 :]
+
+            if not line:
+                continue
+
+            # Handle SSE format
+            if line.startswith("data: "):
+                data = line[6:]
+                if data == "[DONE]":
+                    break
+
+                try:
+                    json_data = json.loads(data)
+
+                    # Yield both content chunks and usage data
+                    if (
+                        json_data.get("choices", [{}])[0]
+                        .get("delta", {})
+                        .get("content")
+                        or "usage" in json_data
+                    ):
+                        yield f"data: {json.dumps(json_data)}\n\n", json_data
+                except json.JSONDecodeError:
+                    logger.debug(f"Incomplete JSON chunk (expected): {data}")
+                    continue
+            else:
+                continue
+
+    except Exception as e:
+        logger.error(f"Stream chunk processing error: {str(e)}")
+        yield f"data: {json.dumps({'error': str(e)})}\n\n", {"error": str(e)}
+
+
+async def stream_response(response) -> AsyncGenerator[tuple[str, dict], None]:
+    """Stream response handler with proper chunk size and decoding"""
+    try:
+        # Use 1024 bytes chunk size and decode to unicode, similar to requests
+        async for chunk in response.content.iter_any():
+            if isinstance(chunk, bytes):
+                text = chunk.decode("utf-8")
+            else:
+                text = str(chunk)
+            async for message, data in handle_stream_chunk(text):
+                yield message, data
+    except Exception as e:
+        logger.error(f"Streaming error: {str(e)}")
+        yield f"data: {json.dumps({'error': str(e)})}\n\n", {"error": str(e)}
 
 
 @router.post(
     "/v1/chat/completions",
     summary="Generate Chat Completion",
-    description="""Generates a chat completion using the specified model.
-
-### Authentication
-- Requires a valid authentication token
-- Token must be passed in the Authorization header
-- Sufficient credits required for generation
-
-### Request Body
-```json
-{
-    "model": string,
-    "model_provider": {
-        "base_url": string,
-        "api_key": string
-    } | null,
-    "messages": [
-        {
-            "role": "system" | "user" | "assistant",
-            "content": string
-        }
-    ],
-    "stream": boolean,
-    "tools": [
-        {
-            "type": "function",
-            "function": {
-                "name": string,
-                "description": string,
-                "parameters": object
-            }
-        }
-    ] | null,
-    "tool_choice": string
-}
-```
-
-### Response Format (Non-Streaming)
-```json
-{
-    "id": string,
-    "object": "chat.completion",
-    "created": int,
-    "model": string,
-    "choices": [
-        {
-            "index": 0,
-            "message": {
-                "role": "assistant",
-                "content": string,
-                "tool_calls": [
-                    {
-                        "id": string,
-                        "type": "function",
-                        "function": {
-                            "name": string,
-                            "arguments": string
-                        }
-                    }
-                ] | null
-            },
-            "finish_reason": "stop" | "length" | "tool_calls"
-        }
-    ],
-    "usage": {
-        "prompt_tokens": int,
-        "completion_tokens": int,
-        "total_tokens": int
-    }
-}
-```
-
-### Streaming Response Format
-Server-sent events with the following data structure:
-```json
-{
-    "content": string | null,
-    "tool_calls": [
-        {
-            "id": string,
-            "type": "function",
-            "function": {
-                "name": string,
-                "arguments": string
-            },
-            "index": int
-        }
-    ] | null
-}
-```
-
-### Error Responses
-- `400 Bad Request`:
-    ```json
-    {
-        "detail": "Unsupported model"
-    }
-    ```
-- `401 Unauthorized`:
-    ```json
-    {
-        "detail": "Could not validate credentials"
-    }
-    ```
-- `402 Payment Required`:
-    ```json
-    {
-        "detail": "Insufficient credits"
-    }
-    ```
-- `404 Not Found`:
-    ```json
-    {
-        "detail": "User not found"
-    }
-    ```
-
-### Notes
-- Supports both streaming and non-streaming responses
-- Automatically tracks usage and deducts credits
-- Records performance metrics (TTFT, total response time)
-- Distributes requests across available machines
-- Supports function calling through tools parameter
-- Credits are calculated based on prompt and completion tokens
-- Response streaming uses server-sent events (SSE)""",
+    description=chatCompletionGenerateDoc["description"],
     response_description="Returns the model's completion response",
-    responses={
-        200: {
-            "description": "Successfully generated completion",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "id": "chatcmpl-123",
-                        "object": "chat.completion",
-                        "created": 1677858242,
-                        "model": "gpt-4",
-                        "choices": [
-                            {
-                                "index": 0,
-                                "message": {
-                                    "role": "assistant",
-                                    "content": "Hello! How can I help you today?",
-                                    "tool_calls": None,
-                                },
-                                "finish_reason": "stop",
-                            }
-                        ],
-                        "usage": {
-                            "prompt_tokens": 10,
-                            "completion_tokens": 8,
-                            "total_tokens": 18,
-                        },
-                    }
-                }
-            },
-        },
-        400: {
-            "description": "Invalid request or unsupported model",
-            "content": {
-                "application/json": {"example": {"detail": "Unsupported model"}}
-            },
-        },
-        401: {
-            "description": "Unauthorized - Invalid or missing authentication",
-            "content": {
-                "application/json": {
-                    "example": {"detail": "Could not validate credentials"}
-                }
-            },
-        },
-        402: {
-            "description": "Insufficient credits",
-            "content": {
-                "application/json": {"example": {"detail": "Insufficient credits"}}
-            },
-        },
-        404: {
-            "description": "User not found",
-            "content": {"application/json": {"example": {"detail": "User not found"}}},
-        },
-    },
+    responses=chatCompletionGenerateDoc["responses"],
 )
-async def generate(
+async def chatCompletionGenerate(
     req: AiRequest,
+    db: DBSession,
     user: User = Depends(verify_user),
-    db: Session = Depends(get_session),
     flow_id: Optional[str] = None,
 ) -> Response:
     track("generate_request", {"model": req.model, "stream": req.stream, "user_id": user.id})
 
     timeStart = time.time()
 
-    user_row = db.exec(select(UserModel).where(UserModel.user_id == user.id)).first()
+    try:
+        # Fix type conversion for user_id
+        user_credits = await get_user_credits((user.id), db)
+        if user_credits <= 0:
+            raise HTTPException(status_code=402, detail="Insufficient credits")
 
-    if not user_row:
-        raise HTTPException(status_code=404, detail="User not found")
+        supported_models = await get_supported_models()
+        if req.model not in supported_models:
+            raise HTTPException(status_code=400, detail="Unsupported model")
 
-    if user_row.credits <= 0:
-        raise HTTPException(status_code=402, detail="Insufficient credits")
+        model_config = supported_models[req.model]
+        original_req_model = req.model
+        req.model = model_config.id
 
-    supported_models = get_supported_models(db)
-    if req.model not in supported_models:
-        raise HTTPException(status_code=400, detail="Unsupported model")
+        proxy_url = f"{NODE_SERVICE_URL}/v1/chat/completions"
+        logger.info(f"Using machine {NODE_SERVICE_URL}")
 
-    model_config = supported_models[req.model]
-    original_req_model = req.model
-    req.model = model_config.id
+        # Create timeout configuration
+        timeout = ClientTimeout(
+            total=300.0, connect=60.0, sock_connect=30.0, sock_read=60.0
+        )
 
-    machine = get_random_machines(1)[0]
-    proxy_url = f"http://{machine.network_ip}:{PROXY_PORT}/v1/chat/completions"
-    llmres = requests.post(
-        proxy_url,
-        json=req.model_dump(),
-        stream=req.stream,
-        headers={"Accept-Encoding": "identity"},
-    )
+        connector = TCPConnector(
+            limit=3000,  # For 100 req/sec minimum
+            limit_per_host=500,  # Prevent single host overwhelming
+        )
 
-    def generate():
-        usage = {}
-        result_text = ""
-        # Track tool calls
-        current_tool_calls = {}
+        async def generate():
+            usage = {}
+            result_text = ""
+            current_tool_calls = {}
+            ttfs: Optional[float] = None
+            machine_id = None
 
-        # Time to first token
-        ttfs: Optional[float] = None
+            async with ClientSession(connector=connector, timeout=timeout) as session:
+                try:
+                    llmres = await session.post(
+                        proxy_url,
+                        json=req.model_dump(),
+                        headers={"Accept-Encoding": "identity"},
+                    )
+                    llmres.raise_for_status()
 
-        for line in llmres.iter_lines():
-            l = line.decode("utf-8")
-            if l.startswith("data: "):
-                l = l[6:]
+                    machine_ip = llmres.headers.get("x-machine-ip", "")
+                    if not machine_ip:
+                        logger.warning("No machine IP in headers")
+                        machine_ip = ""
+
+                    try:
+                        machine_id = int(await get_machine_id(machine_ip, db))
+                    except (ValueError, TypeError) as e:
+                        logger.error(f"Error converting machine_id: {str(e)}")
+                        machine_id = 0
+
+                    async for message, data in stream_response(llmres):
+                        if ttfs is None:
+                            ttfs = time.time() - timeStart
+
+                        if "usage" in data:
+                            usage = data["usage"]
+
+                        yield message
+
+                except Exception as e:
+                    logger.error(f"Generation error: {str(e)}")
+                    yield f"data: {json.dumps({'error': str(e)})}\n\n"
+                finally:
+                    try:
+                        # Save logs with proper error handling
+                        await save_log(
+                            user=user,
+                            user_credits=user_credits,
+                            req=req,
+                            original_req_model=original_req_model,
+                            result_text=result_text,
+                            usage=usage,
+                            ttfs=ttfs,
+                            timeStart=timeStart,
+                            machine_id=machine_id or 0,
+                            flow_id=flow_id,
+                        )
+
+                    except Exception as log_error:
+                        logger.error(f"Log saving error: {str(log_error)}")
+
+        if req.stream:
+            return StreamingResponse(
+                generate(),
+                media_type="text/event-stream",
+                headers={
+                    "Cache-Control": "no-cache",
+                    "Connection": "keep-alive",
+                },
+            )
+
+        # Handle non-streaming response
+        async with ClientSession(connector=connector, timeout=timeout) as session:
+            llmres = await session.post(
+                proxy_url,
+                json=req.model_dump(),
+                headers={"Accept-Encoding": "identity"},
+            )
+            llmres.raise_for_status()
+
+            response_text = await llmres.text()
+            response_json = json.loads(response_text)
+            content_json = response_json.get("data", response_json)
+            result_text = content_json["choices"][0]["message"]["content"]
+            ttfs = time.time() - timeStart
+            usage = content_json.get("usage", {})
+
+            # Handle machine_id safely
+            machine_ip = llmres.headers.get("x-machine-ip", "")
             try:
-                json_line = json.loads(l)
-                if "choices" in json_line:
-                    choice = json_line["choices"][0]
-                    if "delta" in choice:
-                        delta = choice["delta"]
-                        if "content" in delta and delta["content"] is not None:
-                            result_text += delta["content"]
-                            yield f"data: {json.dumps({'content': delta['content']})}\n\n"
-                        if "tool_calls" in delta:
-                            for tool_call in delta["tool_calls"]:
-                                index = tool_call.get("index", 0)
-                                if index not in current_tool_calls:
-                                    current_tool_calls[index] = {
-                                        "id": tool_call.get("id", ""),
-                                        "type": tool_call.get("type", "function"),
-                                        "function": {
-                                            "name": tool_call.get("function", {}).get(
-                                                "name", ""
-                                            ),
-                                            "arguments": tool_call.get(
-                                                "function", {}
-                                            ).get("arguments", ""),
-                                        },
-                                        "index": index,
-                                    }
-                                else:
-                                    # Update existing tool call
-                                    if "id" in tool_call:
-                                        current_tool_calls[index]["id"] = tool_call[
-                                            "id"
-                                        ]
-                                    if "function" in tool_call:
-                                        if "name" in tool_call["function"]:
-                                            current_tool_calls[index]["function"][
-                                                "name"
-                                            ] = tool_call["function"]["name"]
-                                        if "arguments" in tool_call["function"]:
-                                            current_tool_calls[index]["function"][
-                                                "arguments"
-                                            ] += tool_call["function"]["arguments"]
+                machine_id = int(await get_machine_id(machine_ip, db))
+            except (ValueError, TypeError):
+                machine_id = 0
 
-                            # Send the current state of tool calls
-                            yield f"data: {json.dumps({'tool_calls': list(current_tool_calls.values())})}\n\n"
-                if "usage" in json_line:
-                    usage = json_line["usage"]
-            except json.JSONDecodeError:
-                pass
-            except TypeError:
-                # Handle potential TypeError when concatenating
-                pass
+            await save_log(
+                user=user,
+                user_credits=user_credits,
+                req=req,
+                original_req_model=original_req_model,
+                result_text=result_text,
+                usage=usage,
+                ttfs=ttfs,
+                timeStart=timeStart,
+                machine_id=machine_id,
+                flow_id=flow_id,
+            )
 
-            if ttfs is None:
-                ttfs = time.time() - timeStart
+            return Response(
+                content=response_text,
+                status_code=200,
+            )
 
-            # Format response as SSE data
-            if l.strip():
-                yield f"data: {l}\n\n"
-
-        save_log(
-            db=db,
-            user=user,
-            user_row=user_row,
-            req=req,
-            original_req_model=original_req_model,
-            result_text=result_text,
-            usage=usage,
-            ttfs=ttfs,
-            timeStart=timeStart,
-            machine_id=machine.id,
-            flow_id=flow_id,
+    except Exception as e:
+        logger.error(f"Request processing error: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error processing request: {str(e)}",
         )
-
-        track("generate_response", {
-            "model": original_req_model,
-            "prompt_tokens": usage.get("prompt_tokens", 0),
-            "completion_tokens": usage.get("completion_tokens", 0),
-            "total_tokens": usage.get("total_tokens", 0),
-            "response_time": time.time() - timeStart,
-            "ttft": ttfs,
-            "user_id": user.id
-        })
-
-    if req.stream:
-        res = StreamingResponse(generate(), media_type="text/event-stream")
-    else:
-        response_json = llmres.json()
-        result_text = response_json["choices"][0]["message"]["content"]
-        ttfs = time.time() - timeStart
-        usage = response_json.get("usage", {})
-
-        save_log(
-            db=db,
-            user=user,
-            user_row=user_row,
-            req=req,
-            original_req_model=original_req_model,
-            result_text=result_text,
-            usage=usage,
-            ttfs=ttfs,
-            timeStart=timeStart,
-            machine_id=machine.id,
-            flow_id=flow_id,
-        )
-
-        track("generate_response", {
-            "model": original_req_model,
-            "prompt_tokens": usage.get("prompt_tokens", 0),
-            "completion_tokens": usage.get("completion_tokens", 0),
-            "total_tokens": usage.get("total_tokens", 0),
-            "response_time": time.time() - timeStart,
-            "ttft": ttfs,
-            "user_id": user.id
-        })
-
-        return Response(
-            content=llmres.text,
-            status_code=llmres.status_code,
-            headers=dict(llmres.headers),
-        )
-
-    return res

@@ -575,34 +575,31 @@ const ApiLogsPage = () => {
           <div className="mt-4 space-y-3">
             {activeTab === "messages" ? (
               <>
-                {selectedLog.payload &&
-                  JSON.parse(selectedLog.payload).messages.map(
-                    (message: { role: string; content: string }, index: number) => (
-                      <div
-                        key={index}
-                        className={`p-3 rounded-md ${
-                          message.role === "user"
-                            ? "bg-blue-50 border border-blue-100"
-                            : "bg-gray-50 border border-gray-100"
-                        }`}
-                      >
-                        <div className="flex items-center mb-1">
-                          <span
-                            className={`text-xs font-medium px-1.5 py-0.5 rounded-sm ${
-                              message.role === "user"
-                                ? "bg-blue-100 text-blue-700"
-                                : "bg-gray-200 text-gray-700"
-                            }`}
-                          >
-                            {message.role}
-                          </span>
-                        </div>
-                        <div className="text-sm whitespace-pre-wrap">
-                          {message.content}
-                        </div>
+                {selectedLog.payload?.messages.map(
+                  (message: { role: string; content: string }, index: number) => (
+                    <div
+                      key={index}
+                      className={`p-3 rounded-md ${
+                        message.role === "user"
+                          ? "bg-blue-50 border border-blue-100"
+                          : "bg-gray-50 border border-gray-100"
+                      }`}
+                    >
+                      <div className="flex items-center mb-1">
+                        <span
+                          className={`text-xs font-medium px-1.5 py-0.5 rounded-sm ${
+                            message.role === "user"
+                              ? "bg-blue-100 text-blue-700"
+                              : "bg-gray-200 text-gray-700"
+                          }`}
+                        >
+                          {message.role}
+                        </span>
                       </div>
-                    )
-                  )}
+                      <div className="text-sm whitespace-pre-wrap">{message.content}</div>
+                    </div>
+                  )
+                )}
                 <div className="p-3 border border-green-100 rounded-md bg-green-50">
                   <div className="flex items-center mb-1">
                     <span className="text-xs font-medium px-1.5 py-0.5 rounded-sm bg-green-100 text-green-700">
@@ -616,7 +613,7 @@ const ApiLogsPage = () => {
               </>
             ) : (
               <pre className="p-3 overflow-x-auto text-sm border border-gray-200 rounded-md bg-gray-50">
-                {JSON.stringify(JSON.parse(selectedLog.payload || "{}"), null, 2)}
+                {JSON.stringify(selectedLog.payload, null, 2)}
               </pre>
             )}
           </div>

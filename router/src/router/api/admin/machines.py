@@ -1,20 +1,17 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session, select
+from sqlmodel import select
+from src.router.db.session import DBSession
 from src.router.core.security import verify_admin
 from src.router.core.types import User
-from src.router.db.session import get_session
 from src.router.schemas.machine import RegisterMachineRequest, MachineAuthToken
 from src.router.models.machines import Machine
 from src.router.models.machine_tokens import MachineToken
-from typing import Annotated
 import secrets
 from datetime import datetime
 from src.router.utils.redis import redis_client
 
 router = APIRouter()
-
-SessionDep = Annotated[Session, Depends(get_session)]
 
 
 @router.post(
@@ -22,57 +19,85 @@ SessionDep = Annotated[Session, Depends(get_session)]
     summary="Register a New Machine",
     description="Admin endpoint to register a new machine in the system.",
 )
-def register_machine(
+async def register_machine(
     request: RegisterMachineRequest,
-    session: SessionDep,
+    db: DBSession,
     user: User = Depends(verify_admin),
 ):
-    existing_machine = session.exec(
+    existing_machine_res = await db.exec(
         select(Machine).where(Machine.network_ip == request.network_ip)
-    ).first()
+    )
+    existing_machine = existing_machine_res.first()
+
     if existing_machine:
-        raise HTTPException(status_code=400, detail="Machine already registered")
+        return {
+            "id": existing_machine.id,
+            "network_ip": existing_machine.network_ip,
+            "name": existing_machine.name,
+            "description": existing_machine.description,
+            "created_at": existing_machine.created_at.isoformat(),
+            "disabled": existing_machine.disabled,
+            "status": "registered",
+            "message": "Machine already registered",
+        }
 
     new_machine = Machine(
         network_ip=request.network_ip,
         name=request.name,
         description=request.description,
     )
-    session.add(new_machine)
-    session.commit()
-    session.refresh(new_machine)
+    db.add(new_machine)
+    await db.commit()
+    await db.refresh(new_machine)
 
-    redis_client.set(f"network_ip:{new_machine.id}", new_machine.network_ip)
+    await redis_client.set(f"network_ip:{new_machine.id}", new_machine.network_ip)
 
     return {
-        "network_ip": request.network_ip,
-        "name": request.name,
-        "description": request.description,
+        "id": new_machine.id,
+        "network_ip": new_machine.network_ip,
+        "name": new_machine.name,
+        "description": new_machine.description,
         "created_at": new_machine.created_at.isoformat(),
         "disabled": new_machine.disabled,
         "status": "registered",
+        "message": "Machine registered successfully",
     }
+
+
+@router.get(
+    "/machines/{network_ip}",
+    summary="Get Machine Details",
+)
+async def get_machine(
+    network_ip: str,
+    db: DBSession,
+    user: User = Depends(verify_admin),
+):
+    machine_res = await db.exec(select(Machine).where(Machine.network_ip == network_ip))
+    machine = machine_res.first()
+
+    return machine
 
 
 @router.put(
     "/machines/{network_ip}",
     summary="Update Machine Details",
 )
-def update_machine(
+async def update_machine(
     network_ip: str,
     request: RegisterMachineRequest,
-    session: SessionDep,
+    db: DBSession,
     user: User = Depends(verify_admin),
 ):
-    machine = session.exec(
-        select(Machine).where(Machine.network_ip == network_ip)
-    ).first()
+    machine_res = await db.exec(select(Machine).where(Machine.network_ip == network_ip))
+    machine = machine_res.first()
+
     if not machine:
         raise HTTPException(status_code=404, detail="Machine not found")
 
     # If network IP changed, update Redis cache
     if machine.network_ip != request.network_ip:
-        redis_client.set(f"network_ip:{machine.id}", request.network_ip)
+        await redis_client.set(f"network_ip:{machine.id}", request.network_ip)
 
     machine.network_ip = request.network_ip
     machine.name = request.name
@@ -80,23 +105,23 @@ def update_machine(
     machine.disabled = request.disabled
     machine.updated_at = datetime.utcnow()  # Add this line to update timestamp
 
-    session.add(machine)
-    session.commit()
-    session.refresh(machine)
+    db.add(machine)
+    await db.commit()
+    await db.refresh(machine)
 
     return machine
 
 
 @router.post("/machines/{network_ip}/auth-tokens")
-def create_auth_token(
+async def create_auth_token(
     network_ip: str,
     token: MachineAuthToken,
-    session: SessionDep,
+    db: DBSession,
     user: User = Depends(verify_admin),
 ):
-    machine = session.exec(
-        select(Machine).where(Machine.network_ip == network_ip)
-    ).first()
+    machine_res = await db.exec(select(Machine).where(Machine.network_ip == network_ip))
+    machine = machine_res.first()
+
     if not machine:
         raise HTTPException(status_code=404, detail="Machine not found")
 
@@ -110,11 +135,11 @@ def create_auth_token(
     )
 
     try:
-        session.add(new_token)
-        session.commit()
-        session.refresh(new_token)
+        db.add(new_token)
+        await db.commit()
+        await db.refresh(new_token)
     except Exception as e:
-        session.rollback()
+        await db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to save token: {str(e)}")
 
     return {
@@ -131,32 +156,34 @@ def create_auth_token(
     summary="Delete Auth Token",
     status_code=204,
 )
-def delete_auth_token(
+async def delete_auth_token(
     network_ip: str,
     api_token: str,  # updated parameter name
-    session: SessionDep,
+    db: DBSession,
     user: User = Depends(verify_admin),
 ):
-    machine = session.exec(
-        select(Machine).where(Machine.network_ip == network_ip)
-    ).first()
+    machine_res = await db.exec(select(Machine).where(Machine.network_ip == network_ip))
+    machine = machine_res.first()
+
     if not machine:
         raise HTTPException(status_code=404, detail="Machine not found")
 
-    token = session.exec(
+    token_res = await db.exec(
         select(MachineToken).where(
             MachineToken.machine_id == machine.id,
             MachineToken.api_token == api_token,  # updated field name
             MachineToken.deleted_at == None,  # noqa: E711
         )
-    ).first()
+    )
+    token = token_res.first()
+
     if not token:
         raise HTTPException(status_code=404, detail="Token not found")
 
     # Soft delete the token
     token.deleted_at = datetime.utcnow()
-    session.add(token)
-    session.commit()
+    db.add(token)
+    await db.commit()
 
     return None
 
@@ -165,23 +192,24 @@ def delete_auth_token(
     "/machines/{network_ip}/auth-tokens",
     summary="List Machine Tokens",
 )
-def list_machine_tokens(
+async def list_machine_tokens(
     network_ip: str,
-    session: SessionDep,
+    db: DBSession,
     user: User = Depends(verify_admin),
 ):
-    machine = session.exec(
-        select(Machine).where(Machine.network_ip == network_ip)
-    ).first()
+    machine_res = await db.exec(select(Machine).where(Machine.network_ip == network_ip))
+    machine = machine_res.first()
+
     if not machine:
         raise HTTPException(status_code=404, detail="Machine not found")
 
-    tokens = session.exec(
+    tokens_res = await db.exec(
         select(MachineToken).where(
             MachineToken.machine_id == machine.id,
             MachineToken.deleted_at == None,  # noqa: E711
         )
-    ).all()
+    )
+    tokens = tokens_res.all()
 
     return [
         {

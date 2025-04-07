@@ -1,47 +1,63 @@
 from typing import Any, Dict, Optional, TypeVar, Type
 from pydantic import BaseModel
-from sqlmodel import Session, select
+from sqlmodel import select
+from src.router.db.session import get_session_context
 from src.router.models.system_settings import SystemSettings
 from fastapi import HTTPException
-from src.router.core.settings_types import (
-    SETTINGS_MODELS,
-    ModelConfig,
-)
+from src.router.core.settings_types import SETTINGS_MODELS
+from src.router.utils.redis import get_cached_setting, set_cached_setting
 
 T = TypeVar("T", bound=BaseModel)
 
 
-def get_setting(db: Session, name: str) -> Optional[SystemSettings]:
+async def get_setting(name: str):
     """Get a system setting by name."""
-    return db.exec(select(SystemSettings).where(SystemSettings.name == name)).first()
+    async with get_session_context() as db:
+        result = await db.exec(
+            select(SystemSettings).where(SystemSettings.name == name)
+        )
+        row = result.first()
+        return row
 
 
-def get_setting_value(db: Session, name: str, model: Type[T] = None):
+async def get_setting_value(name: str, model: Type[T] = None):
     """Get a system setting value by name with optional model validation."""
-    setting = get_setting(db, name)
+    # Try to get from cache first
+    cached_value = await get_cached_setting(name)
+    if cached_value:
+        if model:
+            return model(**cached_value)
+        return cached_value
+
+    # If not in cache, get from database
+    setting = await get_setting(name)
     if not setting:
         raise HTTPException(status_code=404, detail=f"Setting {name} not found")
+
+    # Cache the setting
+    await set_cached_setting(name, setting.value)
 
     if model:
         try:
             return model(**setting.value)
         except Exception as e:
             raise HTTPException(
-                status_code=500, detail=f"Invalid setting format for {name}: {str(e)}"
+                status_code=500,
+                detail=f"Invalid setting format for {name}: {str(e)}",
             )
     return setting.value
 
 
-def get_supported_models(db: Session) -> Dict[str, ModelConfig]:
+async def get_supported_models():
     """Get the supported models configuration."""
-    return get_setting_value(
-        db,
+    resp = await get_setting_value(
         "SUPPORTED_MODELS",
         SETTINGS_MODELS["SUPPORTED_MODELS"],
-    ).root
+    )
+    return resp.root
 
 
-def validate_setting_name(name: str) -> None:
+def validate_setting_name(name: str):
     """Validate if the setting name is supported and has a defined model."""
     if name not in SETTINGS_MODELS:
         raise HTTPException(
@@ -50,8 +66,7 @@ def validate_setting_name(name: str) -> None:
         )
 
 
-def update_setting_value(
-    db: Session,
+async def update_setting_value(
     name: str,
     value: Dict[str, Any],
     description: Optional[str] = None,
@@ -66,10 +81,11 @@ def update_setting_value(
             model(**value)
         except Exception as e:
             raise HTTPException(
-                status_code=400, detail=f"Invalid setting format: {str(e)}"
+                status_code=400,
+                detail=f"Invalid setting format: {str(e)}",
             )
 
-    setting = get_setting(db, name)
+    setting = await get_setting(name)
     if setting:
         setting.value = value
         if description is not None:
@@ -77,7 +93,12 @@ def update_setting_value(
     else:
         setting = SystemSettings(name=name, value=value, description=description)
 
-    db.add(setting)
-    db.commit()
-    db.refresh(setting)
+    async with get_session_context() as db:
+        db.add(setting)
+        await db.commit()
+        await db.refresh(setting)
+
+    # Update cache
+    await set_cached_setting(name, setting.value)
+
     return setting
