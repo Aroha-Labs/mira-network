@@ -1,9 +1,25 @@
 import { supabase } from "src/utils/supabase/client";
 import api from "src/lib/axios";
 
+export interface TextContentPart {
+  type: "text";
+  text: string;
+}
+
+export interface ImageContentPart {
+  type: "image_url";
+  image_url: {
+    url: string; // Can be data URL or web URL
+  };
+}
+
+export type MessageContentPart = TextContentPart | ImageContentPart;
+
 export interface Message {
   role: "user" | "assistant" | "system";
-  content: string;
+  // Allow content to be a string (for simple text messages or assistant responses)
+  // or an array of content parts (for user messages with text and images).
+  content: string | MessageContentPart[];
   tool_calls?: ToolCall[];
   tool_responses?: ToolResponse[];
 }
@@ -241,12 +257,21 @@ export async function streamChatCompletion(
       if (systemPrompt && options.variables) {
         console.log("Replacing variables in system prompt");
         const systemMessage = messages[0];
-        let content = systemMessage.content;
-        Object.entries(options.variables).forEach(([key, value]) => {
-          content = content.replace(new RegExp(`{{${key}}}`, "g"), value);
-        });
-        console.log("Replaced variables in system prompt", content);
-        messages[0] = { ...systemMessage, content };
+        // Only replace if content is a string
+        if (typeof systemMessage.content === "string") {
+          let systemText = systemMessage.content;
+          Object.entries(options.variables).forEach(([key, value]) => {
+            systemText = systemText.replace(new RegExp(`{{${key}}}`, "g"), value);
+          });
+          console.log("Replaced variables in system prompt", systemText);
+          messages[0] = { ...systemMessage, content: systemText };
+        } else {
+          // Handle the case where system message content is not a string (e.g., log a warning)
+          // This shouldn't happen for system prompts, but good to have a check.
+          console.warn(
+            "System message content is not a string, cannot replace variables."
+          );
+        }
       }
 
       body = {

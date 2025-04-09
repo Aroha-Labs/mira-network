@@ -4,14 +4,20 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import Link from "next/link";
 import ChatBubble from "src/components/ChatBubble";
 // import SystemPromptInput from "src/components/SystemPromptInput";
-import { ChatBubbleBottomCenterIcon, StopIcon } from "@heroicons/react/24/outline";
+import {
+  ChatBubbleBottomCenterIcon,
+  StopIcon,
+  PaperClipIcon,
+  XCircleIcon,
+  PhotoIcon,
+} from "@heroicons/react/24/outline";
 import Loading, { Spinner } from "src/components/PageLoading";
 import AutoGrowTextarea from "src/components/AutoGrowTextarea";
 import ConfirmModal from "src/components/ConfirmModal";
 import { LLM_BASE_URL } from "src/config";
 import { useQuery } from "@tanstack/react-query";
 import { useSession } from "src/hooks/useSession";
-import { Message } from "src/utils/chat";
+import { Message, MessageContentPart } from "src/utils/chat";
 
 const fetchChatCompletion = async (
   messages: Message[],
@@ -91,6 +97,42 @@ const fetchSupportedModels = async () => {
   return data.data.map((model: { id: string }) => model.id);
 };
 
+// Helper function to upload a single file
+const uploadFile = async (file: File, token: string): Promise<string> => {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const uploadUrl = `${LLM_BASE_URL}/upload/image`;
+
+  const response = await fetch(uploadUrl, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    let errorDetail = `Failed to upload ${file.name}. Status: ${response.status}`;
+    try {
+      const errorData = await response.json();
+      errorDetail = errorData.detail || errorDetail;
+    } catch (e) {
+      // Ignore JSON parsing error if response is not JSON
+    }
+    throw new Error(errorDetail);
+  }
+
+  const result = await response.json();
+  const { s3_url } = result;
+  if (!s3_url) {
+    throw new Error(`Failed to get S3 URL after uploading ${file.name}.`);
+  }
+
+  console.log(`Uploaded ${file.name}, S3 URL: ${s3_url}`);
+  return s3_url;
+};
+
 export default function Chat() {
   const { data: userSession, isLoading } = useSession();
 
@@ -100,8 +142,12 @@ export default function Chat() {
   const [isSending, setIsSending] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const [selectedModel, setSelectedModel] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
 
   const {
     data: supportedModelsData,
@@ -145,64 +191,153 @@ export default function Chat() {
     }
   };
 
-  const sendMessage = async (userInput: string = "") => {
-    const i = (userInput || input).trim();
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (files) {
+      const newFiles = Array.from(files);
+      if (selectedFiles.length + newFiles.length > 5) {
+        setErrorMessage("You can upload a maximum of 5 images.");
+        return;
+      }
+      const validFiles = newFiles.filter((file) => {
+        if (!["image/png", "image/jpeg", "image/webp", "image/gif"].includes(file.type)) {
+          setErrorMessage(`Unsupported file type: ${file.name}`);
+          return false;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+          setErrorMessage(`File too large (max 5MB): ${file.name}`);
+          return false;
+        }
+        return true;
+      });
 
-    if (!i) return;
+      setSelectedFiles((prevFiles) => [...prevFiles, ...validFiles]);
+
+      validFiles.forEach((file) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setImagePreviews((prevPreviews) => [...prevPreviews, reader.result as string]);
+        };
+        reader.readAsDataURL(file);
+      });
+
+      event.target.value = "";
+      setErrorMessage("");
+    }
+  };
+
+  const handleAttachmentClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleRemoveImage = (index: number) => {
+    setSelectedFiles((prevFiles) => prevFiles.filter((_, i) => i !== index));
+    setImagePreviews((prevPreviews) => prevPreviews.filter((_, i) => i !== index));
+  };
+
+  const sendMessage = async (userInput: string = "") => {
+    const textInput = (userInput || input).trim();
+
+    if (!textInput && selectedFiles.length === 0) return;
+
     if (!userSession?.access_token) {
       setErrorMessage("Please login to continue.");
       return;
     }
 
-    setIsSending(true);
+    setIsUploading(true);
+    setIsSending(false);
     setErrorMessage("");
-
-    const userMessage: Message = { role: "user", content: i };
-    const assistantMessage: Message = { role: "assistant", content: "" };
-    const updatedMessages = [...messages, userMessage];
-
-    setMessages([...updatedMessages, assistantMessage]);
     setInput("");
 
-    setTimeout(() => {
-      window.scrollTo({
-        top: document.body.scrollHeight,
-        behavior: "smooth",
-      });
-    }, 200);
-
-    // if system prompt is not empty, send it as the first message
-    const sp: Message = { role: "system", content: systemPrompt.trim() };
-    const newMessages = sp.content ? [sp, ...updatedMessages] : updatedMessages;
-
-    abortControllerRef.current = new AbortController();
+    let userMessageContent: MessageContentPart[] = [];
+    let userMessageForState: Message;
+    let textForInputOnError = textInput;
+    let uploadedImageUrls: string[] = [];
 
     try {
+      if (selectedFiles.length > 0) {
+        const uploadPromises = selectedFiles.map((file) =>
+          uploadFile(file, userSession.access_token!)
+        );
+        uploadedImageUrls = await Promise.all(uploadPromises);
+      }
+      setIsUploading(false);
+
+      if (textInput) {
+        userMessageContent.push({ type: "text", text: textInput });
+      }
+      const imageContentParts: MessageContentPart[] = uploadedImageUrls.map((url) => ({
+        type: "image_url",
+        image_url: { url: url },
+      }));
+      userMessageContent.push(...imageContentParts);
+
+      if (userMessageContent.length === 0) {
+        console.warn("Message content is empty after processing inputs.");
+        setInput(textForInputOnError);
+        return;
+      }
+
+      userMessageForState = { role: "user", content: userMessageContent };
+
+      setIsSending(true);
+      const assistantMessage: Message = { role: "assistant", content: "" };
+      const updatedMessages = [...messages, userMessageForState];
+      setMessages([...updatedMessages, assistantMessage]);
+
+      const filesToClear = [...selectedFiles];
+      setSelectedFiles([]);
+
+      setTimeout(() => {
+        window.scrollTo({
+          top: document.body.scrollHeight,
+          behavior: "smooth",
+        });
+      }, 200);
+
+      const sp: Message = { role: "system", content: systemPrompt.trim() };
+      const messagesForApi = sp.content ? [sp, ...updatedMessages] : updatedMessages;
+
+      abortControllerRef.current = new AbortController();
       await fetchChatCompletion(
-        newMessages,
+        messagesForApi,
         (chunk) => {
-          assistantMessage.content += chunk;
-          setMessages((prevMessages) => [...prevMessages.slice(0, -1), assistantMessage]);
+          if (typeof assistantMessage.content === "string") {
+            assistantMessage.content += chunk;
+            setMessages((prevMessages) => [
+              ...prevMessages.slice(0, -1),
+              assistantMessage,
+            ]);
+          }
         },
         abortControllerRef.current,
         selectedModel,
         userSession.access_token
       );
+      setErrorMessage("");
     } catch (error) {
       const err = error as Error;
       if (err.name !== "AbortError") {
         console.error("Failed to send message:", error);
-        setMessages((prevMessages) => prevMessages.slice(0, -2));
-        setInput(userMessage.content);
+        if (isSending) {
+          setMessages((prevMessages) => prevMessages.slice(0, -2));
+        }
+        setInput(textForInputOnError);
         setErrorMessage(err.message || "Failed to send message. Please try again.");
+      } else {
+        setErrorMessage("");
       }
     } finally {
+      setIsUploading(false);
       setIsSending(false);
+      if (!errorMessage) {
+        setImagePreviews([]);
+      }
     }
   };
 
   const sendContinueMessage = async () => {
-    // setInput("continue");
     await sendMessage("continue");
   };
 
@@ -212,7 +347,19 @@ export default function Chat() {
 
   const handleEditMessage = (index: number) => {
     const messageToEdit = messages[index];
-    setInput(messageToEdit.content);
+    let textToEdit = "";
+    if (typeof messageToEdit.content === "string") {
+      textToEdit = messageToEdit.content;
+    } else if (Array.isArray(messageToEdit.content)) {
+      const textPart = messageToEdit.content.find((part) => part.type === "text");
+      if (textPart) {
+        textToEdit = (textPart as { type: "text"; text: string }).text;
+      }
+      setSelectedFiles([]);
+      setImagePreviews([]);
+    }
+
+    setInput(textToEdit);
     setMessages(messages.slice(0, index));
   };
 
@@ -222,9 +369,19 @@ export default function Chat() {
       return;
     }
 
+    if (isSending) return;
+
+    const userMessageToResend = messages[index];
+    if (userMessageToResend.role !== "user") {
+      console.warn("Cannot refresh a non-user message.");
+      return;
+    }
+
     const messagesToKeep = messages.slice(0, index + 1);
     setMessages(messagesToKeep);
     setInput("");
+    setSelectedFiles([]);
+    setImagePreviews([]);
 
     setIsSending(true);
     setErrorMessage("");
@@ -241,18 +398,22 @@ export default function Chat() {
       });
     }, 200);
 
-    // if system prompt is not empty, send it as the first message
     const sp: Message = { role: "system", content: systemPrompt.trim() };
-    const newMessages = sp.content ? [sp, ...messagesToKeep] : messagesToKeep;
+    const messagesForApi = sp.content ? [sp, ...messagesToKeep] : messagesToKeep;
 
     abortControllerRef.current = new AbortController();
 
     try {
       await fetchChatCompletion(
-        newMessages,
+        messagesForApi,
         (chunk) => {
-          assistantMessage.content += chunk;
-          setMessages((prevMessages) => [...prevMessages.slice(0, -1), assistantMessage]);
+          if (typeof assistantMessage.content === "string") {
+            assistantMessage.content += chunk;
+            setMessages((prevMessages) => [
+              ...prevMessages.slice(0, -1),
+              assistantMessage,
+            ]);
+          }
         },
         abortControllerRef.current,
         selectedModel,
@@ -260,9 +421,9 @@ export default function Chat() {
       );
     } catch (error) {
       if ((error as Error).name !== "AbortError") {
-        console.error("Failed to send message:", error);
+        console.error("Failed to refresh message:", error);
         setMessages((prevMessages) => prevMessages.slice(0, -1));
-        setErrorMessage("Failed to send message. Please try again.");
+        setErrorMessage("Failed to refresh message. Please try again.");
       }
     } finally {
       setIsSending(false);
@@ -305,7 +466,7 @@ export default function Chat() {
       <div className="flex items-center justify-center h-screen">
         <Link
           href="/login"
-          className="bg-blue-500 text-white p-4 rounded-lg hover:bg-blue-600"
+          className="p-4 text-white bg-blue-500 rounded-lg hover:bg-blue-600"
         >
           Login
         </Link>
@@ -319,12 +480,12 @@ export default function Chat() {
   };
 
   return (
-    <div className="flex flex-col items-center bg-gray-100 flex-1">
-      <div className="m-1 p-1 bg-white flex justify-center self-start">
+    <div className="flex flex-col items-center flex-1 bg-gray-100">
+      <div className="flex self-start justify-center p-1 m-1 bg-white">
         <select
           value={selectedModel}
           onChange={handleModelChange}
-          className="border border-gray-300 p-1 rounded-md focus:outline-hidden focus:ring-2 focus:ring-blue-500 "
+          className="p-1 border border-gray-300 rounded-md focus:outline-hidden focus:ring-2 focus:ring-blue-500 "
         >
           {supportedModelsOptions.map((o) => (
             <option key={o.value} value={o.value}>
@@ -334,10 +495,10 @@ export default function Chat() {
         </select>
       </div>
       {/* <SystemPromptInput onChange={handleSystemPromptChange} /> */}
-      <div className="flex-1 overflow-y-auto w-full p-4 space-y-6">
+      <div className="flex-1 w-full p-4 space-y-6 overflow-y-auto">
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-gray-500">
-            <ChatBubbleBottomCenterIcon className="h-12 w-12 mb-4" />
+            <ChatBubbleBottomCenterIcon className="w-12 h-12 mb-4" />
             <div>Start chatting...</div>
           </div>
         ) : (
@@ -355,9 +516,9 @@ export default function Chat() {
         )}
 
         {!isSending && messages.length ? (
-          <div className="max-w-2xl mx-auto flex justify-start px-4 -top-4 relative">
+          <div className="relative flex justify-start max-w-2xl px-4 mx-auto -top-4">
             <button
-              className="text-sm text-gray-400 hover:text-gray-600 underline focus:outline-hidden"
+              className="text-sm text-gray-400 underline hover:text-gray-600 focus:outline-hidden"
               onClick={sendContinueMessage}
             >
               Continue
@@ -366,11 +527,11 @@ export default function Chat() {
         ) : null}
 
         {messages.length > 0 && (
-          <div className="text-center text-gray-500 flex flex-col items-center">
+          <div className="flex flex-col items-center text-center text-gray-500">
             {isSending ? <Spinner /> : <div>End of messages</div>}
             {!isSending && (
               <button
-                className="text-sm text-blue-400 hover:text-gray-600 underline focus:outline-hidden"
+                className="text-sm text-blue-400 underline hover:text-gray-600 focus:outline-hidden"
                 onClick={handleClearHistory}
               >
                 Clean History
@@ -379,34 +540,72 @@ export default function Chat() {
           </div>
         )}
       </div>
-      <div className="w-full p-4 bg-white border-t border-gray-300 sticky bottom-0">
-        <div className="max-w-2xl mx-auto flex justify-center space-x-2">
+      <div className="sticky bottom-0 w-full p-4 bg-white border-t border-gray-300">
+        {imagePreviews.length > 0 && (
+          <div className="flex flex-wrap max-w-2xl gap-2 p-2 mx-auto mb-2 border border-gray-200 rounded-md">
+            {imagePreviews.map((previewUrl, index) => (
+              <div key={index} className="relative group">
+                <img
+                  src={previewUrl}
+                  alt={`preview ${index}`}
+                  className="object-cover w-16 h-16 rounded-md"
+                />
+                <button
+                  onClick={() => handleRemoveImage(index)}
+                  className="absolute top-0 right-0 p-0.5 text-gray-600 bg-white rounded-full opacity-0 group-hover:opacity-100 hover:text-red-500 focus:outline-none"
+                  aria-label="Remove image"
+                >
+                  <XCircleIcon className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="flex justify-center max-w-2xl mx-auto space-x-2">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept="image/png, image/jpeg, image/webp, image/gif"
+            multiple
+            style={{ display: "none" }}
+          />
+          <button
+            className="p-2 text-gray-500 border border-gray-300 rounded-l-md hover:bg-gray-100 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+            onClick={handleAttachmentClick}
+            disabled={isSending || isUploading}
+            aria-label="Attach image"
+          >
+            <PhotoIcon className="w-5 h-5" />
+          </button>
           <AutoGrowTextarea
-            className="flex-1 border border-gray-300 p-2 rounded-l-md focus:outline-hidden focus:ring-2 focus:ring-blue-500 resize-none"
+            className="flex-1 p-2 border border-gray-300 resize-none focus:outline-hidden focus:ring-2 focus:ring-blue-500"
             value={input}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder="Type your message... (Shift+Enter for new line)"
-            disabled={isSending}
+            placeholder="Type your message or attach images..."
+            disabled={isSending || isUploading}
           />
           <button
-            className="bg-blue-500 text-white p-2 rounded-r-md hover:bg-blue-600 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+            className="p-2 text-white bg-blue-500 rounded-r-md hover:bg-blue-600 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
             onClick={() => sendMessage(input)}
-            disabled={isSending}
+            disabled={
+              isUploading || isSending || (!input.trim() && selectedFiles.length === 0)
+            }
           >
-            {isSending ? "Sending..." : "Send"}
+            {isUploading ? "Uploading..." : isSending ? "Sending..." : "Send"}
           </button>
-          {isSending && (
+          {(isSending || isUploading) && (
             <button
-              className="bg-red-500 text-white p-2 rounded-md hover:bg-red-600 focus:outline-hidden focus:ring-2 focus:ring-red-500"
+              className="p-2 text-white bg-red-500 rounded-md hover:bg-red-600 focus:outline-hidden focus:ring-2 focus:ring-red-500"
               onClick={handleStop}
             >
-              <StopIcon className="h-5 w-5" />
+              <StopIcon className="w-5 h-5" />
             </button>
           )}
         </div>
         {errorMessage && (
-          <div className="text-red-500 text-sm mt-2 text-center">{errorMessage}</div>
+          <div className="mt-2 text-sm text-center text-red-500">{errorMessage}</div>
         )}
       </div>
       {showConfirmModal && (

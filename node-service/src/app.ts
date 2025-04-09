@@ -4,9 +4,20 @@ import { FastifyPluginAsync, FastifyServerOptions } from "fastify";
 
 export interface AppOptions
   extends FastifyServerOptions,
-    Partial<AutoloadPluginOptions> {}
+  Partial<AutoloadPluginOptions> { }
 // Pass --options via CLI arguments in command to enable these options.
-const options: AppOptions = {};
+const options: AppOptions = {
+  logger: {
+    level: "info",
+    transport: {
+      target: "pino-pretty",
+      options: {
+        colorize: true,
+        colorizeObjects: true,
+      },
+    },
+  },
+};
 
 const app: FastifyPluginAsync<AppOptions> = async (
   fastify,
@@ -31,6 +42,7 @@ const app: FastifyPluginAsync<AppOptions> = async (
     options: opts,
   });
 };
+
 
 export default app;
 export { app, options };

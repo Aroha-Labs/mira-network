@@ -3,6 +3,9 @@ import axios from "axios";
 import { Env } from "../config";
 import { registerMachine, getLocalIp } from "../utils/machineRegistry";
 import OpenAI from "openai";
+import { promises as fs } from "fs";
+import * as mime from "mime-types";
+import { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
 import pino from "pino";
 const logger = pino({
@@ -220,10 +223,18 @@ const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
   fastify.post<{ Body: AiRequest }>(
     "/v1/chat/completions",
     async (request, reply) => {
+      const body = request.body;
+      console.log("Received raw body:", body);
+
       const requestId = request.id;
       const startTime = Date.now();
 
-      const { model, modelProvider, messages, stream = false } = request.body;
+      const { model, modelProvider, messages, stream = false } = request.body as {
+        model: string;
+        modelProvider?: any;
+        messages: Array<{ role: string; content: string | Array<{ type: string;[key: string]: any }> }>;
+        stream?: boolean;
+      };
 
       if (!messages || !messages.some((msg) => msg.role === "user")) {
         logger.warn({
@@ -236,32 +247,77 @@ const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
         return;
       }
 
+      // logger.info({ msg: "Processing messages", messages, requestId });
+      // const processedMessages = await Promise.all(
+      //   messages.map(async (message) => {
+      //     if (Array.isArray(message.content)) {
+      //       const newContent = await Promise.all(
+      //         message.content.map(async (part) => {
+      //           if (
+      //             part.type === "image_url" &&
+      //             part.image_url &&
+      //             typeof part.image_url.url === "string"
+      //           ) {
+      //             const filePath = part.image_url.url;
+      //             logger.info({ msg: `Found absolute image path: ${filePath}`, requestId });
+      //             try {
+      //               const fileBuffer = await fs.readFile(filePath);
+      //               const base64Data = fileBuffer.toString("base64");
+      //               const mimeType = mime.lookup(filePath) || "image/png";
+
+      //               const dataUrl = `data:${mimeType};base64,${base64Data}`;
+
+      //               return {
+      //                 ...part,
+      //                 image_url: {
+      //                   ...part.image_url,
+      //                   url: dataUrl,
+      //                 },
+      //               };
+      //             } catch (error: any) {
+      //               logger.error({
+      //                 msg: `Failed to read or encode local image file: ${filePath}`,
+      //                 error: error.message,
+      //                 requestId,
+      //               });
+      //               return part;
+      //             }
+      //           }
+      //           return part;
+      //         })
+      //       );
+      //       if (Array.isArray(newContent)) {
+      //         return { ...message, content: newContent };
+      //       }
+      //       return message;
+      //     }
+      //     return message;
+      //   })
+      // );
+
       try {
         const [provider, modelName] = getModelProvider(model, modelProvider);
+
 
         const response = await getLlmCompletion({
           model: modelName,
           modelProvider: provider,
-          messages,
+          messages: messages as ChatCompletionMessageParam[],
           stream: !!stream,
         });
 
-        // Handle non-streaming response
         if (!stream) {
           return { data: response };
         }
 
-        // Handle streaming response
         reply.raw.setHeader("x-machine-ip", Env.MACHINE_IP || getLocalIp());
         reply.raw.setHeader("x-machine-name", Env.MACHINE_NAME);
         reply.raw.setHeader("Content-Type", "text/event-stream");
         reply.raw.setHeader("Cache-Control", "no-cache");
         reply.raw.setHeader("Connection", "keep-alive");
 
-        // Use reply.hijack() to prevent Fastify from managing the response
         reply.hijack();
 
-        // Stream the chunks
         for await (const chunk of response as any) {
           const data = JSON.stringify(chunk);
           reply.raw.write(`data: ${data}\n\n`);
