@@ -1,24 +1,25 @@
 from datetime import datetime, timezone
 from typing import Optional, AsyncGenerator
-from fastapi import APIRouter, Depends, Response, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, Response, HTTPException, UploadFile, File
+from fastapi.responses import StreamingResponse, FileResponse, RedirectResponse
 from pydantic import BaseModel
 from src.router.utils.user import get_user_credits
 from src.router.utils.machine import get_machine_id
-from src.router.core.config import NODE_SERVICE_URL
+from src.router.core.config import NODE_SERVICE_URL, S3_PREFIX
 from src.router.core.settings_types import SETTINGS_MODELS
 from src.router.core.types import User
 from src.router.db.session import DBSession
 from src.router.core.security import verify_user
 from src.router.utils.network import get_random_machines
 from src.router.schemas.ai import AiRequest, VerifyRequest
+from src.router.utils.s3 import upload_file_to_s3, get_file_from_s3, get_s3_key
 import time
 import httpx
 import json
 from src.router.utils.settings import get_setting_value
 from src.router.utils.settings import get_supported_models
 import asyncio
-from src.router.utils.redis import redis_client  # new import for redis
+from src.router.utils.redis import redis_client
 from src.router.utils.logger import logger
 from src.router.api.v1.docs.network import (
     chatCompletionGenerateDoc,
@@ -31,11 +32,26 @@ from src.router.utils.opensearch import (
     OPENSEARCH_CREDITS_INDEX,
 )
 from aiohttp import ClientSession, ClientTimeout, TCPConnector
+import shutil
+import os
+import uuid
+from pathlib import Path
+import mimetypes
 
 
 router = APIRouter()
 
 transport = httpx.AsyncHTTPTransport(retries=3)
+
+# Define a directory to store uploads (relative to where the script is run)
+# In a real deployment, use an absolute path or configure via environment variables
+UPLOAD_DIR = Path("./temp_uploads")
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)  # Ensure the directory exists
+
+# Or define the absolute path directly if needed elsewhere
+ABSOLUTE_UPLOAD_BASE = Path(
+    "/Users/sarim/projects/work/mira-network/router/temp_uploads"
+).resolve()  # Use resolve() for cleaner absolute path
 
 
 @router.post(
@@ -105,6 +121,7 @@ async def verify(req: VerifyRequest, db: DBSession):
 class ModelListResItem(BaseModel):
     id: str
     object: str
+    vision: bool
 
 
 class ModelListRes(BaseModel):
@@ -121,13 +138,16 @@ class ModelListRes(BaseModel):
 )
 async def list_models() -> ModelListRes:
     supported_models = await get_supported_models()
-
     # Create a properly typed response
     response = ModelListRes(
         object="list",
         data=[
-            ModelListResItem(id=model_id, object="model")
-            for model_id, _ in supported_models.items()
+            ModelListResItem(
+                id=model_id,
+                object="model",
+                vision=model_config.capabilities.get("vision", False),
+            )
+            for model_id, model_config in supported_models.items()
         ],
     )
 
@@ -316,6 +336,99 @@ async def stream_response(response) -> AsyncGenerator[tuple[str, dict], None]:
         yield f"data: {json.dumps({'error': str(e)})}\n\n", {"error": str(e)}
 
 
+@router.get(
+    "/v1/image/{filename}",
+    summary="Get uploaded image",
+    description="Retrieves an image file from S3 storage and returns a presigned URL for direct access.",
+    responses={
+        307: {"description": "Temporary redirect to presigned S3 URL"},
+        404: {"description": "Image not found"},
+        500: {"description": "Failed to access file in S3"}
+    },
+)
+async def get_image(filename: str):
+    """
+    Retrieves an image from S3 storage and returns a presigned URL.
+    """
+    try:
+        # Basic security: Ensure filename is just a filename, no path components
+        if "/" in filename or "\\" in filename or ".." in filename:
+            logger.warning(f"Invalid characters or path traversal attempt in filename: {filename}")
+            raise HTTPException(status_code=400, detail="Invalid filename")
+
+        # Get S3 key for the file
+        s3_key = get_s3_key(filename)
+        
+        # Get file metadata and presigned URL from S3
+        file_data = await get_file_from_s3(s3_key)
+        if not file_data:
+            logger.warning(f"Image not found in S3: {filename}")
+            raise HTTPException(status_code=404, detail="Image not found")
+            
+        # Redirect to presigned URL
+        return RedirectResponse(
+            url=file_data['presigned_url'],
+            status_code=307
+        )
+
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception as e:
+        logger.error(f"Error serving image {filename}: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error serving image")
+
+
+@router.post(
+    "/v1/upload/image",
+    summary="Upload an image file",
+    description="Uploads an image file to S3 storage and returns the URL for accessing it.",
+    response_description="Returns the URL of the uploaded image.",
+)
+async def upload_image(
+    file: UploadFile = File(...),
+    user: User = Depends(verify_user),
+):
+    """
+    Handles image uploads to S3 storage.
+    """
+    try:
+        # Limit file types
+        allowed_content_types = ["image/jpeg", "image/png", "image/webp", "image/gif"]
+        if file.content_type not in allowed_content_types:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid file type. Allowed types: {', '.join(allowed_content_types)}"
+            )
+
+        # Generate a unique filename
+        file_extension = os.path.splitext(file.filename)[1] if file.filename else ".png"
+        unique_filename = f"{uuid.uuid4()}{file_extension}"
+
+        # Upload to S3
+        s3_key, public_url = await upload_file_to_s3(
+            file.file,
+            unique_filename,
+            file.content_type
+        )
+
+        logger.info(f"User {user.id} uploaded file: {unique_filename} to S3")
+
+        # Return the filename for constructing the GET endpoint URL
+        return {
+            "filename": unique_filename,
+            "url": f"/v1/image/{unique_filename}",  # Relative URL for API endpoint
+            "s3_url": public_url  # Direct S3 URL (if needed)
+        }
+
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception as e:
+        logger.error(f"Failed to upload file for user {user.id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to upload file: {str(e)}")
+    finally:
+        await file.close()
+
+
 @router.post(
     "/v1/chat/completions",
     summary="Generate Chat Completion",
@@ -332,8 +445,8 @@ async def chatCompletionGenerate(
     timeStart = time.time()
 
     try:
-        # Fix type conversion for user_id
-        user_credits = await get_user_credits((user.id), db)
+        # Get user credits
+        user_credits = await get_user_credits(user.id, db)
         if user_credits <= 0:
             raise HTTPException(status_code=402, detail="Insufficient credits")
 
@@ -344,6 +457,26 @@ async def chatCompletionGenerate(
         model_config = supported_models[req.model]
         original_req_model = req.model
         req.model = model_config.id
+
+        # # Check messages for image_urls and handle S3 paths
+        # logger.info("Checking messages for image URLs...")
+        # for message in req.messages:
+        #     if isinstance(message.content, list):
+        #         for part in message.content:
+        #             if isinstance(part, dict) and part.get("type") == "image_url":
+        #                 image_url_data = part.get("image_url", {})
+        #                 url_str = image_url_data.get("url")
+        #                 if isinstance(url_str, str) and url_str.startswith("/v1/image/"):
+        #                     # Extract filename from the API endpoint URL
+        #                     filename = url_str.split("/")[-1]
+        #                     # Get S3 presigned URL
+        #                     file_data = await get_file_from_s3(get_s3_key(filename))
+        #                     if file_data:
+        #                         # Replace the URL with the presigned S3 URL
+        #                         part["image_url"]["url"] = file_data["presigned_url"]
+        #                         logger.debug(f"Replaced {url_str} with presigned S3 URL")
+        #                     else:
+        #                         logger.warning(f"Image file not found in S3: {filename}")
 
         proxy_url = f"{NODE_SERVICE_URL}/v1/chat/completions"
         logger.info(f"Using machine {NODE_SERVICE_URL}")
