@@ -43,16 +43,6 @@ router = APIRouter()
 
 transport = httpx.AsyncHTTPTransport(retries=3)
 
-# Define a directory to store uploads (relative to where the script is run)
-# In a real deployment, use an absolute path or configure via environment variables
-UPLOAD_DIR = Path("./temp_uploads")
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)  # Ensure the directory exists
-
-# Or define the absolute path directly if needed elsewhere
-ABSOLUTE_UPLOAD_BASE = Path(
-    "/Users/sarim/projects/work/mira-network/router/temp_uploads"
-).resolve()  # Use resolve() for cleaner absolute path
-
 
 @router.post(
     "/v1/verify",
@@ -343,7 +333,7 @@ async def stream_response(response) -> AsyncGenerator[tuple[str, dict], None]:
     responses={
         307: {"description": "Temporary redirect to presigned S3 URL"},
         404: {"description": "Image not found"},
-        500: {"description": "Failed to access file in S3"}
+        500: {"description": "Failed to access file in S3"},
     },
 )
 async def get_image(filename: str):
@@ -353,29 +343,30 @@ async def get_image(filename: str):
     try:
         # Basic security: Ensure filename is just a filename, no path components
         if "/" in filename or "\\" in filename or ".." in filename:
-            logger.warning(f"Invalid characters or path traversal attempt in filename: {filename}")
+            logger.warning(
+                f"Invalid characters or path traversal attempt in filename: {filename}"
+            )
             raise HTTPException(status_code=400, detail="Invalid filename")
 
         # Get S3 key for the file
         s3_key = get_s3_key(filename)
-        
+
         # Get file metadata and presigned URL from S3
         file_data = await get_file_from_s3(s3_key)
         if not file_data:
             logger.warning(f"Image not found in S3: {filename}")
             raise HTTPException(status_code=404, detail="Image not found")
-            
+
         # Redirect to presigned URL
-        return RedirectResponse(
-            url=file_data['presigned_url'],
-            status_code=307
-        )
+        return RedirectResponse(url=file_data["presigned_url"], status_code=307)
 
     except HTTPException as http_exc:
         raise http_exc
     except Exception as e:
         logger.error(f"Error serving image {filename}: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error serving image")
+        raise HTTPException(
+            status_code=500, detail="Internal server error serving image"
+        )
 
 
 @router.post(
@@ -397,7 +388,7 @@ async def upload_image(
         if file.content_type not in allowed_content_types:
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid file type. Allowed types: {', '.join(allowed_content_types)}"
+                detail=f"Invalid file type. Allowed types: {', '.join(allowed_content_types)}",
             )
 
         # Generate a unique filename
@@ -406,9 +397,7 @@ async def upload_image(
 
         # Upload to S3
         s3_key, public_url = await upload_file_to_s3(
-            file.file,
-            unique_filename,
-            file.content_type
+            file.file, unique_filename, file.content_type
         )
 
         logger.info(f"User {user.id} uploaded file: {unique_filename} to S3")
@@ -417,7 +406,7 @@ async def upload_image(
         return {
             "filename": unique_filename,
             "url": f"/v1/image/{unique_filename}",  # Relative URL for API endpoint
-            "s3_url": public_url  # Direct S3 URL (if needed)
+            "s3_url": public_url,  # Direct S3 URL (if needed)
         }
 
     except HTTPException as http_exc:
