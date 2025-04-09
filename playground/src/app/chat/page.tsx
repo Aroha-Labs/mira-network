@@ -97,40 +97,19 @@ const fetchSupportedModels = async () => {
   return data.data.map((model: { id: string }) => model.id);
 };
 
-// Helper function to upload a single file
-const uploadFile = async (file: File, token: string): Promise<string> => {
-  const formData = new FormData();
-  formData.append("file", file);
-
-  const uploadUrl = `${LLM_BASE_URL}/upload/image`;
-
-  const response = await fetch(uploadUrl, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    body: formData,
+// Convert file to base64
+const fileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64String = reader.result as string;
+      // Remove the data URL prefix (e.g., "data:image/jpeg;base64,")
+      const base64 = base64String.split(",")[1];
+      resolve(base64);
+    };
+    reader.onerror = (error) => reject(error);
+    reader.readAsDataURL(file);
   });
-
-  if (!response.ok) {
-    let errorDetail = `Failed to upload ${file.name}. Status: ${response.status}`;
-    try {
-      const errorData = await response.json();
-      errorDetail = errorData.detail || errorDetail;
-    } catch (e) {
-      // Ignore JSON parsing error if response is not JSON
-    }
-    throw new Error(errorDetail);
-  }
-
-  const result = await response.json();
-  const { s3_url } = result;
-  if (!s3_url) {
-    throw new Error(`Failed to get S3 URL after uploading ${file.name}.`);
-  }
-
-  console.log(`Uploaded ${file.name}, S3 URL: ${s3_url}`);
-  return s3_url;
 };
 
 export default function Chat() {
@@ -147,7 +126,6 @@ export default function Chat() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const [selectedModel, setSelectedModel] = useState("");
-  const [isUploading, setIsUploading] = useState(false);
 
   const {
     data: supportedModelsData,
@@ -245,7 +223,6 @@ export default function Chat() {
       return;
     }
 
-    setIsUploading(true);
     setIsSending(false);
     setErrorMessage("");
     setInput("");
@@ -253,25 +230,21 @@ export default function Chat() {
     let userMessageContent: MessageContentPart[] = [];
     let userMessageForState: Message;
     let textForInputOnError = textInput;
-    let uploadedImageUrls: string[] = [];
 
     try {
       if (selectedFiles.length > 0) {
-        const uploadPromises = selectedFiles.map((file) =>
-          uploadFile(file, userSession.access_token!)
-        );
-        uploadedImageUrls = await Promise.all(uploadPromises);
+        const base64Promises = selectedFiles.map(fileToBase64);
+        const base64Images = await Promise.all(base64Promises);
+        const imageContentParts: MessageContentPart[] = base64Images.map((base64) => ({
+          type: "image_url",
+          image_url: { url: `data:image/jpeg;base64,${base64}` },
+        }));
+        userMessageContent.push(...imageContentParts);
       }
-      setIsUploading(false);
 
       if (textInput) {
         userMessageContent.push({ type: "text", text: textInput });
       }
-      const imageContentParts: MessageContentPart[] = uploadedImageUrls.map((url) => ({
-        type: "image_url",
-        image_url: { url: url },
-      }));
-      userMessageContent.push(...imageContentParts);
 
       if (userMessageContent.length === 0) {
         console.warn("Message content is empty after processing inputs.");
@@ -329,7 +302,6 @@ export default function Chat() {
         setErrorMessage("");
       }
     } finally {
-      setIsUploading(false);
       setIsSending(false);
       if (!errorMessage) {
         setImagePreviews([]);
@@ -573,7 +545,7 @@ export default function Chat() {
           <button
             className="p-2 text-gray-500 border border-gray-300 rounded-l-md hover:bg-gray-100 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
             onClick={handleAttachmentClick}
-            disabled={isSending || isUploading}
+            disabled={isSending}
             aria-label="Attach image"
           >
             <PhotoIcon className="w-5 h-5" />
@@ -584,18 +556,16 @@ export default function Chat() {
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             placeholder="Type your message or attach images..."
-            disabled={isSending || isUploading}
+            disabled={isSending}
           />
           <button
             className="p-2 text-white bg-blue-500 rounded-r-md hover:bg-blue-600 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
             onClick={() => sendMessage(input)}
-            disabled={
-              isUploading || isSending || (!input.trim() && selectedFiles.length === 0)
-            }
+            disabled={isSending || (!input.trim() && selectedFiles.length === 0)}
           >
-            {isUploading ? "Uploading..." : isSending ? "Sending..." : "Send"}
+            {isSending ? "Sending..." : "Send"}
           </button>
-          {(isSending || isUploading) && (
+          {isSending && (
             <button
               className="p-2 text-white bg-red-500 rounded-md hover:bg-red-600 focus:outline-hidden focus:ring-2 focus:ring-red-500"
               onClick={handleStop}
