@@ -3,8 +3,6 @@ import axios from "axios";
 import { Env } from "../config";
 import { registerMachine, getLocalIp } from "../utils/machineRegistry";
 import OpenAI from "openai";
-import { promises as fs } from "fs";
-import * as mime from "mime-types";
 import { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
 import pino from "pino";
@@ -246,54 +244,6 @@ const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
           .send({ error: "At least one user message is required" });
         return;
       }
-
-      // logger.info({ msg: "Processing messages", messages, requestId });
-      // const processedMessages = await Promise.all(
-      //   messages.map(async (message) => {
-      //     if (Array.isArray(message.content)) {
-      //       const newContent = await Promise.all(
-      //         message.content.map(async (part) => {
-      //           if (
-      //             part.type === "image_url" &&
-      //             part.image_url &&
-      //             typeof part.image_url.url === "string"
-      //           ) {
-      //             const filePath = part.image_url.url;
-      //             logger.info({ msg: `Found absolute image path: ${filePath}`, requestId });
-      //             try {
-      //               const fileBuffer = await fs.readFile(filePath);
-      //               const base64Data = fileBuffer.toString("base64");
-      //               const mimeType = mime.lookup(filePath) || "image/png";
-
-      //               const dataUrl = `data:${mimeType};base64,${base64Data}`;
-
-      //               return {
-      //                 ...part,
-      //                 image_url: {
-      //                   ...part.image_url,
-      //                   url: dataUrl,
-      //                 },
-      //               };
-      //             } catch (error: any) {
-      //               logger.error({
-      //                 msg: `Failed to read or encode local image file: ${filePath}`,
-      //                 error: error.message,
-      //                 requestId,
-      //               });
-      //               return part;
-      //             }
-      //           }
-      //           return part;
-      //         })
-      //       );
-      //       if (Array.isArray(newContent)) {
-      //         return { ...message, content: newContent };
-      //       }
-      //       return message;
-      //     }
-      //     return message;
-      //   })
-      // );
 
       try {
         const [provider, modelName] = getModelProvider(model, modelProvider);
