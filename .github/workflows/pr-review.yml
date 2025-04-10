@@ -54,6 +54,7 @@ jobs:
                     });
 
                     const options = {
+                      protocol: 'https:',
                       hostname: 'api.mira.network',
                       path: '/v1/chat/completions',
                       method: 'POST',
