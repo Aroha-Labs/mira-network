@@ -61,6 +61,7 @@ jobs:
                       headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${process.env.MIRA_API_KEY}`,
+                        'x-github-action': 'pr-review'
                       }
                     };
 
@@ -72,14 +73,6 @@ jobs:
                       res.on('data', (chunk) => { responseData += chunk; });
                       res.on('end', () => {
                         try {
-                          console.log('Raw API Response:', responseData);
-                          
-                          // Check status code before trying to parse JSON
-                          if (res.statusCode === 403) {
-                            reject(new Error(`API returned 403 Forbidden - Check if MIRA_API_KEY is correct and has proper permissions. Current key prefix: ${process.env.MIRA_API_KEY?.substring(0, 10)}...`));
-                            return;
-                          }
-                          
                           const parsedData = JSON.parse(responseData);
                           console.log('Parsed API Response:', JSON.stringify(parsedData, null, 2));
                           if (parsedData.error) {
