@@ -6,7 +6,7 @@ import OpenAI from "openai";
 
 import pino from "pino";
 const logger = pino({
-  level: process.env.LOG_LEVEL || 'info',
+  level: process.env.LOG_LEVEL || 'error',
   timestamp: true,
   formatters: {
     level: (label) => {
