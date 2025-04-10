@@ -528,7 +528,7 @@ jobs:
 
   sdk-test:
     needs: changes
-    if: needs.changes.outputs.sdk == 'true' && false
+    if: needs.changes.outputs.sdk == 'true'
     runs-on: ubuntu-latest
     strategy:
       matrix:
