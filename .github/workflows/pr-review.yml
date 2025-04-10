@@ -68,19 +68,24 @@ jobs:
                       res.on('data', (chunk) => { responseData += chunk; });
                       res.on('end', () => {
                         try {
+                          console.log('Raw API Response:', responseData);
                           const parsedData = JSON.parse(responseData);
+                          console.log('Parsed API Response:', JSON.stringify(parsedData, null, 2));
                           if (parsedData.error) {
+                            console.log('API Error:', parsedData.error);
                             reject(new Error(parsedData.error.message));
                           } else {
                             resolve(parsedData);
                           }
                         } catch (error) {
+                          console.log('JSON Parse Error:', error);
                           reject(error);
                         }
                       });
                     });
 
                     req.on('error', (error) => {
+                      console.log('Request Error:', error);
                       reject(error);
                     });
 
@@ -89,11 +94,12 @@ jobs:
                   });
 
                   // Check if response has the expected structure
-                  if (!response?.choices?.[0]?.message?.content) {
+                  if (!response?.data?.choices?.[0]?.message?.content) {
+                    console.log('Invalid Response Structure:', response);
                     throw new Error('Invalid response structure from API');
                   }
 
-                  return response.choices[0].message.content;
+                  return response.data.choices[0].message.content;
                 } catch (error) {
                   console.log(`Attempt ${attempt} error:`, error.message);
                   
