@@ -67,50 +67,31 @@ jobs:
                     };
 
                     const req = https.request(options, (res) => {
-                      console.log('Response Status Code:', res.statusCode);
-                      console.log('Response Headers:', JSON.stringify(res.headers, null, 2));
-                      
                       let responseData = '';
                       res.on('data', (chunk) => { responseData += chunk; });
                       res.on('end', () => {
                         try {
-                          console.log('Raw API Response:', responseData);
-                          
                           // Check status code before trying to parse JSON
                           if (res.statusCode === 403) {
-                            console.log('Full request headers:', JSON.stringify(options.headers, null, 2));
-                            reject(new Error(`API returned 403 Forbidden - Check WAF rules for GitHub Actions`));
+                            reject(new Error(`API returned 403 Forbidden`));
                             return;
                           }
 
                           const parsedData = JSON.parse(responseData);
-                          console.log('Parsed API Response:', JSON.stringify(parsedData, null, 2));
                           if (parsedData.error) {
-                            console.log('API Error:', parsedData.error);
                             reject(new Error(parsedData.error.message));
                           } else {
                             resolve(parsedData);
                           }
                         } catch (error) {
-                          console.log('JSON Parse Error:', error);
                           reject(error);
                         }
                       });
                     });
 
                     req.on('error', (error) => {
-                      console.log('Request Error:', error);
                       reject(error);
                     });
-
-                    // Log the outgoing request details
-                    console.log('Request Options:', JSON.stringify({
-                      ...options,
-                      headers: {
-                        ...options.headers,
-                        'Authorization': 'Bearer sk-mira-****' // Masked for security
-                      }
-                    }, null, 2));
 
                     req.write(data);
                     req.end();
@@ -118,19 +99,15 @@ jobs:
 
                   // Check if response has the expected structure
                   if (!response?.data?.choices?.[0]?.message?.content) {
-                    console.log('Invalid Response Structure:', response);
                     throw new Error('Invalid response structure from API');
                   }
 
                   return response.data.choices[0].message.content;
                 } catch (error) {
-                  console.log(`Attempt ${attempt} error:`, error.message);
-                  
                   if (attempt === maxRetries) {
                     throw error;
                   }
                   
-                  console.log(`Retrying after delay... (Attempt ${attempt}/${maxRetries})`);
                   await delay(2000 * attempt); // Exponential backoff
                 }
               }
