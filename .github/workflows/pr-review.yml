@@ -61,7 +61,8 @@ jobs:
                       headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${process.env.MIRA_API_KEY}`,
-                        'x-github-action': 'pr-review'
+                        'Accept': 'application/json',
+                        'User-Agent': 'curl/8.0',
                       }
                     };
 
@@ -73,6 +74,15 @@ jobs:
                       res.on('data', (chunk) => { responseData += chunk; });
                       res.on('end', () => {
                         try {
+                          console.log('Raw API Response:', responseData);
+                          
+                          // Check status code before trying to parse JSON
+                          if (res.statusCode === 403) {
+                            console.log('Full request headers:', JSON.stringify(options.headers, null, 2));
+                            reject(new Error(`API returned 403 Forbidden - Check WAF rules for GitHub Actions`));
+                            return;
+                          }
+
                           const parsedData = JSON.parse(responseData);
                           console.log('Parsed API Response:', JSON.stringify(parsedData, null, 2));
                           if (parsedData.error) {
