@@ -65,11 +65,21 @@ jobs:
                     };
 
                     const req = https.request(options, (res) => {
+                      console.log('Response Status Code:', res.statusCode);
+                      console.log('Response Headers:', JSON.stringify(res.headers, null, 2));
+                      
                       let responseData = '';
                       res.on('data', (chunk) => { responseData += chunk; });
                       res.on('end', () => {
                         try {
                           console.log('Raw API Response:', responseData);
+                          
+                          // Check status code before trying to parse JSON
+                          if (res.statusCode === 403) {
+                            reject(new Error(`API returned 403 Forbidden - Check if MIRA_API_KEY is correct and has proper permissions. Current key prefix: ${process.env.MIRA_API_KEY?.substring(0, 10)}...`));
+                            return;
+                          }
+                          
                           const parsedData = JSON.parse(responseData);
                           console.log('Parsed API Response:', JSON.stringify(parsedData, null, 2));
                           if (parsedData.error) {
@@ -89,6 +99,15 @@ jobs:
                       console.log('Request Error:', error);
                       reject(error);
                     });
+
+                    // Log the outgoing request details
+                    console.log('Request Options:', JSON.stringify({
+                      ...options,
+                      headers: {
+                        ...options.headers,
+                        'Authorization': 'Bearer sk-mira-****' // Masked for security
+                      }
+                    }, null, 2));
 
                     req.write(data);
                     req.end();
