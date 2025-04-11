@@ -4,22 +4,6 @@ import { Env } from "../config";
 import { registerMachine, getLocalIp } from "../utils/machineRegistry";
 import OpenAI from "openai";
 
-import pino from "pino";
-const logger = pino({
-  level: process.env.LOG_LEVEL || 'info',
-  timestamp: true,
-  formatters: {
-    level: (label) => {
-      return { level: label };
-    },
-  },
-  serializers: {
-    error: pino.stdSerializers.err,
-    req: pino.stdSerializers.req,
-    res: pino.stdSerializers.res
-  }
-});
-
 enum PROVIDER_NAME {
   OPENAI = "openai",
   OPENROUTER = "openrouter",
@@ -110,8 +94,8 @@ async function getLlmCompletion({
   modelProvider,
   messages,
   stream = false,
-}: GetLlmCompletionRequest) {
-  // const startTime = Date.now();
+  logger,
+}: GetLlmCompletionRequest & { logger: import('fastify').FastifyBaseLogger }) {
   logger.info({
     msg: 'Starting LLM completion request',
     provider: modelProvider.providerName,
@@ -154,13 +138,12 @@ async function getLlmCompletion({
 }
 
 // Update liveness check function
-async function updateLiveness(machineIp: string) {
+async function updateLiveness(machineIp: string, logger: import('fastify').FastifyBaseLogger) {
   const url = `${ROUTER_BASE_URL}/liveness/${machineIp}`;
-  const headers = { Authorization: `Bearer ${Env.MACHINE_API_TOKEN}` };
 
   setInterval(async () => {
     try {
-      await axios.post(url, {}, { headers });
+      await axios.post(url, {}, { headers: { Authorization: `Bearer ${Env.MACHINE_API_TOKEN}` } });
       logger.info(`Liveness check successful for ${machineIp}`);
     } catch (error) {
       const err = error as Error;
@@ -173,11 +156,9 @@ async function updateLiveness(machineIp: string) {
 const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
   // Register startup handler
   fastify.addHook("onReady", async () => {
-    // Get the machine IP from environment or determine the local IP
-    const machineIp = Env.MACHINE_IP || getLocalIp();
+    const machineIp = Env.MACHINE_IP || getLocalIp(fastify.log);
     fastify.log.info(`Using machine IP: ${machineIp}`);
 
-    // Register the machine with the router and get an API token
     fastify.log.info("Starting machine registration process...");
 
     if (!ROUTER_BASE_URL) {
@@ -186,7 +167,7 @@ const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
       process.exit(1);
     }
 
-    const machineToken = await registerMachine(ROUTER_BASE_URL);
+    const machineToken = await registerMachine(ROUTER_BASE_URL, fastify.log);
 
     if (machineToken) {
       fastify.log.info("Machine registered successfully and token acquired");
@@ -194,18 +175,17 @@ const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
       Env.MACHINE_API_TOKEN = machineToken;
       fastify.log.info(`Using machine name: ${Env.MACHINE_NAME}`);
 
-      // Start the liveness update task
-      updateLiveness(machineIp);
+      updateLiveness(machineIp, fastify.log);
     } else {
-      logger.error("Failed to register machine or acquire token after multiple attempts");
-      logger.error("Machine registration is required to run the service");
-      logger.error("Shutting down...");
+      fastify.log.error("Failed to register machine or acquire token after multiple attempts");
+      fastify.log.error("Machine registration is required to run the service");
+      fastify.log.error("Shutting down...");
       process.exit(1);
     }
   });
 
   fastify.addHook("preHandler", async (request, reply) => {
-    reply.header("x-machine-ip", Env.MACHINE_IP || getLocalIp());
+    reply.header("x-machine-ip", Env.MACHINE_IP || getLocalIp(fastify.log));
   });
 
   // Health check endpoint
@@ -226,7 +206,7 @@ const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
       const { model, modelProvider, messages, stream = false } = request.body;
 
       if (!messages || !messages.some((msg) => msg.role === "user")) {
-        logger.warn({
+        fastify.log.warn({
           msg: "Invalid request - missing user message",
           requestId,
         });
@@ -244,24 +224,21 @@ const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
           modelProvider: provider,
           messages,
           stream: !!stream,
+          logger: fastify.log,
         });
 
-        // Handle non-streaming response
         if (!stream) {
           return { data: response };
         }
 
-        // Handle streaming response
-        reply.raw.setHeader("x-machine-ip", Env.MACHINE_IP || getLocalIp());
+        reply.raw.setHeader("x-machine-ip", Env.MACHINE_IP || getLocalIp(fastify.log));
         reply.raw.setHeader("x-machine-name", Env.MACHINE_NAME);
         reply.raw.setHeader("Content-Type", "text/event-stream");
         reply.raw.setHeader("Cache-Control", "no-cache");
         reply.raw.setHeader("Connection", "keep-alive");
 
-        // Use reply.hijack() to prevent Fastify from managing the response
         reply.hijack();
 
-        // Stream the chunks
         for await (const chunk of response as any) {
           const data = JSON.stringify(chunk);
           reply.raw.write(`data: ${data}\n\n`);
@@ -270,7 +247,7 @@ const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
         reply.raw.end();
       } catch (error: any) {
         const duration = Date.now() - startTime;
-        logger.error({
+        fastify.log.error({
           msg: "Chat completion request failed",
           requestId,
           duration,
