@@ -13,6 +13,7 @@ from src.router.schemas.flows import (
     FlowChatCompletion,
     FlowStats,
 )
+from src.router.utils.nr import track
 from src.router.db.session import DBSession
 from src.router.api.v1.docs.flows import (
     CREATE_FLOW_DOCS,
@@ -242,7 +243,7 @@ async def get_flow(flow_id: str, db: DBSession):
         },
     },
 )
-async def update_flow(flow_id: str, flow: FlowRequest, db: DBSession):
+async def update_flow(flow_id: str, flow: FlowRequest, db: DBSession, user: User = Depends(verify_user)):
     # existing_flow = db.query(Flows).filter(Flows.id == flow_id).first()
     existing_flow = await db.exec(select(Flows).where(Flows.id == int(flow_id)))
     existing_flow = existing_flow.first()
@@ -358,7 +359,7 @@ async def update_flow(flow_id: str, flow: FlowRequest, db: DBSession):
         },
     },
 )
-async def delete_flow(flow_id: str, db: DBSession):
+async def delete_flow(flow_id: str, db: DBSession, user: User = Depends(verify_user)):
     existing_flow = await db.exec(select(Flows).where(Flows.id == int(flow_id)))
     existing_flow = existing_flow.first()
 
