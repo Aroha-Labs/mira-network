@@ -2,9 +2,6 @@ import axios, { AxiosInstance, AxiosResponse } from "axios";
 import * as os from "os";
 import { Env } from "../config";
 
-import pino from "pino";
-const logger = pino();
-
 /**
  * Generate a tiny UUID-like alphanumeric string for machine identification
  *
@@ -26,7 +23,7 @@ function generateMachineId(length: number = 8): string {
 /**
  * Get local IP address of the machine
  */
-export function getLocalIp(): string {
+export function getLocalIp(logger: import('fastify').FastifyBaseLogger): string {
   try {
     const interfaces = os.networkInterfaces();
 
@@ -53,6 +50,7 @@ async function performRegistrationRequest(
   client: AxiosInstance,
   url: string,
   headers: Record<string, string>,
+  logger: import('fastify').FastifyBaseLogger,
   jsonData?: Record<string, any>
 ): Promise<AxiosResponse> {
   const maxRetries = 5;
@@ -90,10 +88,11 @@ async function performRegistrationRequest(
  * Uses retry logic to handle transient network issues
  *
  * @param routerBaseUrl Base URL of the router service
+ * @param logger Fastify logger instance
  * @returns The machine API token if successful, null otherwise
  */
-export async function registerMachine(routerBaseUrl: string) {
-  const machineIp = Env.MACHINE_IP || getLocalIp();
+export async function registerMachine(routerBaseUrl: string, logger: import('fastify').FastifyBaseLogger) {
+  const machineIp = Env.MACHINE_IP || getLocalIp(logger);
   // Use provided machine name or generate a tiny UUID-like name
   const machineName = Env.MACHINE_NAME || generateMachineId();
   const adminToken = Env.ADMIN_API_TOKEN;
@@ -150,6 +149,7 @@ export async function registerMachine(routerBaseUrl: string) {
         client,
         registerUrl,
         headers,
+        logger,
         registerData
       );
       logger.info(`Machine registration status: ${response.status}`);
@@ -166,7 +166,8 @@ export async function registerMachine(routerBaseUrl: string) {
       const tokensResponse = await performRegistrationRequest(
         client,
         tokensUrl,
-        headers
+        headers,
+        logger
       );
       tokens = tokensResponse.data;
     } catch (error) {
@@ -192,6 +193,7 @@ export async function registerMachine(routerBaseUrl: string) {
         client,
         createTokenUrl,
         headers,
+        logger,
         tokenData
       );
       const newToken = tokenResponse.data;
