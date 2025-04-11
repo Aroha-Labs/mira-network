@@ -23,7 +23,7 @@ def upgrade() -> None:
     op.add_column('flows', sa.Column('user_id', sqlmodel.sql.sqltypes.AutoString(), nullable=True))
     op.create_index(op.f('ix_flows_user_id'), 'flows', ['user_id'], unique=False)
     
-    op.execute("UPDATE flows SET user_id = 'system' WHERE user_id IS NULL")
+    op.execute("UPDATE flows SET user_id = '3edf8858-4e54-4994-8c72-598556efd995' WHERE user_id IS NULL")
     
     op.alter_column('flows', 'user_id', nullable=False)
 
