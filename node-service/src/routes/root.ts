@@ -4,22 +4,6 @@ import { Env } from "../config";
 import { registerMachine, getLocalIp } from "../utils/machineRegistry";
 import OpenAI from "openai";
 
-import pino from "pino";
-const logger = pino({
-  level: process.env.LOG_LEVEL || 'error',
-  timestamp: true,
-  formatters: {
-    level: (label) => {
-      return { level: label };
-    },
-  },
-  serializers: {
-    error: pino.stdSerializers.err,
-    req: pino.stdSerializers.req,
-    res: pino.stdSerializers.res
-  }
-});
-
 enum PROVIDER_NAME {
   OPENAI = "openai",
   OPENROUTER = "openrouter",
@@ -110,8 +94,8 @@ async function getLlmCompletion({
   modelProvider,
   messages,
   stream = false,
-}: GetLlmCompletionRequest) {
-  // const startTime = Date.now();
+  logger,
+}: GetLlmCompletionRequest & { logger: import('fastify').FastifyBaseLogger }) {
   logger.info({
     msg: 'Starting LLM completion request',
     provider: modelProvider.providerName,
@@ -154,98 +138,54 @@ async function getLlmCompletion({
 }
 
 // Update liveness check function
-async function updateLiveness(machineIp: string) {
+async function updateLiveness(machineIp: string, logger: import('fastify').FastifyBaseLogger) {
   const url = `${ROUTER_BASE_URL}/liveness/${machineIp}`;
-  
-  // Ensure token is available before trying to use it
-  if (!Env.MACHINE_API_TOKEN) {
-    logger.error("Attempted to start liveness check without MACHINE_API_TOKEN. Registration likely failed or is incomplete.");
-    // Consider exiting or other failure strategy if liveness is critical
-    return; 
-  }
-  const headers = { Authorization: `Bearer ${Env.MACHINE_API_TOKEN}` };
 
-  // Initial immediate check (optional, consider if needed)
-  // try {
-  //   await axios.post(url, {}, { headers });
-  //   logger.info(`Initial liveness check successful for ${machineIp}`);
-  // } catch (error) {
-  //   const err = error as Error;
-  //   logger.error(`Error in initial liveness check: ${err.message}`);
-  // }
-
-  // Start periodic checks
   setInterval(async () => {
-    // Re-check token in case it becomes unset somehow (unlikely but safe)
-    if (!Env.MACHINE_API_TOKEN) {
-      logger.warn("MACHINE_API_TOKEN not set, skipping liveness check.");
-      return; 
-    }
     try {
-      await axios.post(url, {}, { headers });
-      logger.info(`Periodic liveness check successful for ${machineIp}`);
+      await axios.post(url, {}, { headers: { Authorization: `Bearer ${Env.MACHINE_API_TOKEN}` } });
+      logger.info(`Liveness check successful for ${machineIp}`);
     } catch (error) {
       const err = error as Error;
-      logger.error(`Error in periodic liveness check: ${err.message}`);
+      logger.error(`Error in liveness check: ${err.message}`);
     }
-  }, 30000); // 30s interval
+  }, 3000);
 }
 
 // Root plugin definition
 const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
   // Register startup handler
   fastify.addHook("onReady", async () => {
-    // Get the machine IP from environment or determine the local IP
-    const machineIp = Env.MACHINE_IP || getLocalIp();
+    const machineIp = Env.MACHINE_IP || getLocalIp(fastify.log);
     fastify.log.info(`Using machine IP: ${machineIp}`);
 
-    // Register the machine with the router and get an API token
-    fastify.log.info("Starting machine registration process (blocking startup)...");
+    fastify.log.info("Starting machine registration process...");
 
     if (!ROUTER_BASE_URL) {
       fastify.log.error("ROUTER_BASE_URL is not set");
       fastify.log.error("Shutting down...");
-      process.exit(1); // Exit if router URL is missing
+      process.exit(1);
     }
 
-    const startTime = Date.now();
-    try {
-      const machineToken = await registerMachine(ROUTER_BASE_URL);
-      const duration = Date.now() - startTime;
-      logger.info(`Machine registration process took ${duration}ms`);
+    const machineToken = await registerMachine(ROUTER_BASE_URL, fastify.log);
 
-      if (machineToken) {
-        fastify.log.info("Machine registered successfully and token acquired");
-        process.env.MACHINE_API_TOKEN = machineToken;
-        Env.MACHINE_API_TOKEN = machineToken; // Update Env class as well
-        fastify.log.info(`Using machine name: ${Env.MACHINE_NAME}`);
+    if (machineToken) {
+      fastify.log.info("Machine registered successfully and token acquired");
+      process.env.MACHINE_API_TOKEN = machineToken;
+      Env.MACHINE_API_TOKEN = machineToken;
+      fastify.log.info(`Using machine name: ${Env.MACHINE_NAME}`);
 
-        // Start the liveness update task only after successful registration
-        updateLiveness(machineIp);
-      } else {
-        // registerMachine already logs errors, just log the consequence here
-        logger.error("Failed to register machine or acquire token. Shutting down...");
-        process.exit(1); // Exit if registration fails
-      }
-    } catch (error) {
-      // Catch unexpected errors during the registration call itself
-      const duration = Date.now() - startTime;
-      logger.error({
-        msg: "Unhandled error during machine registration process",
-        duration,
-        error,
-      });
-      logger.error("Shutting down due to unexpected registration error...");
-      process.exit(1); // Exit on unexpected error during registration
+      updateLiveness(machineIp, fastify.log);
+    } else {
+      fastify.log.error("Failed to register machine or acquire token after multiple attempts");
+      fastify.log.error("Machine registration is required to run the service");
+      fastify.log.error("Shutting down...");
+      process.exit(1);
     }
   });
 
   fastify.addHook("preHandler", async (request, reply) => {
-    // Add headers - these will only be added once the server starts listening
-    reply.header("x-machine-ip", Env.MACHINE_IP || getLocalIp());
-    if (Env.MACHINE_NAME) {
-      reply.header("x-machine-name", Env.MACHINE_NAME);
-    }
+    reply.header("x-machine-ip", Env.MACHINE_IP || getLocalIp(fastify.log));
   });
 
   // Health check endpoint
@@ -266,7 +206,7 @@ const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
       const { model, modelProvider, messages, stream = false } = request.body;
 
       if (!messages || !messages.some((msg) => msg.role === "user")) {
-        logger.warn({
+        fastify.log.warn({
           msg: "Invalid request - missing user message",
           requestId,
         });
@@ -284,24 +224,21 @@ const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
           modelProvider: provider,
           messages,
           stream: !!stream,
+          logger: fastify.log,
         });
 
-        // Handle non-streaming response
         if (!stream) {
           return { data: response };
         }
 
-        // Handle streaming response
-        reply.raw.setHeader("x-machine-ip", Env.MACHINE_IP || getLocalIp());
+        reply.raw.setHeader("x-machine-ip", Env.MACHINE_IP || getLocalIp(fastify.log));
         reply.raw.setHeader("x-machine-name", Env.MACHINE_NAME);
         reply.raw.setHeader("Content-Type", "text/event-stream");
         reply.raw.setHeader("Cache-Control", "no-cache");
         reply.raw.setHeader("Connection", "keep-alive");
 
-        // Use reply.hijack() to prevent Fastify from managing the response
         reply.hijack();
 
-        // Stream the chunks
         for await (const chunk of response as any) {
           const data = JSON.stringify(chunk);
           reply.raw.write(`data: ${data}\n\n`);
@@ -310,7 +247,7 @@ const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
         reply.raw.end();
       } catch (error: any) {
         const duration = Date.now() - startTime;
-        logger.error({
+        fastify.log.error({
           msg: "Chat completion request failed",
           requestId,
           duration,
