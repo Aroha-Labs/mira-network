@@ -9,6 +9,7 @@ from src.router.core.security import verify_user
 from datetime import datetime
 import os
 from src.router.utils.redis import redis_client
+from src.router.utils.nr import track
 
 logger = logging.getLogger(__name__)
 
@@ -108,6 +109,12 @@ async def create_api_token(
     db: DBSession,
     user: User = Depends(verify_user),
 ):
+    track("create_api_token_request", {
+        "user_id": str(user.id),
+        "has_description": request.description is not None,
+        "has_metadata": request.meta_data is not None
+    })
+    
     token = f"sk-mira-{os.urandom(24).hex()}"
     try:
         api_token = ApiToken(
@@ -179,6 +186,13 @@ async def list_api_tokens(
     page_size: int = Query(10, ge=1, le=100, description="Items per page"),
     user: User = Depends(verify_user),
 ):
+    track("list_api_tokens_request", {
+        "user_id": str(user.id),
+        "page": page,
+        "page_size": page_size,
+        "use_pagination": page is not None and page_size is not None
+    })
+    
     query = (
         select(ApiToken)
         .where(ApiToken.user_id == user.id)
@@ -293,6 +307,10 @@ async def delete_api_token(
     api_token = api_token_res.one_or_none()
 
     if not api_token:
+        track("delete_api_token_error", {
+            "user_id": str(user.id),
+            "error": "token_not_found"
+        })
         raise HTTPException(status_code=404, detail="Token not found")
 
     api_token.deleted_at = datetime.utcnow()

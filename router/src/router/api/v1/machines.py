@@ -7,6 +7,7 @@ from src.router.core.types import User
 import time
 from src.router.models.machines import Machine
 from src.router.utils.redis import redis_client, get_online_machines
+from src.router.utils.nr import track
 
 router = APIRouter()
 
@@ -125,6 +126,8 @@ async def set_liveness(
     db: DBSession,
     machine_auth: dict = Depends(verify_machine),
 ):
+    track("set_liveness_request", {"network_ip": network_ip})
+    
     # Verify the token is authorized for this machine
     authorized_ips = [m["network_ip"] for m in machine_auth["machines"]]
     if network_ip not in authorized_ips:
@@ -137,6 +140,10 @@ async def set_liveness(
     machine = machine.first()
 
     if not machine:
+        track("set_liveness_error", {
+            "network_ip": network_ip,
+            "error": "machine_not_found"
+        })
         raise HTTPException(status_code=404, detail="Machine not found")
 
     now = time.time()
@@ -184,7 +191,18 @@ async def list_all_machines(
     include_disabled: bool = False,
     user: User = Depends(verify_user),
 ):
+    track("list_machines_request", {
+        "user_id": str(user.id),
+        "include_disabled": include_disabled,
+        "is_admin": "admin" in user.roles
+    })
+    
     if include_disabled and "admin" not in user.roles:
+        track("list_machines_error", {
+            "user_id": str(user.id),
+            "error": "permission_denied",
+            "include_disabled": include_disabled
+        })
         raise HTTPException(
             status_code=403, detail="Only admins can view disabled machines"
         )

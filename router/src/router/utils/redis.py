@@ -23,7 +23,7 @@ use_ssl = os.getenv("REDIS_SSL", "False").lower() == "true"
 if use_ssl:
     redis_url = f"rediss://{os.getenv('REDIS_HOST')}:{os.getenv('REDIS_PORT')}"
 else:
-    redis_url = f"redis://{os.getenv('REDIS_USERNAME')}:{os.getenv('REDIS_PASSWORD')}@{os.getenv('REDIS_HOST')}:{os.getenv('REDIS_PORT')}/{os.getenv('REDIS_DB')}"
+    redis_url = f"redis://{os.getenv('REDIS_HOST')}:{os.getenv('REDIS_PORT')}/{os.getenv('REDIS_DB')}"
 
 redis_pool = aioredis.ConnectionPool.from_url(
     url=redis_url,

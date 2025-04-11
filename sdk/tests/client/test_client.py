@@ -1,126 +1,120 @@
 import pytest
-import pytest_asyncio
 import httpx
-import json
 from mira_network import MiraClient, Message, ApiTokenRequest
+from httpx import ReadTimeout
+import os
 
 pytestmark = pytest.mark.asyncio
 
 
-@pytest_asyncio.fixture
-async def client():
-    async with MiraClient(api_key="test-key") as client:
-        yield client
-
-
 @pytest.fixture
-def mock_response():
-    return {"choices": [{"message": {"content": "Hello, world!"}}]}
+def client():
+    return MiraClient(
+        base_url="http://10.147.19.214:9005",
+        api_key=os.getenv("STG_API_KEY"),
+    )
 
 
 async def test_client_initialization():
-    client = MiraClient(api_key="test-key")
-    assert client.api_key == "test-key"
-    assert client.base_url == "https://apis.mira.network"
-
-    custom_client = MiraClient(api_key="test-key", base_url="https://custom.url")
-    assert custom_client.base_url == "https://custom.url"
-
-
-async def test_chat_completions_create(client, mock_response, monkeypatch):
-    async def mock_post(*args, **kwargs):
-        request = httpx.Request("POST", "https://apis.mira.network/v1/chat/completions")
-        return httpx.Response(status_code=200, json=mock_response, request=request)
-
-    monkeypatch.setattr(httpx.AsyncClient, "post", mock_post)
-
-    response = await client.chat_completions_create(
-        model="test-model", messages=[Message(role="user", content="Hello")]
+    client = MiraClient(
+        api_key=os.getenv("STG_API_KEY"), base_url="http://10.147.19.214:9005"
     )
+    assert client.api_key == os.getenv("STG_API_KEY")
+    assert client.base_url == "http://10.147.19.214:9005"
 
-    assert response == mock_response
-
-
-async def test_chat_completions_create_streaming(client, monkeypatch):
-    responses = [
-        b'{"choices":[{"delta":{"content":"Hello"}}]}\n\n',
-        b'{"choices":[{"delta":{"content":" World"}}]}\n\n',
-        b'{"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n',
-    ]
-    response_iter = iter(responses)
-
-    async def mock_post(*args, **kwargs):
-        request = httpx.Request("POST", "https://apis.mira.network/v1/chat/completions")
-
-        async def aiter_lines():
-            for chunk in response_iter:
-                yield chunk.decode().strip()
-
-        response = httpx.Response(
-            status_code=200,
-            headers={"content-type": "text/event-stream"},
-            request=request,
-        )
-        response.aiter_lines = aiter_lines
-        return response
-
-    monkeypatch.setattr(httpx.AsyncClient, "post", mock_post)
-
-    stream = await client.chat_completions_create(
-        model="test-model",
-        messages=[Message(role="user", content="Hello")],
-        stream=True,
+    custom_client = MiraClient(
+        api_key=os.getenv("STG_API_KEY"), base_url="http://10.147.19.214:9005"
     )
-
-    chunks = []
-    async for chunk in stream:
-        # The client's _format_stream_response wraps the line in a choices array
-        # So we need to parse the content string as JSON first
-        try:
-            parsed = json.loads(chunk["choices"][0]["delta"]["content"])
-            if parsed["choices"][0]["delta"].get("content"):
-                chunks.append(parsed["choices"][0]["delta"]["content"])
-        except (json.JSONDecodeError, KeyError):
-            continue
-
-    assert chunks == ["Hello", " World"]
+    assert custom_client.base_url == "http://10.147.19.214:9005"
 
 
-async def test_create_api_token(client, monkeypatch):
-    mock_token_response = {"token": "new-token"}
-
-    async def mock_post(*args, **kwargs):
-        request = httpx.Request("POST", "https://apis.mira.network/v1/api-tokens")
-        return httpx.Response(
-            status_code=200, json=mock_token_response, request=request
+# @pytest.mark.integration  # Mark as integration test
+async def test_chat_completions_create(client):
+    try:
+        response = await client.chat_completions_create(
+            model="llama-3.3-70b-instruct",
+            messages=[Message(role="user", content="Hello")],
+            timeout=30.0,  # Reduced timeout to 30 seconds
         )
 
-    monkeypatch.setattr(httpx.AsyncClient, "post", mock_post)
-
-    response = await client.create_api_token(ApiTokenRequest(description="Test token"))
-    assert response == mock_token_response
-
-
-async def test_list_api_tokens(client, monkeypatch):
-    mock_tokens = [{"token": "token1"}, {"token": "token2"}]
-
-    async def mock_get(*args, **kwargs):
-        request = httpx.Request("GET", "https://apis.mira.network/v1/api-tokens")
-        return httpx.Response(status_code=200, json=mock_tokens, request=request)
-
-    monkeypatch.setattr(httpx.AsyncClient, "get", mock_get)
-
-    response = await client.list_api_tokens()
-    assert response == mock_tokens
+        assert "message" in response["data"]["choices"][0]
+        assert "content" in response["data"]["choices"][0]["message"]
+    except ReadTimeout:
+        pytest.skip("LLM service timed out - skipping test")
+    except httpx.HTTPError as e:
+        pytest.fail(f"HTTP request failed: {str(e)}")
 
 
-async def test_error_handling(client, monkeypatch):
-    async def mock_error_response(*args, **kwargs):
-        raise httpx.HTTPError("API Error")
+# # @pytest.mark.integration  # Mark as integration test
+async def test_chat_completions_create_streaming(client):
+    try:
+        stream = await client.chat_completions_create(
+            model="llama-3.3-70b-instruct",
+            messages=[Message(role="user", content="Hello")],
+            stream=True,
+            timeout=30.0,  # Reduced timeout to 30 seconds
+        )
 
-    monkeypatch.setattr(httpx.AsyncClient, "post", mock_error_response)
+        chunks = []
+        async for chunk in stream:
+            try:
+                if chunk["choices"][0]["delta"].get("content"):
+                    chunks.append(chunk["choices"][0]["delta"]["content"])
+            except (KeyError, TypeError):
+                continue
 
-    with pytest.raises(httpx.HTTPError):
+        assert len(chunks) > 0
+        assert all(isinstance(chunk, str) for chunk in chunks)
+    except ReadTimeout:
+        pytest.skip("LLM service timed out - skipping test")
+    except httpx.HTTPError as e:
+        pytest.fail(f"HTTP request failed: {str(e)}")
+
+
+async def test_create_api_token(client):
+    try:
+        response = await client.create_api_token(
+            ApiTokenRequest(description="Test token")
+        )
+        assert "token" in response
+        assert isinstance(response["token"], str)
+    except httpx.HTTPError as e:
+        pytest.fail(f"HTTP request failed: {str(e)}")
+
+
+async def test_list_api_tokens(client):
+    try:
+        response = await client.list_api_tokens()
+        assert isinstance(response, dict)
+
+        # Check pagination fields
+        assert "total" in response
+        assert "page" in response
+        assert "page_size" in response
+        assert "total_pages" in response
+        assert "items" in response
+
+        # Check items array
+        assert isinstance(response["items"], list)
+        for token in response["items"]:
+            assert isinstance(token, dict)
+            assert all(
+                key in token
+                for key in ["id", "token", "description", "meta_data", "created_at"]
+            )
+            assert isinstance(token["id"], int)
+            assert isinstance(token["token"], str)
+            assert isinstance(token["description"], str)
+            assert token["meta_data"] is None or isinstance(token["meta_data"], dict)
+            assert isinstance(token["created_at"], str)
+    except httpx.HTTPError as e:
+        pytest.fail(f"HTTP request failed: {str(e)}")
+
+
+async def test_error_handling(client):
+    # Tests error handling for invalid model names
+    with pytest.raises(httpx.HTTPStatusError) as exc_info:
         await client.chat_completions_create(
-            model="test-model", messages=[Message(role="user", content="Hello")]
+            model="invalid-model", messages=[Message(role="user", content="Hello")]
         )
+    assert exc_info.value.response.status_code == 500

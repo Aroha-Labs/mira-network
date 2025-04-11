@@ -9,5 +9,6 @@ class Flows(SQLModel, table=True):
     system_prompt: str = SQLField(nullable=False)
     name: str = SQLField(nullable=False, unique=False)
     variables: List[str] = SQLField(sa_type=JSON, nullable=True)
+    user_id: str = SQLField(nullable=False, index=True)
     created_at: datetime = SQLField(default=func.now(), nullable=False)
     updated_at: datetime = SQLField(default=func.now(), nullable=False)
