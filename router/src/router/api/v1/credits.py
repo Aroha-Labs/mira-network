@@ -5,6 +5,7 @@ from src.router.db.session import DBSession
 from src.router.core.security import verify_user
 from datetime import datetime
 from src.router.utils.opensearch import opensearch_client, OPENSEARCH_CREDITS_INDEX
+from src.router.utils.nr import track
 
 router = APIRouter()
 
@@ -60,7 +61,15 @@ router = APIRouter()
     },
 )
 async def get_credit_balance(db: DBSession, user: User = Depends(verify_user)):
+    track("get_credit_balance_request", {"user_id": str(user.id)})
+    
     user_credits = await get_user_credits(user.id, db)
+    
+    track("get_credit_balance_response", {
+        "user_id": str(user.id),
+        "credits": user_credits
+    })
+    
     return {"credits": user_credits}
 
 
@@ -151,6 +160,12 @@ async def get_user_credits_history(
     page: int = Query(default=1, ge=1, description="Page number"),
     size: int = Query(default=20, ge=1, le=100, description="Items per page"),
 ):
+    track("get_credits_history_request", {
+        "user_id": str(user.id),
+        "page": page,
+        "size": size
+    })
+    
     start = (page - 1) * size
 
     query = {
@@ -187,6 +202,12 @@ async def get_user_credits_history(
             }
         )
 
+    track("get_credits_history_response", {
+        "user_id": str(user.id),
+        "total_records": total,
+        "records_returned": len(history)
+    })
+    
     return {
         "items": history,
         "total": total,
@@ -202,6 +223,8 @@ async def get_user_credits_history(
     response_description="Returns the user's credit usage statistics",
 )
 async def get_user_credits_stats(user: User = Depends(verify_user)):
+    track("get_credits_stats_request", {"user_id": str(user.id)})
+    
     query = {
         "query": {
             "bool": {
@@ -232,8 +255,17 @@ async def get_user_credits_stats(user: User = Depends(verify_user)):
 
     response = opensearch_client.search(index=OPENSEARCH_CREDITS_INDEX, body=query)
     aggs = response["aggregations"]
+    
+    total_added = aggs["total_credits_added"]["value"]
+    total_used = aggs["total_credits_used"]["value"]
+    
+    track("get_credits_stats_response", {
+        "user_id": str(user.id),
+        "total_credits_added": total_added,
+        "total_credits_used": total_used
+    })
 
     return {
-        "total_credits_added": aggs["total_credits_added"]["value"],
-        "total_credits_used": aggs["total_credits_used"]["value"],
+        "total_credits_added": total_added,
+        "total_credits_used": total_used,
     }

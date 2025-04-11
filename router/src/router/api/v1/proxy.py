@@ -3,6 +3,7 @@ from fastapi.responses import FileResponse
 import os
 import httpx
 from hashlib import md5
+from src.router.utils.nr import track
 
 router = APIRouter()
 
@@ -87,29 +88,50 @@ Returns the image file directly with appropriate content-type header
     },
 )
 async def proxy_image(url: str):
+    track("proxy_image_request", {"url_hash": md5(url.encode()).hexdigest()})
+    
     # Generate a unique filename based on the URL
     filename = md5(url.encode()).hexdigest()
     filepath = os.path.join(IMAGE_CACHE_DIR, filename)
 
     # Check if the image is already cached
     if os.path.exists(filepath):
+        track("proxy_image_cache_hit", {"url_hash": filename})
         return FileResponse(filepath)
 
     # Download the image and save it to the cache
-    async with httpx.AsyncClient() as client:
-        response = await client.get(url)
-        if response.status_code != 200:
-            raise HTTPException(
-                status_code=response.status_code, detail="Failed to fetch image"
-            )
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url)
+            if response.status_code != 200:
+                track("proxy_image_error", {
+                    "url_hash": filename,
+                    "status_code": response.status_code,
+                    "error": "failed_to_fetch"
+                })
+                raise HTTPException(
+                    status_code=response.status_code, detail="Failed to fetch image"
+                )
 
-        # Determine the file extension from the response headers
-        content_type = response.headers.get("content-type")
-        if content_type:
-            extension = content_type.split("/")[-1]
-            filepath += f".{extension}"
+            # Determine the file extension from the response headers
+            content_type = response.headers.get("content-type")
+            if content_type:
+                extension = content_type.split("/")[-1]
+                filepath += f".{extension}"
 
-        with open(filepath, "wb") as f:
-            f.write(response.content)
+            with open(filepath, "wb") as f:
+                f.write(response.content)
+                
+            track("proxy_image_cache_store", {
+                "url_hash": filename,
+                "content_type": content_type,
+                "size_bytes": len(response.content)
+            })
 
-    return FileResponse(filepath)
+        return FileResponse(filepath)
+    except Exception as e:
+        track("proxy_image_error", {
+            "url_hash": filename,
+            "error": str(e)
+        })
+        raise

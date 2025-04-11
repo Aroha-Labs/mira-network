@@ -31,6 +31,7 @@ from src.router.utils.opensearch import (
     OPENSEARCH_CREDITS_INDEX,
 )
 from aiohttp import ClientSession, ClientTimeout, TCPConnector
+from src.router.utils.nr import track
 
 
 router = APIRouter()
@@ -46,13 +47,26 @@ transport = httpx.AsyncHTTPTransport(retries=3)
     responses=verify_doc["responses"],
 )
 async def verify(req: VerifyRequest, db: DBSession):
+    track("verify_request", {
+        "models_count": len(req.models),
+        "min_yes": req.min_yes,
+        "messages_count": len(req.messages)
+    })
+    
     if len(req.models) < 1:
+        track("verify_error", {"error": "no_models"})
         raise HTTPException(status_code=400, detail="At least one model is required")
 
     if req.min_yes < 1:
+        track("verify_error", {"error": "invalid_min_yes", "min_yes": req.min_yes})
         raise HTTPException(status_code=400, detail="Minimum yes must be at least 1")
 
     if req.min_yes > len(req.models):
+        track("verify_error", {
+            "error": "min_yes_too_high", 
+            "min_yes": req.min_yes, 
+            "models_count": len(req.models)
+        })
         raise HTTPException(
             status_code=400,
             detail="Minimum yes must be less than or equal to the number of models",
@@ -64,6 +78,7 @@ async def verify(req: VerifyRequest, db: DBSession):
     transformed_models = []
     for model in req.models:
         if model not in supported_models:
+            track("verify_error", {"error": "unsupported_model", "model": model})
             raise HTTPException(status_code=400, detail=f"Unsupported model: {model}")
         model_config = supported_models[model]
         transformed_models.append({"original": model, "id": model_config.id})
@@ -97,8 +112,10 @@ async def verify(req: VerifyRequest, db: DBSession):
 
     yes_count = sum(1 for result in results if result["result"] == "yes")
     if yes_count >= req.min_yes:
+        track("verify_response", {"result": "yes", "yes_count": yes_count})
         return {"result": "yes", "results": results}
     else:
+        track("verify_response", {"result": "no", "yes_count": yes_count})
         return {"result": "no", "results": results}
 
 
@@ -120,6 +137,8 @@ class ModelListRes(BaseModel):
     responses=list_models_doc["responses"],
 )
 async def list_models() -> ModelListRes:
+    track("list_models_request", {})
+    
     supported_models = await get_supported_models()
 
     # Create a properly typed response
@@ -130,7 +149,9 @@ async def list_models() -> ModelListRes:
             for model_id, _ in supported_models.items()
         ],
     )
-
+    
+    track("list_models_response", {"models_count": len(supported_models)})
+    
     return response
 
 
@@ -146,6 +167,17 @@ async def save_log(
     machine_id: int,
     flow_id: Optional[str] = None,
 ):
+    track("save_log", {
+        "user_id": str(user.id),
+        "model": original_req_model,
+        "prompt_tokens": usage.get("prompt_tokens", 0),
+        "completion_tokens": usage.get("completion_tokens", 0),
+        "total_tokens": usage.get("total_tokens", 0),
+        "ttfs": ttfs,
+        "total_response_time": time.time() - timeStart,
+        "has_flow_id": flow_id is not None
+    })
+    
     sm = await get_setting_value(
         "SUPPORTED_MODELS",
         SETTINGS_MODELS["SUPPORTED_MODELS"],
@@ -154,6 +186,11 @@ async def save_log(
     model_p = sm.root.get(original_req_model)
 
     if model_p is None:
+        track("save_log_error", {
+            "user_id": str(user.id),
+            "error": "model_not_found",
+            "model": original_req_model
+        })
         raise HTTPException(
             status_code=500, detail="Supported model not found in settings"
         )
@@ -244,6 +281,10 @@ async def save_log(
             ),
         )
     except Exception as e:
+        track("save_log_error", {
+            "user_id": str(user.id),
+            "error": str(e)
+        })
         logger.error(f"Log saving error: {str(e)}")
 
 
@@ -296,6 +337,7 @@ async def handle_stream_chunk(
                 continue
 
     except Exception as e:
+        track("stream_chunk_error", {"error": str(e)})
         logger.error(f"Stream chunk processing error: {str(e)}")
         yield f"data: {json.dumps({'error': str(e)})}\n\n", {"error": str(e)}
 
@@ -312,6 +354,7 @@ async def stream_response(response) -> AsyncGenerator[tuple[str, dict], None]:
             async for message, data in handle_stream_chunk(text):
                 yield message, data
     except Exception as e:
+        track("stream_response_error", {"error": str(e)})
         logger.error(f"Streaming error: {str(e)}")
         yield f"data: {json.dumps({'error': str(e)})}\n\n", {"error": str(e)}
 
@@ -329,16 +372,34 @@ async def chatCompletionGenerate(
     user: User = Depends(verify_user),
     flow_id: Optional[str] = None,
 ) -> Response:
+    track("generate_request", {
+        "model": req.model,
+        "stream": req.stream,
+        "user_id": str(user.id),
+        "has_flow_id": flow_id is not None,
+        "messages_count": len(req.messages)
+    })
+
     timeStart = time.time()
 
     try:
         # Fix type conversion for user_id
         user_credits = await get_user_credits((user.id), db)
         if user_credits <= 0:
+            track("generate_error", {
+                "user_id": str(user.id),
+                "error": "insufficient_credits",
+                "credits": user_credits
+            })
             raise HTTPException(status_code=402, detail="Insufficient credits")
 
         supported_models = await get_supported_models()
         if req.model not in supported_models:
+            track("generate_error", {
+                "user_id": str(user.id),
+                "error": "unsupported_model",
+                "model": req.model
+            })
             raise HTTPException(status_code=400, detail="Unsupported model")
 
         model_config = supported_models[req.model]
@@ -388,6 +449,12 @@ async def chatCompletionGenerate(
                     async for message, data in stream_response(llmres):
                         if ttfs is None:
                             ttfs = time.time() - timeStart
+                            track("generate_first_token", {
+                                "user_id": str(user.id),
+                                "model": original_req_model,
+                                "ttfs": ttfs,
+                                "stream": req.stream
+                            })
 
                         if "usage" in data:
                             usage = data["usage"]
@@ -395,6 +462,10 @@ async def chatCompletionGenerate(
                         yield message
 
                 except Exception as e:
+                    track("generate_stream_error", {
+                        "user_id": str(user.id),
+                        "error": str(e)
+                    })
                     logger.error(f"Generation error: {str(e)}")
                     yield f"data: {json.dumps({'error': str(e)})}\n\n"
                 finally:
@@ -414,6 +485,10 @@ async def chatCompletionGenerate(
                         )
 
                     except Exception as log_error:
+                        track("generate_log_error", {
+                            "user_id": str(user.id),
+                            "error": str(log_error)
+                        })
                         logger.error(f"Log saving error: {str(log_error)}")
 
         if req.stream:
@@ -441,6 +516,15 @@ async def chatCompletionGenerate(
             result_text = content_json["choices"][0]["message"]["content"]
             ttfs = time.time() - timeStart
             usage = content_json.get("usage", {})
+            
+            track("generate_completion", {
+                "user_id": str(user.id),
+                "model": original_req_model,
+                "ttfs": ttfs,
+                "prompt_tokens": usage.get("prompt_tokens", 0),
+                "completion_tokens": usage.get("completion_tokens", 0),
+                "total_tokens": usage.get("total_tokens", 0)
+            })
 
             # Handle machine_id safely
             machine_ip = llmres.headers.get("x-machine-ip", "")
@@ -468,6 +552,10 @@ async def chatCompletionGenerate(
             )
 
     except Exception as e:
+        track("generate_error", {
+            "user_id": str(user.id),
+            "error": str(e)
+        })
         logger.error(f"Request processing error: {str(e)}")
         raise HTTPException(
             status_code=500,
