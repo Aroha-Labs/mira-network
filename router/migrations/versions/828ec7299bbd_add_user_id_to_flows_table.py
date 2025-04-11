@@ -1,7 +1,7 @@
 """add user_id to flows table
 
 Revision ID: 828ec7299bbd
-Revises: 71fb79bd3089
+Revises: 76361c5b2f95
 Create Date: 2025-04-04 14:27:59.298766
 
 """
@@ -14,7 +14,7 @@ import sqlmodel
 
 # revision identifiers, used by Alembic.
 revision: str = '828ec7299bbd'
-down_revision: Union[str, None] = '71fb79bd3089'
+down_revision: Union[str, None] = '76361c5b2f95'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
