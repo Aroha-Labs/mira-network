@@ -16,6 +16,7 @@ import {
   UserCircleIcon,
   CheckIcon,
   ChartBarIcon,
+  TrashIcon,
 } from "@heroicons/react/24/solid";
 import { PlayIcon, Bars3Icon } from "@heroicons/react/24/outline";
 import api from "src/lib/axios";
@@ -123,6 +124,16 @@ const createFlow = async (data: { system_prompt: string; name: string }) => {
   }
 };
 
+const deleteFlow = async (flowId: string) => {
+  try {
+    const response = await api.delete(`/flows/${flowId}`);
+    return response.data;
+  } catch (error) {
+    console.error("Failed to delete flow:", error);
+    throw error;
+  }
+};
+
 export default function Workbench() {
   const { data: userSession } = useSession();
 
@@ -130,6 +141,8 @@ export default function Workbench() {
   const [isSliderOpen, setIsSliderOpen] = useState(true);
   const [selectedModel, setSelectedModel] = useState<string>("");
   const [showMetrics, setShowMetrics] = useState(false);
+  const [isSavingFlow, setIsSavingFlow] = useState(false);
+  const [isCreatingFlow, setIsCreatingFlow] = useState(false);
 
   // Flow state
   const [selectedFlow, setSelectedFlow] = useState<Flow | null>(null);
@@ -146,7 +159,7 @@ export default function Workbench() {
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // Fetch flows with better error handling
-  const { data: flows = [] } = useQuery<Flow[]>({
+  const { data: flows = [], isLoading: isFlowsLoading } = useQuery<Flow[]>({
     queryKey: ["flows"],
     queryFn: fetchFlows,
     staleTime: 30000, // Cache for 30 seconds
@@ -225,6 +238,7 @@ export default function Workbench() {
   // Add state for editing flow name
   const [editingFlowName, setEditingFlowName] = useState<string | null>(null);
   const [newFlowName, setNewFlowName] = useState("");
+  const [isUpdatingFlowName, setIsUpdatingFlowName] = useState(false);
 
   // Add this near the top with other state
   const [isMobileView, setIsMobileView] = useState(false);
@@ -311,11 +325,11 @@ export default function Workbench() {
               setPreviewMessage((prev) =>
                 prev
                   ? {
-                      ...prev,
-                      content: chunk.content || prev.content,
-                      tool_calls: chunk.tool_calls || prev.tool_calls,
-                      tool_responses: chunk.tool_responses || prev.tool_responses,
-                    }
+                    ...prev,
+                    content: chunk.content || prev.content,
+                    tool_calls: chunk.tool_calls || prev.tool_calls,
+                    tool_responses: chunk.tool_responses || prev.tool_responses,
+                  }
                   : null
               );
             }
@@ -389,12 +403,14 @@ export default function Workbench() {
     if (!selectedFlow) return;
 
     try {
+      setIsSavingFlow(true);
       await updateFlow(String(selectedFlow.id), {
         system_prompt: editableSystemPrompt,
         name: selectedFlow.name,
       });
 
-      queryClient.invalidateQueries({ queryKey: ["flows"] });
+      // Wait for the query to invalidate and refetch
+      await queryClient.invalidateQueries({ queryKey: ["flows"] });
 
       // Show success toast
       setToast({
@@ -420,6 +436,8 @@ export default function Workbench() {
       setTimeout(() => {
         setToast(null);
       }, 3000);
+    } finally {
+      setIsSavingFlow(false);
     }
   };
 
@@ -436,12 +454,15 @@ export default function Workbench() {
   // Add function to handle flow creation
   const handleCreateFlow = async () => {
     try {
+      setIsCreatingFlow(true);
       const newFlow = await createFlow({
         name: "New Flow",
         system_prompt: "",
       });
 
-      queryClient.invalidateQueries({ queryKey: ["flows"] });
+      // Wait for the query to invalidate and refetch
+      await queryClient.invalidateQueries({ queryKey: ["flows"] });
+
       setSelectedFlow(newFlow);
       setEditingFlowName(newFlow.id);
       setNewFlowName(newFlow.name);
@@ -461,6 +482,8 @@ export default function Workbench() {
         type: "error",
         visible: true,
       });
+    } finally {
+      setIsCreatingFlow(false);
     }
   };
 
@@ -469,12 +492,15 @@ export default function Workbench() {
     if (!newName.trim()) return;
 
     try {
+      setIsUpdatingFlowName(true);
       await updateFlow(String(flowId), {
         name: newName,
         system_prompt: selectedFlow?.system_prompt || "",
       });
 
-      queryClient.invalidateQueries({ queryKey: ["flows"] });
+      // Wait for the query to invalidate and refetch
+      await queryClient.invalidateQueries({ queryKey: ["flows"] });
+
       setEditingFlowName(null);
 
       setToast({
@@ -489,11 +515,74 @@ export default function Workbench() {
         type: "error",
         visible: true,
       });
+    } finally {
+      setIsUpdatingFlowName(false);
     }
   };
 
   const [showVerification, setShowVerification] = useState(false);
   const [verificationSystemMessage, setVerificationSystemMessage] = useState("");
+
+  // Ref for the slider panel
+  const sliderRef = useRef<HTMLDivElement>(null);
+
+  // Handle outside click to close slider
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (isSliderOpen && sliderRef.current && !sliderRef.current.contains(event.target as Node)) {
+        setIsSliderOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleOutsideClick);
+
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+    };
+  }, [isSliderOpen]);
+
+  // Add state for deleting flow
+  const [isDeletingFlow, setIsDeletingFlow] = useState(false);
+  const [flowIdToDelete, setFlowIdToDelete] = useState<string | null>(null);
+
+  // Add function to handle flow deletion
+  const handleDeleteFlow = async (flowId: string) => {
+    try {
+      setIsDeletingFlow(true);
+      setFlowIdToDelete(flowId);
+
+      await deleteFlow(flowId);
+
+      // Wait for the query to invalidate and refetch
+      await queryClient.invalidateQueries({ queryKey: ["flows"] });
+
+      // If we're deleting the currently selected flow, clear the selection
+      if (selectedFlow?.id === flowId) {
+        setSelectedFlow(null);
+        setConversation([]);
+        setPreviewMessage(null);
+      }
+
+      setToast({
+        message: "Flow deleted successfully",
+        type: "success",
+        visible: true,
+      });
+    } catch (error) {
+      console.error("Failed to delete flow", error);
+      setToast({
+        message: "Failed to delete flow",
+        type: "error",
+        visible: true,
+      });
+    } finally {
+      setIsDeletingFlow(false);
+      setFlowIdToDelete(null);
+    }
+  };
+
+  // Computed state for any loading operation
+  const isAnyOperationInProgress = isSavingFlow || isCreatingFlow || isDeletingFlow || isUpdatingFlowName;
 
   if (!userSession?.user) {
     return (
@@ -514,11 +603,10 @@ export default function Workbench() {
       {toast && (
         <div className="fixed z-50 top-4 right-4 animate-fade-in">
           <div
-            className={`px-4 py-3 rounded-lg shadow-lg ${
-              toast.type === "success"
-                ? "bg-green-50 border border-green-200"
-                : "bg-red-50 border border-red-200"
-            }`}
+            className={`px-4 py-3 rounded-lg shadow-lg ${toast.type === "success"
+              ? "bg-green-50 border border-green-200"
+              : "bg-red-50 border border-red-200"
+              }`}
           >
             <div className="flex items-center space-x-2">
               {toast.type === "success" ? (
@@ -527,9 +615,8 @@ export default function Workbench() {
                 <div className="w-2 h-2 bg-red-500 rounded-full" />
               )}
               <p
-                className={`text-sm font-medium ${
-                  toast.type === "success" ? "text-green-800" : "text-red-800"
-                }`}
+                className={`text-sm font-medium ${toast.type === "success" ? "text-green-800" : "text-red-800"
+                  }`}
               >
                 {toast.message}
               </p>
@@ -549,11 +636,15 @@ export default function Workbench() {
 
       {/* Flow Slider - Update classes for mobile */}
       <div
-        className={`absolute inset-y-0 left-0 z-30 w-full md:w-96 transform transition-transform duration-300 ease-in-out ${
-          isSliderOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={`absolute inset-y-0 left-0 z-30 w-full md:w-96 transform transition-transform duration-300 ease-in-out ${isSliderOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
       >
-        <div className="flex flex-col h-full bg-white shadow-xl">
+        <div ref={sliderRef} className="flex flex-col h-full bg-white shadow-xl relative">
+          {/* Simple overlay to disable panel when any operation is in progress */}
+          {isAnyOperationInProgress && (
+            <div className="absolute inset-0 bg-white/20 z-50"></div>
+          )}
+
           <div className="flex flex-col border-b border-gray-200">
             <div className="flex items-center justify-between p-6">
               <div>
@@ -565,10 +656,36 @@ export default function Workbench() {
               <div className="flex items-center space-x-2">
                 <button
                   onClick={handleCreateFlow}
-                  className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 transition-colors group relative"
+                  disabled={isCreatingFlow}
+                  className={`inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 transition-colors group relative ${isCreatingFlow ? "opacity-75 cursor-not-allowed" : ""
+                    }`}
                 >
-                  <PlusIcon className="w-4 h-4 mr-1.5" />
-                  New Flow
+                  {isCreatingFlow ? (
+                    <>
+                      <svg className="w-4 h-4 mr-1.5 animate-spin" viewBox="0 0 24 24">
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                          fill="none"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        />
+                      </svg>
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <PlusIcon className="w-4 h-4 mr-1.5" />
+                      New Flow
+                    </>
+                  )}
                   <span className="absolute px-2 py-1 mb-2 text-xs font-medium text-white transition-opacity transform -translate-x-1/2 bg-gray-900 rounded-sm opacity-0 bottom-full left-1/2 group-hover:opacity-100 whitespace-nowrap">
                     Create a new flow
                   </span>
@@ -598,10 +715,36 @@ export default function Workbench() {
                   </div>
                   <button
                     onClick={handleSaveFlow}
-                    className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 transition-colors"
+                    disabled={isSavingFlow}
+                    className={`inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 transition-colors ${isSavingFlow ? "opacity-75 cursor-not-allowed" : ""
+                      }`}
                   >
-                    <ArrowDownTrayIcon className="w-4 h-4 mr-1.5" />
-                    Save Changes
+                    {isSavingFlow ? (
+                      <>
+                        <svg className="w-4 h-4 mr-1.5 animate-spin" viewBox="0 0 24 24">
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                            fill="none"
+                          />
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          />
+                        </svg>
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <ArrowDownTrayIcon className="w-4 h-4 mr-1.5" />
+                        Save Changes
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
@@ -609,7 +752,7 @@ export default function Workbench() {
           </div>
           <div className="flex-1 p-6 space-y-4 overflow-y-auto">
             {/* Loading State */}
-            {!flows ? (
+            {isFlowsLoading ? (
               <div className="space-y-4">
                 {[...Array(3)].map((_, i) => (
                   <div
@@ -641,11 +784,10 @@ export default function Workbench() {
                       setIsSliderOpen(false);
                     }
                   }}
-                  className={`w-full p-4 text-left transition-all rounded-xl border relative group ${
-                    selectedFlow?.id === flow.id
-                      ? "bg-linear-to-br from-indigo-50 to-white border-indigo-200 shadow-xs"
-                      : "border-gray-200 hover:border-indigo-200 hover:bg-linear-to-br hover:from-gray-50 hover:to-white"
-                  }`}
+                  className={`w-full p-4 text-left transition-all rounded-xl border relative group ${selectedFlow?.id === flow.id
+                    ? "bg-linear-to-br from-indigo-50 to-white border-indigo-200 shadow-xs"
+                    : "border-gray-200 hover:border-indigo-200 hover:bg-linear-to-br hover:from-gray-50 hover:to-white"
+                    }`}
                 >
                   {selectedFlow?.id === flow.id && (
                     <div className="absolute border-2 border-indigo-500 pointer-events-none -inset-px rounded-xl"></div>
@@ -677,24 +819,77 @@ export default function Workbench() {
                           {flow.name}
                         </div>
                       )}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (editingFlowName === flow.id) {
-                            handleUpdateFlowName(flow.id, newFlowName);
-                          } else {
-                            setEditingFlowName(flow.id);
-                            setNewFlowName(flow.name);
-                          }
-                        }}
-                        className="p-1.5 text-gray-400 rounded-md hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
-                      >
-                        {editingFlowName === flow.id ? (
-                          <CheckIcon className="w-4 h-4" />
-                        ) : (
-                          <PencilIcon className="w-4 h-4" />
-                        )}
-                      </button>
+                      <div className="flex items-center space-x-1">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (editingFlowName === flow.id) {
+                              handleUpdateFlowName(flow.id, newFlowName);
+                            } else {
+                              setEditingFlowName(flow.id);
+                              setNewFlowName(flow.name);
+                            }
+                          }}
+                          disabled={isUpdatingFlowName && editingFlowName === flow.id}
+                          className={`p-1.5 text-gray-400 rounded-md hover:text-indigo-600 hover:bg-indigo-50 transition-colors ${isUpdatingFlowName && editingFlowName === flow.id ? "opacity-75 cursor-not-allowed" : ""
+                            }`}
+                        >
+                          {isUpdatingFlowName && editingFlowName === flow.id ? (
+                            <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24">
+                              <circle
+                                className="opacity-25"
+                                cx="12"
+                                cy="12"
+                                r="10"
+                                stroke="currentColor"
+                                strokeWidth="4"
+                                fill="none"
+                              />
+                              <path
+                                className="opacity-75"
+                                fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                              />
+                            </svg>
+                          ) : editingFlowName === flow.id ? (
+                            <CheckIcon className="w-4 h-4" />
+                          ) : (
+                            <PencilIcon className="w-4 h-4" />
+                          )}
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (confirm("Are you sure you want to delete this flow?")) {
+                              handleDeleteFlow(flow.id);
+                            }
+                          }}
+                          disabled={isDeletingFlow && flowIdToDelete === flow.id}
+                          className={`p-1.5 text-gray-400 rounded-md hover:text-red-600 hover:bg-red-50 transition-colors ${isDeletingFlow && flowIdToDelete === flow.id ? "opacity-75 cursor-not-allowed" : ""
+                            }`}
+                        >
+                          {isDeletingFlow && flowIdToDelete === flow.id ? (
+                            <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24">
+                              <circle
+                                className="opacity-25"
+                                cx="12"
+                                cy="12"
+                                r="10"
+                                stroke="currentColor"
+                                strokeWidth="4"
+                                fill="none"
+                              />
+                              <path
+                                className="opacity-75"
+                                fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                              />
+                            </svg>
+                          ) : (
+                            <TrashIcon className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
                     </div>
                     <div className="mt-2 text-sm text-gray-600 line-clamp-2">
                       {flow.system_prompt || (
@@ -726,9 +921,8 @@ export default function Workbench() {
         {/* Toggle Slider Button - Update for mobile */}
         <button
           onClick={() => setIsSliderOpen(true)}
-          className={`fixed top-20 left-4 z-20 p-2 bg-white/50 backdrop-blur-xs border border-gray-200/50 rounded-full shadow-sm hover:bg-white hover:border-gray-300 hover:shadow-md transition-all duration-200 ${
-            isSliderOpen ? "hidden" : "flex items-center space-x-2"
-          }`}
+          className={`fixed top-20 left-4 z-20 p-2 bg-white/50 backdrop-blur-xs border border-gray-200/50 rounded-full shadow-sm hover:bg-white hover:border-gray-300 hover:shadow-md transition-all duration-200 ${isSliderOpen ? "hidden" : "flex items-center space-x-2"
+            }`}
         >
           <Bars3Icon className="w-5 h-5 text-gray-400 group-hover:text-gray-600" />
           <span className="hidden text-sm font-medium text-gray-500 group-hover:text-gray-700 md:inline">
@@ -741,21 +935,19 @@ export default function Workbench() {
           <div className="fixed z-20 flex items-center p-1 space-x-2 -translate-x-1/2 bg-white rounded-full shadow-lg bottom-4 left-1/2">
             <button
               onClick={() => setActivePanel("left")}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                activePanel === "left"
-                  ? "bg-indigo-100 text-indigo-700"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${activePanel === "left"
+                ? "bg-indigo-100 text-indigo-700"
+                : "text-gray-500 hover:text-gray-700"
+                }`}
             >
               Edit
             </button>
             <button
               onClick={() => setActivePanel("right")}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                activePanel === "right"
-                  ? "bg-indigo-100 text-indigo-700"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${activePanel === "right"
+                ? "bg-indigo-100 text-indigo-700"
+                : "text-gray-500 hover:text-gray-700"
+                }`}
             >
               Preview
             </button>
@@ -764,9 +956,8 @@ export default function Workbench() {
 
         {/* Left Panel - Update for mobile */}
         <div
-          className={`flex flex-col w-full md:w-1/2 p-6 overflow-y-auto border-r border-gray-200 transition-all duration-300 ${
-            isMobileView && activePanel === "right" ? "hidden" : "block"
-          }`}
+          className={`flex flex-col w-full md:w-1/2 p-6 overflow-y-auto border-r border-gray-200 transition-all duration-300 ${isMobileView && activePanel === "right" ? "hidden" : "block"
+            }`}
         >
           {selectedFlow ? (
             <>
@@ -970,11 +1161,10 @@ export default function Workbench() {
                                     [key]: newValue,
                                   }));
                                 }}
-                                className={`flex-1 px-3 py-1.5 text-sm border rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all ${
-                                  !value || value.trim() === ""
-                                    ? "border-red-300 bg-red-50"
-                                    : "border-gray-300 bg-white hover:border-gray-400"
-                                }`}
+                                className={`flex-1 px-3 py-1.5 text-sm border rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all ${!value || value.trim() === ""
+                                  ? "border-red-300 bg-red-50"
+                                  : "border-gray-300 bg-white hover:border-gray-400"
+                                  }`}
                                 placeholder="Required"
                               />
                             </div>
@@ -1010,11 +1200,10 @@ export default function Workbench() {
                     {conversation.map((message, index) => (
                       <div
                         key={index}
-                        className={`border rounded-lg ${
-                          message.role === "user"
-                            ? "bg-blue-50 border-blue-200"
-                            : "bg-white border-gray-200"
-                        }`}
+                        className={`border rounded-lg ${message.role === "user"
+                          ? "bg-blue-50 border-blue-200"
+                          : "bg-white border-gray-200"
+                          }`}
                       >
                         <div className="flex items-center justify-between px-4 py-2 border-b border-inherit">
                           <div className="flex items-center space-x-2">
@@ -1028,11 +1217,10 @@ export default function Workbench() {
                                 };
                                 setConversation(newMessages);
                               }}
-                              className={`px-2 py-1 text-xs font-medium rounded-md border-0 focus:ring-1 focus:ring-indigo-500 ${
-                                message.role === "user"
-                                  ? "bg-blue-100 text-blue-700"
-                                  : "bg-gray-100 text-gray-700"
-                              }`}
+                              className={`px-2 py-1 text-xs font-medium rounded-md border-0 focus:ring-1 focus:ring-indigo-500 ${message.role === "user"
+                                ? "bg-blue-100 text-blue-700"
+                                : "bg-gray-100 text-gray-700"
+                                }`}
                             >
                               <option value="user">user</option>
                               <option value="assistant">assistant</option>
@@ -1097,22 +1285,20 @@ export default function Workbench() {
 
         {/* Right Panel - Update for mobile */}
         <div
-          className={`flex flex-col w-full md:w-1/2 p-6 bg-gray-50 transition-all duration-300 ${
-            isMobileView && activePanel === "left" ? "hidden" : "block"
-          }`}
+          className={`flex flex-col w-full md:w-1/2 p-6 bg-gray-50 transition-all duration-300 ${isMobileView && activePanel === "left" ? "hidden" : "block"
+            }`}
         >
           {/* Header Controls - Make more compact for mobile */}
           <div className="flex flex-col justify-between mb-6 space-y-4 md:flex-row md:items-center md:space-y-0">
             <div className="flex flex-wrap items-center gap-4">
               <div className="flex items-center space-x-2">
                 <div
-                  className={`w-2 h-2 rounded-full ${
-                    isLoading
-                      ? "bg-yellow-500 animate-pulse"
-                      : conversation.length === 0
-                        ? "bg-gray-400"
-                        : "bg-green-500"
-                  }`}
+                  className={`w-2 h-2 rounded-full ${isLoading
+                    ? "bg-yellow-500 animate-pulse"
+                    : conversation.length === 0
+                      ? "bg-gray-400"
+                      : "bg-green-500"
+                    }`}
                 ></div>
                 <span className="text-sm font-medium text-gray-600">
                   {isLoading
@@ -1202,9 +1388,8 @@ export default function Workbench() {
                 <button
                   onClick={handleAddToConversation}
                   disabled={!previewMessage || isGenerating}
-                  className={`px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center space-x-1 disabled:opacity-50 disabled:cursor-not-allowed ${
-                    (!previewMessage || isGenerating) && "opacity-50 cursor-not-allowed"
-                  }`}
+                  className={`px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center space-x-1 disabled:opacity-50 disabled:cursor-not-allowed ${(!previewMessage || isGenerating) && "opacity-50 cursor-not-allowed"
+                    }`}
                 >
                   <CheckIcon className="w-4 h-4" />
                   <span>Add to Conversation</span>
@@ -1212,13 +1397,11 @@ export default function Workbench() {
                 <button
                   onClick={() => setShowVerification(!showVerification)}
                   disabled={!previewMessage || isGenerating}
-                  className={`px-3 py-1 ${
-                    showVerification
-                      ? "bg-gray-600 hover:bg-gray-700"
-                      : "bg-green-600 hover:bg-green-700"
-                  } text-white rounded flex items-center space-x-1 disabled:opacity-50 disabled:cursor-not-allowed ${
-                    (!previewMessage || isGenerating) && "opacity-50 cursor-not-allowed"
-                  }`}
+                  className={`px-3 py-1 ${showVerification
+                    ? "bg-gray-600 hover:bg-gray-700"
+                    : "bg-green-600 hover:bg-green-700"
+                    } text-white rounded flex items-center space-x-1 disabled:opacity-50 disabled:cursor-not-allowed ${(!previewMessage || isGenerating) && "opacity-50 cursor-not-allowed"
+                    }`}
                 >
                   <ChartBarIcon className="w-4 h-4" />
                   <span>{showVerification ? "Hide Verification" : "Verify"}</span>
@@ -1273,15 +1456,13 @@ export default function Workbench() {
 
       {/* Full-screen verification panel */}
       <div
-        className={`fixed inset-0 bg-black/50 backdrop-blur-xs z-50 transition-all duration-300 ${
-          showVerification ? "opacity-100" : "opacity-0 pointer-events-none"
-        }`}
+        className={`fixed inset-0 bg-black/50 backdrop-blur-xs z-50 transition-all duration-300 ${showVerification ? "opacity-100" : "opacity-0 pointer-events-none"
+          }`}
         onClick={() => setShowVerification(false)}
       >
         <div
-          className={`absolute inset-y-0 right-0 w-full md:w-2/3 lg:w-1/2 bg-white shadow-2xl transform transition-transform duration-300 ease-out ${
-            showVerification ? "translate-x-0" : "translate-x-full"
-          } flex flex-col h-full`}
+          className={`absolute inset-y-0 right-0 w-full md:w-2/3 lg:w-1/2 bg-white shadow-2xl transform transition-transform duration-300 ease-out ${showVerification ? "translate-x-0" : "translate-x-full"
+            } flex flex-col h-full`}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -1320,10 +1501,10 @@ export default function Workbench() {
                     messages={
                       verificationSystemMessage
                         ? [
-                            { role: "system", content: verificationSystemMessage },
-                            ...conversation,
-                            previewMessage,
-                          ]
+                          { role: "system", content: verificationSystemMessage },
+                          ...conversation,
+                          previewMessage,
+                        ]
                         : [previewMessage]
                     }
                     models={models}
