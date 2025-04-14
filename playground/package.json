@@ -11,20 +11,20 @@
     "fix": "yarn format && yarn lint:fix"
   },
   "dependencies": {
-    "@headlessui/react": "^2.2.0",
+    "@headlessui/react": "^2.2.1",
     "@heroicons/react": "^2.2.0",
-    "@supabase/ssr": "^0.5.2",
-    "@supabase/supabase-js": "^2.49.1",
+    "@supabase/ssr": "^0.6.1",
+    "@supabase/supabase-js": "^2.49.4",
     "@tailwindcss/typography": "^0.5.16",
-    "@tanstack/react-query": "^5.67.1",
+    "@tanstack/react-query": "^5.74.0",
     "@tanstack/react-store": "^0.7.0",
     "@tanstack/store": "^0.7.0",
-    "axios": "^1.8.1",
+    "axios": "^1.8.4",
     "chart.js": "^4.4.8",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "jwt-decode": "^4.0.0",
-    "lucide-react": "^0.477.0",
+    "lucide-react": "^0.488.0",
     "next": "15.2.1",
     "prism-react-renderer": "^2.4.1",
     "react": "^19.0.0",
@@ -32,23 +32,23 @@
     "react-code-blocks": "^0.1.6",
     "react-dom": "^19.0.0",
     "react-hot-toast": "^2.5.2",
-    "react-markdown": "^10.0.1",
+    "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
-    "sass": "1.85.1"
+    "sass": "1.86.3"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
-    "@tailwindcss/postcss": "^4.0.9",
+    "@tailwindcss/postcss": "^4.1.3",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "19.0.4",
     "eslint": "^9",
-    "eslint-config-next": "15.2.1",
+    "eslint-config-next": "15.3.0",
     "postcss": "8.5.3",
     "prettier": "^3.5.3",
     "prettier-plugin-tailwindcss": "^0.6.11",
     "tailwindcss": "^4.0.6",
-    "typescript": "5.8.2"
+    "typescript": "5.8.3"
   },
   "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }
