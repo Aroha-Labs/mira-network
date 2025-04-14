@@ -16,7 +16,7 @@ import {
   UserCircleIcon,
   CheckIcon,
   ChartBarIcon,
-  TrashIcon,
+  // TrashIcon, // Temporarily commented out
 } from "@heroicons/react/24/solid";
 import { PlayIcon, Bars3Icon } from "@heroicons/react/24/outline";
 import api from "src/lib/axios";
@@ -124,15 +124,16 @@ const createFlow = async (data: { system_prompt: string; name: string }) => {
   }
 };
 
-const deleteFlow = async (flowId: string) => {
-  try {
-    const response = await api.delete(`/flows/${flowId}`);
-    return response.data;
-  } catch (error) {
-    console.error("Failed to delete flow:", error);
-    throw error;
-  }
-};
+// Comment out the deleteFlow function
+// const deleteFlow = async (flowId: string) => {
+//   try {
+//     const response = await api.delete(`/flows/${flowId}`);
+//     return response.data;
+//   } catch (error) {
+//     console.error("Failed to delete flow:", error);
+//     throw error;
+//   }
+// };
 
 export default function Workbench() {
   const { data: userSession } = useSession();
@@ -223,7 +224,7 @@ export default function Workbench() {
       }, {});
       setVariables(newVars);
     }
-  }, [editableSystemPrompt, selectedFlow]);
+  }, [editableSystemPrompt, selectedFlow, variables]);
 
   // Add queryClient
   const queryClient = useQueryClient();
@@ -541,48 +542,12 @@ export default function Workbench() {
     };
   }, [isSliderOpen]);
 
-  // Add state for deleting flow
-  const [isDeletingFlow, setIsDeletingFlow] = useState(false);
-  const [flowIdToDelete, setFlowIdToDelete] = useState<string | null>(null);
+  // Comment out delete flow state
+  // const [isDeletingFlow, setIsDeletingFlow] = useState(false);
+  // const [flowIdToDelete, setFlowIdToDelete] = useState<string | null>(null);
 
-  // Add function to handle flow deletion
-  const handleDeleteFlow = async (flowId: string) => {
-    try {
-      setIsDeletingFlow(true);
-      setFlowIdToDelete(flowId);
-
-      await deleteFlow(flowId);
-
-      // Wait for the query to invalidate and refetch
-      await queryClient.invalidateQueries({ queryKey: ["flows"] });
-
-      // If we're deleting the currently selected flow, clear the selection
-      if (selectedFlow?.id === flowId) {
-        setSelectedFlow(null);
-        setConversation([]);
-        setPreviewMessage(null);
-      }
-
-      setToast({
-        message: "Flow deleted successfully",
-        type: "success",
-        visible: true,
-      });
-    } catch (error) {
-      console.error("Failed to delete flow", error);
-      setToast({
-        message: "Failed to delete flow",
-        type: "error",
-        visible: true,
-      });
-    } finally {
-      setIsDeletingFlow(false);
-      setFlowIdToDelete(null);
-    }
-  };
-
-  // Computed state for any loading operation
-  const isAnyOperationInProgress = isSavingFlow || isCreatingFlow || isDeletingFlow || isUpdatingFlowName;
+  // Update the computation for any operation in progress
+  const isAnyOperationInProgress = isSavingFlow || isCreatingFlow || isUpdatingFlowName;
 
   if (!userSession?.user) {
     return (
@@ -857,6 +822,7 @@ export default function Workbench() {
                             <PencilIcon className="w-4 h-4" />
                           )}
                         </button>
+                        {/* Delete button temporarily removed
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -865,8 +831,9 @@ export default function Workbench() {
                             }
                           }}
                           disabled={isDeletingFlow && flowIdToDelete === flow.id}
-                          className={`p-1.5 text-gray-400 rounded-md hover:text-red-600 hover:bg-red-50 transition-colors ${isDeletingFlow && flowIdToDelete === flow.id ? "opacity-75 cursor-not-allowed" : ""
-                            }`}
+                          className={`p-1.5 text-gray-400 rounded-md hover:text-red-600 hover:bg-red-50 transition-colors ${
+                            isDeletingFlow && flowIdToDelete === flow.id ? "opacity-75 cursor-not-allowed" : ""
+                          }`}
                         >
                           {isDeletingFlow && flowIdToDelete === flow.id ? (
                             <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24">
@@ -889,6 +856,7 @@ export default function Workbench() {
                             <TrashIcon className="w-4 h-4" />
                           )}
                         </button>
+                        */}
                       </div>
                     </div>
                     <div className="mt-2 text-sm text-gray-600 line-clamp-2">
@@ -918,10 +886,10 @@ export default function Workbench() {
 
       {/* Main Content - Update for mobile responsiveness */}
       <div className="flex flex-1">
-        {/* Toggle Slider Button - Update for mobile */}
+        {/* Toggle Slider Button - Fixed below top bar */}
         <button
           onClick={() => setIsSliderOpen(true)}
-          className={`fixed top-20 left-4 z-20 p-2 bg-white/50 backdrop-blur-xs border border-gray-200/50 rounded-full shadow-sm hover:bg-white hover:border-gray-300 hover:shadow-md transition-all duration-200 ${isSliderOpen ? "hidden" : "flex items-center space-x-2"
+          className={`fixed top-17 left-6 z-20 p-2 bg-white border border-gray-200 rounded-full shadow-sm hover:bg-white hover:border-gray-300 hover:shadow-md transition-all duration-200 ${isSliderOpen ? "hidden" : "flex items-center space-x-2"
             }`}
         >
           <Bars3Icon className="w-5 h-5 text-gray-400 group-hover:text-gray-600" />
@@ -956,13 +924,182 @@ export default function Workbench() {
 
         {/* Left Panel - Update for mobile */}
         <div
-          className={`flex flex-col w-full md:w-1/2 p-6 overflow-y-auto border-r border-gray-200 transition-all duration-300 ${isMobileView && activePanel === "right" ? "hidden" : "block"
+          className={`flex flex-col w-full md:w-1/2 pt-12 p-6 overflow-y-auto border-r border-gray-200 transition-all duration-300 ${isMobileView && activePanel === "right" ? "hidden" : "block"
             }`}
         >
           {selectedFlow ? (
             <>
-              {/* Tools Editor */}
+              {/* System Message */}
               <div className="mb-6 border border-gray-200 rounded-lg bg-linear-to-b from-gray-50 to-white">
+                <div
+                  className="flex items-center justify-between px-4 py-3 border-b border-gray-200 cursor-pointer bg-linear-to-b from-gray-100 to-gray-50 hover:from-gray-200 hover:to-gray-100"
+                  onClick={() => toggleSection("system")}
+                >
+                  <div className="flex items-center space-x-2">
+                    <span className="px-2 py-1 text-xs font-medium text-indigo-700 bg-indigo-100 rounded-md">
+                      system
+                    </span>
+                    <span className="text-sm font-medium text-gray-700">
+                      System Prompt
+                    </span>
+                  </div>
+                  {sectionsOpen.system ? (
+                    <ChevronUpIcon className="w-5 h-5 text-gray-500" />
+                  ) : (
+                    <ChevronDownIcon className="w-5 h-5 text-gray-500" />
+                  )}
+                </div>
+                {sectionsOpen.system && (
+                  <>
+                    <div className="p-4">
+                      <textarea
+                        value={editableSystemPrompt}
+                        onChange={(e) => setEditableSystemPrompt(e.target.value)}
+                        rows={5}
+                        className="w-full p-3 font-mono text-sm text-gray-700 transition-shadow bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        placeholder="Enter system prompt... Use {{variable}} for variables"
+                      />
+                    </div>
+
+                    {/* Variables */}
+                    {Object.entries(variables).length > 0 && (
+                      <div className="px-4 py-3 border-t border-gray-200 bg-linear-to-b from-gray-50 to-white">
+                        <h4 className="mb-3 text-sm font-medium text-gray-700">
+                          Variables
+                        </h4>
+                        <div className="space-y-2">
+                          {Object.entries(variables).map(([key, value]) => (
+                            <div key={key} className="flex items-center space-x-2">
+                              <span className="text-sm font-medium text-gray-600">
+                                {key}:
+                              </span>
+                              <input
+                                type="text"
+                                value={value}
+                                onChange={(e) => {
+                                  const newValue = e.target.value;
+                                  setVariables((prev) => ({
+                                    ...prev,
+                                    [key]: newValue,
+                                  }));
+                                }}
+                                className={`flex-1 px-3 py-1.5 text-sm border rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all ${!value || value.trim() === ""
+                                  ? "border-red-300 bg-red-50"
+                                  : "border-gray-300 bg-white hover:border-gray-400"
+                                  }`}
+                                placeholder="Required"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Conversation Flow */}
+              <div className="mb-6 border border-gray-200 rounded-lg bg-linear-to-b from-gray-50 to-white">
+                <div
+                  className="flex items-center justify-between px-4 py-3 border-b border-gray-200 cursor-pointer bg-linear-to-b from-gray-100 to-gray-50 hover:from-gray-200 hover:to-gray-100"
+                  onClick={() => toggleSection("conversation")}
+                >
+                  <div className="flex items-center space-x-2">
+                    <span className="px-2 py-1 text-xs font-medium text-indigo-700 bg-indigo-100 rounded-md">
+                      conversation
+                    </span>
+                    <span className="text-sm font-medium text-gray-700">Messages</span>
+                  </div>
+                  {sectionsOpen.conversation ? (
+                    <ChevronUpIcon className="w-5 h-5 text-gray-500" />
+                  ) : (
+                    <ChevronDownIcon className="w-5 h-5 text-gray-500" />
+                  )}
+                </div>
+                {sectionsOpen.conversation && (
+                  <div className="p-4 space-y-4">
+                    {/* Conversation Messages */}
+                    {conversation.map((message, index) => (
+                      <div
+                        key={index}
+                        className={`border rounded-lg ${message.role === "user"
+                          ? "bg-blue-50 border-blue-200"
+                          : "bg-white border-gray-200"
+                          }`}
+                      >
+                        <div className="flex items-center justify-between px-4 py-2 border-b border-inherit">
+                          <div className="flex items-center space-x-2">
+                            <select
+                              value={message.role}
+                              onChange={(e) => {
+                                const newMessages = [...conversation];
+                                newMessages[index] = {
+                                  ...message,
+                                  role: e.target.value as "user" | "assistant" | "system",
+                                };
+                                setConversation(newMessages);
+                              }}
+                              className={`px-2 py-1 text-xs font-medium rounded-md border-0 focus:ring-1 focus:ring-indigo-500 ${message.role === "user"
+                                ? "bg-blue-100 text-blue-700"
+                                : "bg-gray-100 text-gray-700"
+                                }`}
+                            >
+                              <option value="user">user</option>
+                              <option value="assistant">assistant</option>
+                              <option value="system">system</option>
+                            </select>
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            <button
+                              onClick={() => {
+                                setConversation(
+                                  conversation.filter((_, i) => i !== index)
+                                );
+                              }}
+                              className="p-1 text-red-500 hover:text-red-700"
+                            >
+                              <XMarkIcon className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="p-4">
+                          <textarea
+                            value={message.content}
+                            onChange={(e) => {
+                              const newMessages = [...conversation];
+                              newMessages[index] = {
+                                ...message,
+                                content: e.target.value,
+                              };
+                              setConversation(newMessages);
+                            }}
+                            rows={3}
+                            className="w-full p-3 text-sm transition-colors border border-gray-200 rounded-lg resize-none bg-gray-50 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:bg-white"
+                            placeholder={
+                              message.role === "user"
+                                ? "Type your message..."
+                                : "Assistant's response..."
+                            }
+                          />
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* Add Message Button */}
+                    <button
+                      onClick={handleAddMessage}
+                      className="flex items-center justify-center w-full px-4 py-2.5 text-sm font-medium text-gray-700 bg-linear-to-b from-white to-gray-50 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors group relative"
+                    >
+                      <PlusIcon className="w-4 h-4 md:mr-1.5" />
+                      Add Message
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Tools Editor - Moved to the bottom */}
+              <div className={`border border-gray-200 rounded-lg bg-linear-to-b from-gray-50 to-white ${sectionsOpen.tools ? "flex-1" : ""
+                }`}>
                 <div
                   className="flex items-center justify-between px-4 py-3 border-b border-gray-200 cursor-pointer bg-linear-to-b from-gray-100 to-gray-50 hover:from-gray-200 hover:to-gray-100"
                   onClick={() => toggleSection("tools")}
@@ -1103,174 +1240,6 @@ export default function Workbench() {
                         <p className="text-sm">No tools added yet</p>
                       </div>
                     )}
-                  </div>
-                )}
-              </div>
-
-              {/* System Message */}
-              <div className="mb-6 border border-gray-200 rounded-lg bg-linear-to-b from-gray-50 to-white">
-                <div
-                  className="flex items-center justify-between px-4 py-3 border-b border-gray-200 cursor-pointer bg-linear-to-b from-gray-100 to-gray-50 hover:from-gray-200 hover:to-gray-100"
-                  onClick={() => toggleSection("system")}
-                >
-                  <div className="flex items-center space-x-2">
-                    <span className="px-2 py-1 text-xs font-medium text-indigo-700 bg-indigo-100 rounded-md">
-                      system
-                    </span>
-                    <span className="text-sm font-medium text-gray-700">
-                      System Prompt
-                    </span>
-                  </div>
-                  {sectionsOpen.system ? (
-                    <ChevronUpIcon className="w-5 h-5 text-gray-500" />
-                  ) : (
-                    <ChevronDownIcon className="w-5 h-5 text-gray-500" />
-                  )}
-                </div>
-                {sectionsOpen.system && (
-                  <>
-                    <div className="p-4">
-                      <textarea
-                        value={editableSystemPrompt}
-                        onChange={(e) => setEditableSystemPrompt(e.target.value)}
-                        rows={5}
-                        className="w-full p-3 font-mono text-sm text-gray-700 transition-shadow bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                        placeholder="Enter system prompt... Use {{variable}} for variables"
-                      />
-                    </div>
-
-                    {/* Variables */}
-                    {Object.entries(variables).length > 0 && (
-                      <div className="px-4 py-3 border-t border-gray-200 bg-linear-to-b from-gray-50 to-white">
-                        <h4 className="mb-3 text-sm font-medium text-gray-700">
-                          Variables
-                        </h4>
-                        <div className="space-y-2">
-                          {Object.entries(variables).map(([key, value]) => (
-                            <div key={key} className="flex items-center space-x-2">
-                              <span className="text-sm font-medium text-gray-600">
-                                {key}:
-                              </span>
-                              <input
-                                type="text"
-                                value={value}
-                                onChange={(e) => {
-                                  const newValue = e.target.value;
-                                  setVariables((prev) => ({
-                                    ...prev,
-                                    [key]: newValue,
-                                  }));
-                                }}
-                                className={`flex-1 px-3 py-1.5 text-sm border rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all ${!value || value.trim() === ""
-                                  ? "border-red-300 bg-red-50"
-                                  : "border-gray-300 bg-white hover:border-gray-400"
-                                  }`}
-                                placeholder="Required"
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-
-              {/* Conversation Flow */}
-              <div className="flex-1 border border-gray-200 rounded-lg bg-linear-to-b from-gray-50 to-white">
-                <div
-                  className="flex items-center justify-between px-4 py-3 border-b border-gray-200 cursor-pointer bg-linear-to-b from-gray-100 to-gray-50 hover:from-gray-200 hover:to-gray-100"
-                  onClick={() => toggleSection("conversation")}
-                >
-                  <div className="flex items-center space-x-2">
-                    <span className="px-2 py-1 text-xs font-medium text-indigo-700 bg-indigo-100 rounded-md">
-                      conversation
-                    </span>
-                    <span className="text-sm font-medium text-gray-700">Messages</span>
-                  </div>
-                  {sectionsOpen.conversation ? (
-                    <ChevronUpIcon className="w-5 h-5 text-gray-500" />
-                  ) : (
-                    <ChevronDownIcon className="w-5 h-5 text-gray-500" />
-                  )}
-                </div>
-                {sectionsOpen.conversation && (
-                  <div className="p-4 space-y-4">
-                    {/* Conversation Messages */}
-                    {conversation.map((message, index) => (
-                      <div
-                        key={index}
-                        className={`border rounded-lg ${message.role === "user"
-                          ? "bg-blue-50 border-blue-200"
-                          : "bg-white border-gray-200"
-                          }`}
-                      >
-                        <div className="flex items-center justify-between px-4 py-2 border-b border-inherit">
-                          <div className="flex items-center space-x-2">
-                            <select
-                              value={message.role}
-                              onChange={(e) => {
-                                const newMessages = [...conversation];
-                                newMessages[index] = {
-                                  ...message,
-                                  role: e.target.value as "user" | "assistant" | "system",
-                                };
-                                setConversation(newMessages);
-                              }}
-                              className={`px-2 py-1 text-xs font-medium rounded-md border-0 focus:ring-1 focus:ring-indigo-500 ${message.role === "user"
-                                ? "bg-blue-100 text-blue-700"
-                                : "bg-gray-100 text-gray-700"
-                                }`}
-                            >
-                              <option value="user">user</option>
-                              <option value="assistant">assistant</option>
-                              <option value="system">system</option>
-                            </select>
-                          </div>
-                          <div className="flex items-center space-x-1">
-                            <button
-                              onClick={() => {
-                                setConversation(
-                                  conversation.filter((_, i) => i !== index)
-                                );
-                              }}
-                              className="p-1 text-red-500 hover:text-red-700"
-                            >
-                              <XMarkIcon className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                        <div className="p-4">
-                          <textarea
-                            value={message.content}
-                            onChange={(e) => {
-                              const newMessages = [...conversation];
-                              newMessages[index] = {
-                                ...message,
-                                content: e.target.value,
-                              };
-                              setConversation(newMessages);
-                            }}
-                            rows={3}
-                            className="w-full p-3 text-sm transition-colors border border-gray-200 rounded-lg resize-none bg-gray-50 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:bg-white"
-                            placeholder={
-                              message.role === "user"
-                                ? "Type your message..."
-                                : "Assistant's response..."
-                            }
-                          />
-                        </div>
-                      </div>
-                    ))}
-
-                    {/* Add Message Button */}
-                    <button
-                      onClick={handleAddMessage}
-                      className="flex items-center justify-center w-full px-4 py-2.5 text-sm font-medium text-gray-700 bg-linear-to-b from-white to-gray-50 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors group relative"
-                    >
-                      <PlusIcon className="w-4 h-4 md:mr-1.5" />
-                      Add Message
-                    </button>
                   </div>
                 )}
               </div>
