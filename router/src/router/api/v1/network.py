@@ -84,7 +84,6 @@ async def verify(req: VerifyRequest, db: DBSession):
         transformed_models.append({"original": model, "id": model_config.id})
 
     async def process_model(model, idx):
-        machine = await get_random_machines(db, 1)
         proxy_url = f"{NODE_SERVICE_URL}/v1/verify"
         async with httpx.AsyncClient(timeout=httpx.Timeout(60.0)) as client:
             response = await client.post(
@@ -99,7 +98,6 @@ async def verify(req: VerifyRequest, db: DBSession):
             )
             response_data = response.json()
             return {
-                "machine": machine,
                 "result": response_data["result"],
                 "response": response_data,
                 "model": transformed_models[idx]["original"],
