@@ -1511,7 +1511,7 @@ export default function Workbench() {
                             ...conversation,
                             previewMessage,
                           ]
-                        : [previewMessage]
+                        : [...conversation, previewMessage]
                     }
                     models={models}
                   />
