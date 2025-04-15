@@ -323,10 +323,15 @@ const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
       try {
         const [provider, modelName] = getModelProvider(model, model_provider);
 
-        const response = await getLlmCompletion({
+
+        const openai = new OpenAI({
+          apiKey: provider.apiKey,
+          baseURL: provider.baseUrl,
+        });
+
+        const response = await openai.chat.completions.create({
           model: modelName,
-          modelProvider: provider,
-          messages: messages as OpenAI.ChatCompletionMessageParam[],
+          messages: messages as OpenAI.ChatCompletionMessageParam[], 
           stream: false,
           tools: [{
             type: "function",
@@ -350,8 +355,8 @@ const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
             }
           }],
           tool_choice: { type: "function", function: { name: "verify_statement" } },
-          logger: fastify.log
         }) as OpenAI.ChatCompletion;
+
 
         const toolCall = response.choices[0].message.tool_calls?.[0];
         
