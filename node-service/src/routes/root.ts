@@ -19,6 +19,24 @@ interface ModelProvider {
   providerName: PROVIDER_NAME;
 }
 
+interface Message {
+  role: "system" | "user" | "assistant" | "function";
+  content: string;
+  name?: string;
+}
+
+interface VerifyRequest {
+  messages: Message[];
+  model: string;
+  model_provider?: ModelProvider;
+}
+
+
+interface VerifyFunctionArgs {
+  is_correct: boolean;
+  reason: string;
+}
+
 type AiRequest = OpenAI.ChatCompletionCreateParams & {
   model: string;
   modelProvider?: ModelProvider;
@@ -274,6 +292,99 @@ const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
         reply.code(statusCode).send({
           error: errorMessage,
           request_id: requestId,
+        });
+      }
+    }
+  );
+
+  // Verification endpoint
+  fastify.post<{ Body: VerifyRequest }>(
+    "/v1/verify",
+    async (request, reply) => {
+      const { messages, model, model_provider } = request.body;
+
+      if (!messages || messages.length === 0) {
+        return reply.code(400).send({
+          error: "At least one message is required"
+        });
+      }
+
+      // Add system message if not present
+      if (!messages.some(msg => msg.role === "system")) {
+        messages.unshift({
+          role: "system",
+          content: `You are a verification assistant. Your task is to verify if the user message is correct or not.
+                   Use the provided verify_statement function to respond.
+                   Be concise with your reasoning.
+                   Always use the function to respond.`
+        });
+      }
+
+      try {
+        const [provider, modelName] = getModelProvider(model, model_provider);
+
+        const response = await getLlmCompletion({
+          model: modelName,
+          modelProvider: provider,
+          messages: messages as OpenAI.ChatCompletionMessageParam[],
+          stream: false,
+          tools: [{
+            type: "function",
+            function: {
+              name: "verify_statement",
+              description: "Verify if the user message is correct or not",
+              parameters: {
+                type: "object",
+                properties: {
+                  is_correct: {
+                    type: "boolean",
+                    description: "Whether the statement is correct (true) or incorrect (false)"
+                  },
+                  reason: {
+                    type: "string",
+                    description: "Brief explanation for the verification result"
+                  }
+                },
+                required: ["is_correct", "reason"]
+              }
+            }
+          }],
+          tool_choice: { type: "function", function: { name: "verify_statement" } },
+          logger: fastify.log
+        }) as OpenAI.ChatCompletion;
+
+        const toolCall = response.choices[0].message.tool_calls?.[0];
+        
+        if (toolCall) {
+          const args = JSON.parse(toolCall.function.arguments) as VerifyFunctionArgs;
+          return {
+            result: args.is_correct ? "yes" : "no",
+            content: args.reason
+          };
+        }
+
+        // Fallback to content-based response
+        const content = response.choices[0].message.content || "";
+        return {
+          result: content.trim().toLowerCase() === "yes" ? "yes" : "no",
+          content: content
+        };
+
+      } catch (error: any) {
+        fastify.log.error({
+          msg: "Verification request failed",
+          error: {
+            message: error.message,
+            code: error.code,
+            stack: error.stack
+          }
+        });
+
+        const statusCode = error.response?.status || 500;
+        const errorMessage = error.response?.data?.error?.message || error.message || "Unknown error";
+
+        return reply.code(statusCode).send({
+          error: errorMessage
         });
       }
     }
