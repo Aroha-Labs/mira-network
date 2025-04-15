@@ -116,12 +116,27 @@ export async function processStream(
 
           try {
             const parsed = JSON.parse(data);
-            // console.log("Parsed SSE data:", parsed); // Debug log
+            console.log("Parsed SSE data:", parsed); // Enable debug log to see the response structure
+
+            // Direct content field (current implementation)
             if (parsed.content) {
               onMessage(parsed.content);
             }
+            // OpenAI-style format with choices and delta
+            else if (parsed.choices && parsed.choices.length > 0) {
+              const choice = parsed.choices[0];
+              if (choice.delta && choice.delta.content) {
+                onMessage(choice.delta.content);
+              } else if (choice.message && choice.message.content) {
+                onMessage(choice.message.content);
+              }
+            }
+            // Log unhandled formats to help debug
+            else {
+              console.log("Unhandled SSE data format:", parsed);
+            }
+
             if (parsed.tool_calls) {
-              console.log("Received tool calls:", parsed.tool_calls); // Debug log
               const toolCalls = parsed.tool_calls.map(
                 (call: {
                   id?: string;
@@ -231,7 +246,6 @@ export async function streamChatCompletion(
 
     let body;
     if (endpoint === "/v1/chat/completions") {
-      console.log("Direct chat completion", systemPrompt, options.variables, chatOptions.variables);
       // Direct chat completion - include system prompt in messages
       const messages = systemPrompt
         ? [{ role: "system" as const, content: systemPrompt }, ...chatOptions.messages]
@@ -239,13 +253,11 @@ export async function streamChatCompletion(
 
       // Replace variables in system prompt if both are present
       if (systemPrompt && options.variables) {
-        console.log("Replacing variables in system prompt");
         const systemMessage = messages[0];
         let content = systemMessage.content;
         Object.entries(options.variables).forEach(([key, value]) => {
           content = content.replace(new RegExp(`{{${key}}}`, "g"), value);
         });
-        console.log("Replaced variables in system prompt", content);
         messages[0] = { ...systemMessage, content };
       }
 
@@ -279,7 +291,6 @@ export async function streamChatCompletion(
     let url = `${api.defaults.baseURL}${endpoint}`;
 
     if (flowId && endpoint === "/v1/chat/completions") {
-      console.log("Adding flow ID to URL");
       url = `${url}?flow_id=${flowId}`;
     }
 
