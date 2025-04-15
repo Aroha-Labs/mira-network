@@ -85,7 +85,7 @@ async def verify(req: VerifyRequest, db: DBSession):
 
     async def process_model(model, idx):
         machine = await get_random_machines(db, 1)
-        proxy_url = f"http://{machine[0].network_ip}:34523/v1/verify"
+        proxy_url = f"{NODE_SERVICE_URL}/v1/verify"
         async with httpx.AsyncClient(timeout=httpx.Timeout(60.0)) as client:
             response = await client.post(
                 proxy_url,
