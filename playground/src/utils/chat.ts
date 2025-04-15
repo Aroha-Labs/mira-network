@@ -331,10 +331,6 @@ export interface VerificationRequest {
 export interface VerificationResponse {
   result: "yes" | "no";
   results: {
-    machine: {
-      machine_uid: string;
-      network_ip: string;
-    }[];
     result: "yes" | "no";
     response: {
       result: "yes" | "no";
