@@ -265,11 +265,10 @@ export default function TryFlowModal({
                     <button
                       onClick={handleSave}
                       disabled={!name.trim() || !systemPrompt.trim() || isLoading}
-                      className={`flex-1 px-4 py-2 text-sm font-medium text-white transition-colors duration-200 rounded-lg focus:outline-hidden focus:ring-2 ${
-                        !isLoading && saveClicked
-                          ? "bg-green-500 hover:bg-green-600 focus:ring-green-400"
-                          : "bg-green-600 hover:bg-green-700 focus:ring-green-500"
-                      } disabled:opacity-50 disabled:cursor-not-allowed`}
+                      className={`flex-1 px-4 py-2 text-sm font-medium text-white transition-colors duration-200 rounded-lg focus:outline-hidden focus:ring-2 ${!isLoading && saveClicked
+                        ? "bg-green-500 hover:bg-green-600 focus:ring-green-400"
+                        : "bg-green-600 hover:bg-green-700 focus:ring-green-500"
+                        } disabled:opacity-50 disabled:cursor-not-allowed`}
                     >
                       {isLoading ? (
                         <div className="flex items-center justify-center gap-2">
@@ -313,18 +312,20 @@ export default function TryFlowModal({
                   {messages.map((msg, index) => (
                     <div
                       key={index}
-                      className={`flex ${
-                        msg.role === "assistant" ? "justify-start" : "justify-end"
-                      }`}
+                      className={`flex ${msg.role === "assistant" ? "justify-start" : "justify-end"
+                        }`}
                     >
                       <div
-                        className={`max-w-[80%] rounded-2xl px-4 py-3 ${
-                          msg.role === "assistant"
-                            ? "bg-gray-100 text-gray-900"
-                            : "bg-blue-600 text-white"
-                        }`}
+                        className={`max-w-[80%] rounded-2xl px-4 py-3 ${msg.role === "assistant"
+                          ? "bg-gray-100 text-gray-900"
+                          : "bg-blue-600 text-white"
+                          }`}
                       >
-                        <p className="whitespace-pre-wrap">{msg.content}</p>
+                        <p className="whitespace-pre-wrap">
+                          {typeof msg.content === 'string'
+                            ? msg.content
+                            : JSON.stringify(msg.content, null, 2)}
+                        </p>
                       </div>
                     </div>
                   ))}
