@@ -52,9 +52,8 @@ export default function ChatBubble({
 
   return (
     <div
-      className={`group flex flex-col space-y-2 max-w-2xl mx-auto ${
-        msg.role === "user" ? "items-end" : "items-start"
-      }`}
+      className={`group flex flex-col space-y-2 max-w-2xl mx-auto ${msg.role === "user" ? "items-end" : "items-start"
+        }`}
     >
       <div className="flex items-center gap-2 px-2">
         {msg.role === "user" ? (
@@ -71,22 +70,29 @@ export default function ChatBubble({
         </strong>
       </div>
       <div
-        className={`px-3 py-2 rounded-lg shadow-md max-w-full min-w-48 w-auto ${
-          msg.role === "assistant"
-            ? "bg-gray-50"
-            : msg.role === "system"
-              ? "bg-blue-50"
-              : msg.role === "user"
-                ? "bg-sky-50 text-black self-end rounded-tr-lg"
-                : "bg-indigo-50 text-black self-start rounded-tl-lg border border-gray-300"
-        }`}
+        className={`px-3 py-2 rounded-lg shadow-md max-w-full min-w-48 w-auto ${msg.role === "assistant"
+          ? "bg-gray-50"
+          : msg.role === "system"
+            ? "bg-blue-50"
+            : msg.role === "user"
+              ? "bg-sky-50 text-black self-end rounded-tr-lg"
+              : "bg-indigo-50 text-black self-start rounded-tl-lg border border-gray-300"
+          }`}
       >
         <div className="flex-1 space-y-2 overflow-x-auto">
           {showRaw ? (
-            <pre className="whitespace-pre-wrap">{msg.content}</pre>
+            <pre className="whitespace-pre-wrap">
+              {typeof msg.content === 'string'
+                ? msg.content
+                : JSON.stringify(msg.content, null, 2)}
+            </pre>
           ) : (
             <div className="prose">
-              <ReactMarkdown>{msg.content}</ReactMarkdown>
+              <ReactMarkdown>
+                {typeof msg.content === 'string'
+                  ? msg.content
+                  : JSON.stringify(msg.content, null, 2)}
+              </ReactMarkdown>
             </div>
           )}
           {(msg.tool_calls || msg.tool_responses) && (
@@ -96,7 +102,11 @@ export default function ChatBubble({
         <>
           <div className="border-t border-gray-300 my-2"></div>
           <div className="flex gap-2">
-            <CopyToClipboardIcon text={msg.content} />
+            <CopyToClipboardIcon
+              text={typeof msg.content === 'string'
+                ? msg.content
+                : JSON.stringify(msg.content, null, 2)}
+            />
             <button
               onClick={() => setShowRaw(!showRaw)}
               className="ml-2"

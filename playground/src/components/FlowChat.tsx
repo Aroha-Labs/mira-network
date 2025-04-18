@@ -121,7 +121,18 @@ export default function FlowChat({ flow, onClose }: FlowChatProps) {
 
   const handleEditMessage = (index: number) => {
     const messageToEdit = messages[index];
-    setUserInput(messageToEdit.content);
+    if (typeof messageToEdit.content === 'string') {
+      setUserInput(messageToEdit.content);
+    } else if (Array.isArray(messageToEdit.content)) {
+      // Extract text content from MessageContentPart array
+      const textPart = messageToEdit.content.find(part => part.type === 'text');
+      if (textPart && 'text' in textPart) {
+        setUserInput(textPart.text);
+      } else {
+        // Fallback if no text part is found
+        setUserInput(JSON.stringify(messageToEdit.content));
+      }
+    }
     setMessages(messages.slice(0, index));
   };
 
@@ -149,11 +160,21 @@ export default function FlowChat({ flow, onClose }: FlowChatProps) {
         (chunk) => {
           console.log("Received refresh chunk:", chunk);
           if (typeof chunk === "string") {
-            assistantMessage.content += chunk;
+            if (typeof assistantMessage.content === "string") {
+              assistantMessage.content += chunk;
+            } else {
+              assistantMessage.content = chunk;
+            }
           } else {
             // Handle Message object with tool_calls
             if (chunk.content) {
-              assistantMessage.content += chunk.content;
+              if (typeof assistantMessage.content === "string" && typeof chunk.content === "string") {
+                assistantMessage.content += chunk.content;
+              } else {
+                assistantMessage.content = typeof chunk.content === "string"
+                  ? chunk.content
+                  : JSON.stringify(chunk.content);
+              }
             }
             if (chunk.tool_calls) {
               assistantMessage.tool_calls = chunk.tool_calls;
@@ -223,11 +244,21 @@ export default function FlowChat({ flow, onClose }: FlowChatProps) {
         (chunk) => {
           console.log("Received chunk:", chunk);
           if (typeof chunk === "string") {
-            assistantMessage.content += chunk;
+            if (typeof assistantMessage.content === "string") {
+              assistantMessage.content += chunk;
+            } else {
+              assistantMessage.content = chunk;
+            }
           } else {
             // Handle Message object with tool_calls
             if (chunk.content) {
-              assistantMessage.content += chunk.content;
+              if (typeof assistantMessage.content === "string" && typeof chunk.content === "string") {
+                assistantMessage.content += chunk.content;
+              } else {
+                assistantMessage.content = typeof chunk.content === "string"
+                  ? chunk.content
+                  : JSON.stringify(chunk.content);
+              }
             }
             if (chunk.tool_calls) {
               assistantMessage.tool_calls = chunk.tool_calls;

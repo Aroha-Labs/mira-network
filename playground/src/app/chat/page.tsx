@@ -7,7 +7,6 @@ import ChatBubble from "src/components/ChatBubble";
 import {
   ChatBubbleBottomCenterIcon,
   StopIcon,
-  PaperClipIcon,
   XCircleIcon,
   PhotoIcon,
 } from "@heroicons/react/24/outline";
@@ -227,9 +226,9 @@ export default function Chat() {
     setErrorMessage("");
     setInput("");
 
-    let userMessageContent: MessageContentPart[] = [];
+    const userMessageContent: MessageContentPart[] = [];
     let userMessageForState: Message;
-    let textForInputOnError = textInput;
+    const textForInputOnError = textInput;
 
     try {
       if (selectedFiles.length > 0) {
@@ -259,7 +258,6 @@ export default function Chat() {
       const updatedMessages = [...messages, userMessageForState];
       setMessages([...updatedMessages, assistantMessage]);
 
-      const filesToClear = [...selectedFiles];
       setSelectedFiles([]);
 
       setTimeout(() => {

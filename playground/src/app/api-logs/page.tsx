@@ -167,22 +167,20 @@ const ApiLogsPage = () => {
           <div className="bg-white rounded-md border border-gray-300 p-0.5 flex items-center">
             <button
               onClick={() => setViewMode("table")}
-              className={`p-1.5 rounded-sm ${
-                viewMode === "table"
-                  ? "bg-gray-100 text-gray-900"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
+              className={`p-1.5 rounded-sm ${viewMode === "table"
+                ? "bg-gray-100 text-gray-900"
+                : "text-gray-500 hover:text-gray-700"
+                }`}
               title="Table view"
             >
               <TableCellsIcon className="w-5 h-5" />
             </button>
             <button
               onClick={() => setViewMode("card")}
-              className={`p-1.5 rounded-sm ${
-                viewMode === "card"
-                  ? "bg-gray-100 text-gray-900"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
+              className={`p-1.5 rounded-sm ${viewMode === "card"
+                ? "bg-gray-100 text-gray-900"
+                : "text-gray-500 hover:text-gray-700"
+                }`}
               title="Card view"
             >
               <Squares2X2Icon className="w-5 h-5" />
@@ -316,9 +314,8 @@ const ApiLogsPage = () => {
                       onClick={() =>
                         column.sortable ? handleOrderByChange(column.key) : undefined
                       }
-                      className={`px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
-                        column.sortable ? "cursor-pointer hover:bg-gray-100" : ""
-                      }`}
+                      className={`px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${column.sortable ? "cursor-pointer hover:bg-gray-100" : ""
+                        }`}
                     >
                       <div className="flex items-center gap-1">
                         {column.label}
@@ -335,40 +332,40 @@ const ApiLogsPage = () => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {isLoading
                   ? Array(5)
-                      .fill(0)
-                      .map((_, i) => <TableLoadingRow key={i} />)
+                    .fill(0)
+                    .map((_, i) => <TableLoadingRow key={i} />)
                   : data?.logs?.map((log) => (
-                      <tr
-                        key={log.id}
-                        onClick={() => handleRowClick(log)}
-                        className="cursor-pointer hover:bg-gray-50"
-                      >
-                        <td className="px-4 py-3 text-sm text-gray-500">
-                          {format(new Date(log.created_at), "MMM d, HH:mm")}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-500">
-                          {log.total_tokens}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-500">
-                          {log.ttft ? log.ttft.toFixed(2) : "N/A"}s
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-500">
-                          {log.total_response_time.toFixed(2)}s
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-500">
-                          {log.machine_id || "N/A"}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-500">{log.model}</td>
-                        <td className="px-4 py-3 text-sm text-gray-500">
-                          {log.model_pricing
-                            ? (
-                                log.prompt_tokens * log.model_pricing.prompt_token +
-                                log.completion_tokens * log.model_pricing.completion_token
-                              ).toFixed(4)
-                            : "N/A"}
-                        </td>
-                      </tr>
-                    ))}
+                    <tr
+                      key={log.id}
+                      onClick={() => handleRowClick(log)}
+                      className="cursor-pointer hover:bg-gray-50"
+                    >
+                      <td className="px-4 py-3 text-sm text-gray-500">
+                        {format(new Date(log.created_at), "MMM d, HH:mm")}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-500">
+                        {log.total_tokens}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-500">
+                        {log.ttft ? log.ttft.toFixed(2) : "N/A"}s
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-500">
+                        {log.total_response_time.toFixed(2)}s
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-500">
+                        {log.machine_id || "N/A"}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-500">{log.model}</td>
+                      <td className="px-4 py-3 text-sm text-gray-500">
+                        {log.model_pricing
+                          ? (
+                            log.prompt_tokens * log.model_pricing.prompt_token +
+                            log.completion_tokens * log.model_pricing.completion_token
+                          ).toFixed(4)
+                          : "N/A"}
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>
@@ -436,7 +433,7 @@ const ApiLogsPage = () => {
                                 {(
                                   log.prompt_tokens * log.model_pricing.prompt_token +
                                   log.completion_tokens *
-                                    log.model_pricing.completion_token
+                                  log.model_pricing.completion_token
                                 ).toFixed(4)}
                               </div>
                             </div>
@@ -550,21 +547,19 @@ const ApiLogsPage = () => {
             <nav className="flex space-x-4">
               <button
                 onClick={() => setActiveTab("messages")}
-                className={`${
-                  activeTab === "messages"
-                    ? "border-blue-500 text-blue-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                } whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm`}
+                className={`${activeTab === "messages"
+                  ? "border-blue-500 text-blue-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                  } whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm`}
               >
                 Messages
               </button>
               <button
                 onClick={() => setActiveTab("raw")}
-                className={`${
-                  activeTab === "raw"
-                    ? "border-blue-500 text-blue-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                } whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm`}
+                className={`${activeTab === "raw"
+                  ? "border-blue-500 text-blue-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                  } whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm`}
               >
                 Raw Request
               </button>
@@ -576,27 +571,29 @@ const ApiLogsPage = () => {
             {activeTab === "messages" ? (
               <>
                 {selectedLog.payload?.messages.map(
-                  (message: { role: string; content: string }, index: number) => (
+                  (message, index: number) => (
                     <div
                       key={index}
-                      className={`p-3 rounded-md ${
-                        message.role === "user"
-                          ? "bg-blue-50 border border-blue-100"
-                          : "bg-gray-50 border border-gray-100"
-                      }`}
+                      className={`p-3 rounded-md ${message.role === "user"
+                        ? "bg-blue-50 border border-blue-100"
+                        : "bg-gray-50 border border-gray-100"
+                        }`}
                     >
                       <div className="flex items-center mb-1">
                         <span
-                          className={`text-xs font-medium px-1.5 py-0.5 rounded-sm ${
-                            message.role === "user"
-                              ? "bg-blue-100 text-blue-700"
-                              : "bg-gray-200 text-gray-700"
-                          }`}
+                          className={`text-xs font-medium px-1.5 py-0.5 rounded-sm ${message.role === "user"
+                            ? "bg-blue-100 text-blue-700"
+                            : "bg-gray-200 text-gray-700"
+                            }`}
                         >
                           {message.role}
                         </span>
                       </div>
-                      <div className="text-sm whitespace-pre-wrap">{message.content}</div>
+                      <div className="text-sm whitespace-pre-wrap">
+                        {typeof message.content === 'string'
+                          ? message.content
+                          : JSON.stringify(message.content, null, 2)}
+                      </div>
                     </div>
                   )
                 )}
