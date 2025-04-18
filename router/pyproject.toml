@@ -42,9 +42,10 @@ distribution = false
 "_".env_file = ".env.local"
 
 # Server commands
-dev = {cmd = "newrelic-admin run-python -m uvicorn src.router.main:app --host 0.0.0.0 --port 8000  --reload", env_file = ".env.local"}
-prod = {cmd = "newrelic-admin run-python -m uvicorn src.router.main:app --host 0.0.0.0 --port 80 --workers 3", env_file = ".env.prod"}
-test = {cmd = "newrelic-admin run-python -m uvicorn src.router.main:app --host 0.0.0.0 --port 8001", env_file = ".env.test"}
+
+dev = {cmd = "newrelic-admin run-python -m uvicorn src.router.main:app --host 0.0.0.0 --port 8000 --reload", env_file = ".env.local"}
+prod = {cmd = "newrelic-admin run-python -m uvicorn src.router.main:app --host 0.0.0.0 --port 80 --workers 3 --no-access-log", env_file = ".env.prod"}
+test = {cmd = "newrelic-admin run-python -m uvicorn src.router.main:app --host 0.0.0.0 --port 8001 --no-access-log", env_file = ".env.test"}
 
 # Migration commands for local development
 dev-migrate = {cmd = "alembic", env_file = ".env.local"}

@@ -5,22 +5,6 @@ import { registerMachine, getLocalIp } from "../utils/machineRegistry";
 import OpenAI from "openai";
 import { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
-import pino from "pino";
-const logger = pino({
-  level: process.env.LOG_LEVEL || 'info',
-  timestamp: true,
-  formatters: {
-    level: (label) => {
-      return { level: label };
-    },
-  },
-  serializers: {
-    error: pino.stdSerializers.err,
-    req: pino.stdSerializers.req,
-    res: pino.stdSerializers.res
-  }
-});
-
 enum PROVIDER_NAME {
   OPENAI = "openai",
   OPENROUTER = "openrouter",
@@ -34,6 +18,24 @@ interface ModelProvider {
   baseUrl: string;
   apiKey: string;
   providerName: PROVIDER_NAME;
+}
+
+interface Message {
+  role: "system" | "user" | "assistant" | "function";
+  content: string;
+  name?: string;
+}
+
+interface VerifyRequest {
+  messages: Message[];
+  model: string;
+  model_provider?: ModelProvider;
+}
+
+
+interface VerifyFunctionArgs {
+  is_correct: boolean;
+  reason: string;
 }
 
 type AiRequest = OpenAI.ChatCompletionCreateParams & {
@@ -111,8 +113,8 @@ async function getLlmCompletion({
   modelProvider,
   messages,
   stream = false,
-}: GetLlmCompletionRequest) {
-  // const startTime = Date.now();
+  logger,
+}: GetLlmCompletionRequest & { logger: import('fastify').FastifyBaseLogger }) {
   logger.info({
     msg: 'Starting LLM completion request',
     provider: modelProvider.providerName,
@@ -155,13 +157,12 @@ async function getLlmCompletion({
 }
 
 // Update liveness check function
-async function updateLiveness(machineIp: string) {
+async function updateLiveness(machineIp: string, logger: import('fastify').FastifyBaseLogger) {
   const url = `${ROUTER_BASE_URL}/liveness/${machineIp}`;
-  const headers = { Authorization: `Bearer ${Env.MACHINE_API_TOKEN}` };
 
   setInterval(async () => {
     try {
-      await axios.post(url, {}, { headers });
+      await axios.post(url, {}, { headers: { Authorization: `Bearer ${Env.MACHINE_API_TOKEN}` } });
       logger.info(`Liveness check successful for ${machineIp}`);
     } catch (error) {
       const err = error as Error;
@@ -174,11 +175,9 @@ async function updateLiveness(machineIp: string) {
 const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
   // Register startup handler
   fastify.addHook("onReady", async () => {
-    // Get the machine IP from environment or determine the local IP
-    const machineIp = Env.MACHINE_IP || getLocalIp();
+    const machineIp = Env.MACHINE_IP || getLocalIp(fastify.log);
     fastify.log.info(`Using machine IP: ${machineIp}`);
 
-    // Register the machine with the router and get an API token
     fastify.log.info("Starting machine registration process...");
 
     if (!ROUTER_BASE_URL) {
@@ -187,7 +186,7 @@ const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
       process.exit(1);
     }
 
-    const machineToken = await registerMachine(ROUTER_BASE_URL);
+    const machineToken = await registerMachine(ROUTER_BASE_URL, fastify.log);
 
     if (machineToken) {
       fastify.log.info("Machine registered successfully and token acquired");
@@ -195,18 +194,17 @@ const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
       Env.MACHINE_API_TOKEN = machineToken;
       fastify.log.info(`Using machine name: ${Env.MACHINE_NAME}`);
 
-      // Start the liveness update task
-      updateLiveness(machineIp);
+      updateLiveness(machineIp, fastify.log);
     } else {
-      logger.error("Failed to register machine or acquire token after multiple attempts");
-      logger.error("Machine registration is required to run the service");
-      logger.error("Shutting down...");
+      fastify.log.error("Failed to register machine or acquire token after multiple attempts");
+      fastify.log.error("Machine registration is required to run the service");
+      fastify.log.error("Shutting down...");
       process.exit(1);
     }
   });
 
   fastify.addHook("preHandler", async (request, reply) => {
-    reply.header("x-machine-ip", Env.MACHINE_IP || getLocalIp());
+    reply.header("x-machine-ip", Env.MACHINE_IP || getLocalIp(fastify.log));
   });
 
   // Health check endpoint
@@ -235,7 +233,7 @@ const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
       };
 
       if (!messages || !messages.some((msg) => msg.role === "user")) {
-        logger.warn({
+        fastify.log.warn({
           msg: "Invalid request - missing user message",
           requestId,
         });
@@ -254,6 +252,7 @@ const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
           modelProvider: provider,
           messages: messages as ChatCompletionMessageParam[],
           stream: !!stream,
+          logger: fastify.log,
         });
 
         if (!stream) {
@@ -276,7 +275,7 @@ const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
         reply.raw.end();
       } catch (error: any) {
         const duration = Date.now() - startTime;
-        logger.error({
+        fastify.log.error({
           msg: "Chat completion request failed",
           requestId,
           duration,
@@ -303,6 +302,104 @@ const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
         reply.code(statusCode).send({
           error: errorMessage,
           request_id: requestId,
+        });
+      }
+    }
+  );
+
+  // Verification endpoint
+  fastify.post<{ Body: VerifyRequest }>(
+    "/v1/verify",
+    async (request, reply) => {
+      const { messages, model, model_provider } = request.body;
+
+      if (!messages || messages.length === 0) {
+        return reply.code(400).send({
+          error: "At least one message is required"
+        });
+      }
+
+      // Add system message if not present
+      if (!messages.some(msg => msg.role === "system")) {
+        messages.unshift({
+          role: "system",
+          content: `You are a verification assistant. Your task is to verify if the user message is correct or not.
+                   Use the provided verify_statement function to respond.
+                   Be concise with your reasoning.
+                   Always use the function to respond.`
+        });
+      }
+
+      try {
+        const [provider, modelName] = getModelProvider(model, model_provider);
+
+
+        const openai = new OpenAI({
+          apiKey: provider.apiKey,
+          baseURL: provider.baseUrl,
+        });
+
+        const response = await openai.chat.completions.create({
+          model: modelName,
+          messages: messages as OpenAI.ChatCompletionMessageParam[], 
+          stream: false,
+          tools: [{
+            type: "function",
+            function: {
+              name: "verify_statement",
+              description: "Verify if the user message is correct or not",
+              parameters: {
+                type: "object",
+                properties: {
+                  is_correct: {
+                    type: "boolean",
+                    description: "Whether the statement is correct (true) or incorrect (false)"
+                  },
+                  reason: {
+                    type: "string",
+                    description: "Brief explanation for the verification result"
+                  }
+                },
+                required: ["is_correct", "reason"]
+              }
+            }
+          }],
+          tool_choice: { type: "function", function: { name: "verify_statement" } },
+        }) as OpenAI.ChatCompletion;
+
+
+        const toolCall = response.choices[0].message.tool_calls?.[0];
+        
+        if (toolCall) {
+          const args = JSON.parse(toolCall.function.arguments) as VerifyFunctionArgs;
+          return {
+            result: args.is_correct ? "yes" : "no",
+            content: args.reason
+          };
+        }
+
+        // Fallback to content-based response
+        const content = response.choices[0].message.content || "";
+        return {
+          result: content.trim().toLowerCase() === "yes" ? "yes" : "no",
+          content: content
+        };
+
+      } catch (error: any) {
+        fastify.log.error({
+          msg: "Verification request failed",
+          error: {
+            message: error.message,
+            code: error.code,
+            stack: error.stack
+          }
+        });
+
+        const statusCode = error.response?.status || 500;
+        const errorMessage = error.response?.data?.error?.message || error.message || "Unknown error";
+
+        return reply.code(statusCode).send({
+          error: errorMessage
         });
       }
     }

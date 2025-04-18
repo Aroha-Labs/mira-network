@@ -54,12 +54,15 @@ jobs:
                     });
 
                     const options = {
-                      hostname: 'apis.mira.network',
+                      protocol: 'https:',
+                      hostname: 'api.mira.network',
                       path: '/v1/chat/completions',
                       method: 'POST',
                       headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${process.env.MIRA_API_KEY}`,
+                        'Accept': 'application/json',
+                        'User-Agent': 'curl/8.0',
                       }
                     };
 
@@ -68,6 +71,12 @@ jobs:
                       res.on('data', (chunk) => { responseData += chunk; });
                       res.on('end', () => {
                         try {
+                          // Check status code before trying to parse JSON
+                          if (res.statusCode === 403) {
+                            reject(new Error(`API returned 403 Forbidden`));
+                            return;
+                          }
+
                           const parsedData = JSON.parse(responseData);
                           if (parsedData.error) {
                             reject(new Error(parsedData.error.message));
@@ -89,19 +98,16 @@ jobs:
                   });
 
                   // Check if response has the expected structure
-                  if (!response?.choices?.[0]?.message?.content) {
+                  if (!response?.data?.choices?.[0]?.message?.content) {
                     throw new Error('Invalid response structure from API');
                   }
 
-                  return response.choices[0].message.content;
+                  return response.data.choices[0].message.content;
                 } catch (error) {
-                  console.log(`Attempt ${attempt} error:`, error.message);
-                  
                   if (attempt === maxRetries) {
                     throw error;
                   }
                   
-                  console.log(`Retrying after delay... (Attempt ${attempt}/${maxRetries})`);
                   await delay(2000 * attempt); // Exponential backoff
                 }
               }

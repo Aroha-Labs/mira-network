@@ -3,6 +3,7 @@ from src.router.utils.user import get_user_credits
 from src.router.core.types import User
 from src.router.db.session import DBSession
 from src.router.core.security import verify_token
+from src.router.utils.nr import track
 
 router = APIRouter()
 
@@ -45,7 +46,15 @@ router = APIRouter()
     },
 )
 async def get_current_user(db: DBSession, user: User = Depends(verify_token)):
+    track("get_current_user_request", {"user_id": str(user.id)})
+    
     user_credits = await get_user_credits(user.id, db)
     data = user.model_dump()
     data["credits"] = user_credits
+    
+    track("get_current_user_response", {
+        "user_id": str(user.id),
+        "credits": user_credits
+    })
+    
     return data
