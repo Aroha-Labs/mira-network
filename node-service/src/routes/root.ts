@@ -3,6 +3,7 @@ import axios from "axios";
 import { Env } from "../config";
 import { registerMachine, getLocalIp } from "../utils/machineRegistry";
 import OpenAI from "openai";
+import { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
 enum PROVIDER_NAME {
   OPENAI = "openai",
@@ -218,10 +219,18 @@ const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
   fastify.post<{ Body: AiRequest }>(
     "/v1/chat/completions",
     async (request, reply) => {
+      const body = request.body;
+      console.log("Received raw body:", body);
+
       const requestId = request.id;
       const startTime = Date.now();
 
-      const { model, modelProvider, messages, stream = false } = request.body;
+      const { model, modelProvider, messages, stream = false } = request.body as {
+        model: string;
+        modelProvider?: any;
+        messages: Array<{ role: string; content: string | Array<{ type: string;[key: string]: any }> }>;
+        stream?: boolean;
+      };
 
       if (!messages || !messages.some((msg) => msg.role === "user")) {
         fastify.log.warn({
@@ -237,10 +246,11 @@ const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
       try {
         const [provider, modelName] = getModelProvider(model, modelProvider);
 
+
         const response = await getLlmCompletion({
           model: modelName,
           modelProvider: provider,
-          messages,
+          messages: messages as ChatCompletionMessageParam[],
           stream: !!stream,
           logger: fastify.log,
         });
@@ -249,7 +259,7 @@ const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
           return { data: response };
         }
 
-        reply.raw.setHeader("x-machine-ip", Env.MACHINE_IP || getLocalIp(fastify.log));
+        reply.raw.setHeader("x-machine-ip", Env.MACHINE_IP || getLocalIp());
         reply.raw.setHeader("x-machine-name", Env.MACHINE_NAME);
         reply.raw.setHeader("Content-Type", "text/event-stream");
         reply.raw.setHeader("Cache-Control", "no-cache");

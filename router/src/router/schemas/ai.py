@@ -9,7 +9,7 @@ class ModelProvider(BaseModel):
 
 class Message(BaseModel):
     role: str
-    content: str
+    content: str | list[dict]
 
 
 class FunctionCall(BaseModel):
