@@ -259,7 +259,7 @@ const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
           return { data: response };
         }
 
-        reply.raw.setHeader("x-machine-ip", Env.MACHINE_IP || getLocalIp());
+        reply.raw.setHeader("x-machine-ip", Env.MACHINE_IP || getLocalIp(fastify.log));
         reply.raw.setHeader("x-machine-name", Env.MACHINE_NAME);
         reply.raw.setHeader("Content-Type", "text/event-stream");
         reply.raw.setHeader("Cache-Control", "no-cache");
