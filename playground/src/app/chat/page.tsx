@@ -11,7 +11,7 @@ import ConfirmModal from "src/components/ConfirmModal";
 import { LLM_BASE_URL } from "src/config";
 import { useQuery } from "@tanstack/react-query";
 import { useSession } from "src/hooks/useSession";
-import { Message } from "src/utils/chat";
+import { Message, sanitizeText } from "src/utils/chat";
 import { Brain } from "lucide-react";
 
 const fetchChatCompletion = async (
@@ -20,7 +20,7 @@ const fetchChatCompletion = async (
   controller: AbortController,
   model: string,
   token: string,
-  reasoningEffort: "low" | "medium" | "high"
+  reasoningEffort: "disabled" | "low" | "medium" | "high" | undefined
 ) => {
   const response = await fetch(`${LLM_BASE_URL}/chat/completions`, {
     method: "POST",
@@ -78,18 +78,18 @@ const fetchChatCompletion = async (
         if (choice.delta) {
           const message: Partial<Message> = {};
           if (choice.delta.content !== undefined) {
-            message.content = choice.delta.content;
+            message.content = sanitizeText(choice.delta.content);
           }
           if (choice.delta.reasoning !== undefined) {
-            message.reasoning = choice.delta.reasoning;
+            message.reasoning = sanitizeText(choice.delta.reasoning);
           }
           if (Object.keys(message).length > 0) {
             onMessage(message);
           }
         } else if (choice.message) {
           onMessage({
-            content: choice.message.content,
-            reasoning: choice.message.reasoning,
+            content: sanitizeText(choice.message.content),
+            reasoning: sanitizeText(choice.message.reasoning),
           });
         }
       } catch (error) {
@@ -119,9 +119,9 @@ export default function Chat() {
   const [errorMessage, setErrorMessage] = useState("");
   const abortControllerRef = useRef<AbortController | null>(null);
   const [selectedModel, setSelectedModel] = useState("");
-  const [reasoningEffort, setReasoningEffort] = useState<"low" | "medium" | "high">(
-    "low"
-  );
+  const [reasoningEffort, setReasoningEffort] = useState<
+    "disabled" | "low" | "medium" | "high"
+  >("disabled");
 
   const {
     data: supportedModelsData,
@@ -159,7 +159,7 @@ export default function Chat() {
   };
 
   const handleReasoningEffortChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setReasoningEffort(e.target.value as "low" | "medium" | "high");
+    setReasoningEffort(e.target.value as "disabled" | "low" | "medium" | "high");
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -223,7 +223,7 @@ export default function Chat() {
         abortControllerRef.current,
         selectedModel,
         userSession.access_token,
-        reasoningEffort
+        reasoningEffort === "disabled" ? undefined : reasoningEffort
       );
     } catch (error) {
       const err = error as Error;
@@ -306,7 +306,7 @@ export default function Chat() {
         abortControllerRef.current,
         selectedModel,
         userSession.access_token,
-        reasoningEffort
+        reasoningEffort === "disabled" ? undefined : reasoningEffort
       );
     } catch (error) {
       if ((error as Error).name !== "AbortError") {
@@ -431,19 +431,55 @@ export default function Chat() {
       </div>
       <div className="sticky bottom-0 w-full p-4 bg-white border-t border-gray-300">
         <div className="flex flex-col max-w-2xl gap-2 mx-auto">
-          <div className="flex items-center gap-2 px-2">
-            <Brain className="w-5 h-5 text-yellow-600" />
-            <select
-              value={reasoningEffort}
-              onChange={handleReasoningEffortChange}
-              className="p-1 text-sm border border-gray-300 rounded-md focus:outline-hidden focus:ring-2 focus:ring-yellow-500"
-            >
-              <option value="low">Basic Reasoning</option>
-              <option value="medium">Detailed Reasoning</option>
-              <option value="high">Deep Reasoning</option>
-            </select>
-          </div>
           <div className="flex justify-center space-x-2">
+            <div className="relative flex items-center gap-2">
+              <select
+                value={reasoningEffort}
+                onChange={handleReasoningEffortChange}
+                className="py-2 pl-10 pr-8 text-sm font-medium transition-all duration-200 ease-in-out bg-white border border-gray-300 rounded-lg shadow-sm appearance-none cursor-pointer hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Select reasoning depth"
+              >
+                <option value="disabled" className="text-gray-700 bg-gray-50">
+                  💡 No Reasoning
+                </option>
+                <option value="low" className="text-blue-700 bg-blue-50">
+                  🤔 Basic Reasoning
+                </option>
+                <option value="medium" className="text-yellow-700 bg-yellow-50">
+                  🧐 Detailed Reasoning
+                </option>
+                <option value="high" className="text-red-700 bg-red-50">
+                  🤯 Deep Reasoning
+                </option>
+              </select>
+              <div className="absolute transform -translate-y-1/2 pointer-events-none left-3 top-1/2">
+                <Brain
+                  className={`w-4 h-4 ${
+                    reasoningEffort === "disabled"
+                      ? "text-gray-400"
+                      : reasoningEffort === "low"
+                        ? "text-blue-500"
+                        : reasoningEffort === "medium"
+                          ? "text-yellow-500"
+                          : "text-red-500"
+                  }`}
+                />
+              </div>
+              <div className="absolute transform -translate-y-1/2 pointer-events-none right-2 top-1/2">
+                <svg
+                  className="w-5 h-5 text-gray-400"
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </div>
+            </div>
             <AutoGrowTextarea
               className="flex-1 p-2 border border-gray-300 resize-none rounded-l-md focus:outline-hidden focus:ring-2 focus:ring-blue-500"
               value={input}
