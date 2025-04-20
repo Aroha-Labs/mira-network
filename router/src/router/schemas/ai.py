@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, Literal
 
 
 class ModelProvider(BaseModel):
@@ -40,6 +40,9 @@ class AiRequest(BaseModel):
     tools: Optional[list[Tool]] = Field(None, title="Tools")
     tool_choice: Optional[str] = Field("auto", title="Tool Choice")
     model_config = {"protected_namespaces": ()}  # This disables the warning
+    reasoning_effort: Optional[Literal["high", "medium", "low"]] = Field(
+        None, title="Reasoning Effort"
+    )
 
 
 class VerifyRequest(BaseModel):
