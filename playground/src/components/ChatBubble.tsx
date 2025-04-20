@@ -6,6 +6,7 @@ import {
   PencilIcon,
   ArrowPathIcon,
 } from "@heroicons/react/24/outline";
+import { Brain } from "lucide-react";
 import CopyToClipboardIcon from "src/components/CopyToClipboardIcon";
 import ConfirmModal from "src/components/ConfirmModal";
 import { User } from "@supabase/supabase-js";
@@ -35,20 +36,12 @@ export default function ChatBubble({
   const [showRaw, setShowRaw] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showReasoning, setShowReasoning] = useState(false);
-
-  // Show reasoning box immediately for assistant messages
-  const [hasReasoning, setHasReasoning] = useState(msg.role === "assistant");
+  const [hasReasoning, setHasReasoning] = useState(false);
 
   useEffect(() => {
-    // Show reasoning for assistant messages, even if reasoning is empty (streaming)
-    if (msg.role === "assistant") {
-      setHasReasoning(true);
-      // Auto-show reasoning if we have content
-      if (msg.reasoning) {
-        setShowReasoning(true);
-      }
-    }
-  }, [msg.role, msg.reasoning]);
+    // Only set hasReasoning if there's actual reasoning content
+    setHasReasoning(Boolean(msg.reasoning && msg.reasoning.trim()));
+  }, [msg.reasoning]);
 
   const handleDelete = () => {
     setShowConfirmModal(true);
@@ -65,10 +58,36 @@ export default function ChatBubble({
 
   // Get the reasoning display text
   const getReasoningText = () => {
-    if (!msg.reasoning && isLoading) {
+    if (isLoading && !msg.reasoning) {
       return "Thinking...";
     }
     return msg.reasoning || "";
+  };
+
+  const getReasoningLevel = () => {
+    const text = getReasoningText();
+    if (!text || text === "Thinking...") return "none";
+
+    // Simple heuristic based on length
+    const length = text.length;
+    if (length < 100) return "low";
+    if (length < 300) return "medium";
+    return "high";
+  };
+
+  const reasoningLevel = getReasoningLevel();
+  const reasoningColors = {
+    none: "text-gray-400",
+    low: "text-gray-500",
+    medium: "text-yellow-500",
+    high: "text-red-500",
+  };
+
+  const reasoningTooltips = {
+    none: "No reasoning available",
+    low: "Basic reasoning",
+    medium: "Detailed reasoning",
+    high: "Extensive reasoning",
   };
 
   return (
@@ -112,8 +131,8 @@ export default function ChatBubble({
               </ReactMarkdown>
             </div>
           )}
-          {hasReasoning && (
-            <div className={`mt-2 ${showReasoning ? "block" : "hidden"}`}>
+          {hasReasoning && showReasoning && (
+            <div className="pt-2 mt-2 border-t border-gray-200">
               <div className="mb-1 text-sm font-medium text-gray-500">Reasoning:</div>
               <div className="p-2 text-sm text-gray-700 rounded bg-yellow-50">
                 <ReactMarkdown>{getReasoningText()}</ReactMarkdown>
@@ -143,11 +162,12 @@ export default function ChatBubble({
             {hasReasoning && (
               <button
                 onClick={() => setShowReasoning(!showReasoning)}
-                className="px-2 py-1 ml-2 text-xs text-yellow-800 bg-yellow-100 rounded hover:bg-yellow-200"
-                disabled={isLoading}
-                title={showReasoning ? "Hide reasoning" : "Show reasoning"}
+                className={`ml-2 ${
+                  showReasoning ? "text-blue-500" : "text-gray-500"
+                } hover:text-blue-600`}
+                title={`${showReasoning ? "Hide" : "Show"} reasoning`}
               >
-                {showReasoning ? "Hide Reasoning" : "Show Reasoning"}
+                <Brain className="w-5 h-5" />
               </button>
             )}
             {msg.role === "user" && (
