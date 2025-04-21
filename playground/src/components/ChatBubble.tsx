@@ -64,17 +64,6 @@ export default function ChatBubble({
     return msg.reasoning || "";
   };
 
-  const getReasoningLevel = () => {
-    const text = getReasoningText();
-    if (!text || text === "Thinking...") return "none";
-
-    // Simple heuristic based on length
-    const length = text.length;
-    if (length < 100) return "low";
-    if (length < 300) return "medium";
-    return "high";
-  };
-
   return (
     <div
       className={`group flex flex-col space-y-2 max-w-2xl mx-auto ${
