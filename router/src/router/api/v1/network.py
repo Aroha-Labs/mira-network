@@ -47,12 +47,15 @@ transport = httpx.AsyncHTTPTransport(retries=3)
     responses=verify_doc["responses"],
 )
 async def verify(req: VerifyRequest, db: DBSession):
-    track("verify_request", {
-        "models_count": len(req.models),
-        "min_yes": req.min_yes,
-        "messages_count": len(req.messages)
-    })
-    
+    track(
+        "verify_request",
+        {
+            "models_count": len(req.models),
+            "min_yes": req.min_yes,
+            "messages_count": len(req.messages),
+        },
+    )
+
     if len(req.models) < 1:
         track("verify_error", {"error": "no_models"})
         raise HTTPException(status_code=400, detail="At least one model is required")
@@ -62,11 +65,14 @@ async def verify(req: VerifyRequest, db: DBSession):
         raise HTTPException(status_code=400, detail="Minimum yes must be at least 1")
 
     if req.min_yes > len(req.models):
-        track("verify_error", {
-            "error": "min_yes_too_high", 
-            "min_yes": req.min_yes, 
-            "models_count": len(req.models)
-        })
+        track(
+            "verify_error",
+            {
+                "error": "min_yes_too_high",
+                "min_yes": req.min_yes,
+                "models_count": len(req.models),
+            },
+        )
         raise HTTPException(
             status_code=400,
             detail="Minimum yes must be less than or equal to the number of models",
@@ -136,7 +142,7 @@ class ModelListRes(BaseModel):
 )
 async def list_models() -> ModelListRes:
     track("list_models_request", {})
-    
+
     supported_models = await get_supported_models()
 
     # Create a properly typed response
@@ -147,9 +153,9 @@ async def list_models() -> ModelListRes:
             for model_id, _ in supported_models.items()
         ],
     )
-    
+
     track("list_models_response", {"models_count": len(supported_models)})
-    
+
     return response
 
 
@@ -165,17 +171,20 @@ async def save_log(
     machine_id: int,
     flow_id: Optional[str] = None,
 ):
-    track("save_log", {
-        "user_id": str(user.id),
-        "model": original_req_model,
-        "prompt_tokens": usage.get("prompt_tokens", 0),
-        "completion_tokens": usage.get("completion_tokens", 0),
-        "total_tokens": usage.get("total_tokens", 0),
-        "ttfs": ttfs,
-        "total_response_time": time.time() - timeStart,
-        "has_flow_id": flow_id is not None
-    })
-    
+    track(
+        "save_log",
+        {
+            "user_id": str(user.id),
+            "model": original_req_model,
+            "prompt_tokens": usage.get("prompt_tokens", 0),
+            "completion_tokens": usage.get("completion_tokens", 0),
+            "total_tokens": usage.get("total_tokens", 0),
+            "ttfs": ttfs,
+            "total_response_time": time.time() - timeStart,
+            "has_flow_id": flow_id is not None,
+        },
+    )
+
     sm = await get_setting_value(
         "SUPPORTED_MODELS",
         SETTINGS_MODELS["SUPPORTED_MODELS"],
@@ -184,11 +193,14 @@ async def save_log(
     model_p = sm.root.get(original_req_model)
 
     if model_p is None:
-        track("save_log_error", {
-            "user_id": str(user.id),
-            "error": "model_not_found",
-            "model": original_req_model
-        })
+        track(
+            "save_log_error",
+            {
+                "user_id": str(user.id),
+                "error": "model_not_found",
+                "model": original_req_model,
+            },
+        )
         raise HTTPException(
             status_code=500, detail="Supported model not found in settings"
         )
@@ -279,10 +291,7 @@ async def save_log(
             ),
         )
     except Exception as e:
-        track("save_log_error", {
-            "user_id": str(user.id),
-            "error": str(e)
-        })
+        track("save_log_error", {"user_id": str(user.id), "error": str(e)})
         logger.error(f"Log saving error: {str(e)}")
 
 
@@ -319,15 +328,22 @@ async def handle_stream_chunk(
 
                 try:
                     json_data = json.loads(data)
-
-                    # Yield both content chunks and usage data
+                    # Stream any delta update or usage data
                     if (
-                        json_data.get("choices", [{}])[0]
-                        .get("delta", {})
-                        .get("content")
-                        or "usage" in json_data
+                        "choices" in json_data
+                        and len(json_data["choices"]) > 0
+                        and ("delta" in json_data["choices"][0] or "usage" in json_data)
                     ):
-                        yield f"data: {json.dumps(json_data)}\n\n", json_data
+                        # Check if we have reasoning in the delta and ensure it's preserved
+                        if (
+                            "delta" in json_data["choices"][0]
+                            and "reasoning" in json_data["choices"][0]["delta"]
+                        ):
+                            # Ensure we preserve the reasoning field in the response
+                            yield f"data: {json.dumps(json_data)}\n\n", json_data
+                        else:
+                            # For regular content updates
+                            yield f"data: {json.dumps(json_data)}\n\n", json_data
                 except json.JSONDecodeError:
                     logger.debug(f"Incomplete JSON chunk (expected): {data}")
                     continue
@@ -370,13 +386,17 @@ async def chatCompletionGenerate(
     user: User = Depends(verify_user),
     flow_id: Optional[str] = None,
 ) -> Response:
-    track("generate_request", {
-        "model": req.model,
-        "stream": req.stream,
-        "user_id": str(user.id),
-        "has_flow_id": flow_id is not None,
-        "messages_count": len(req.messages)
-    })
+    track(
+        "generate_request",
+        {
+            "model": req.model,
+            "stream": req.stream,
+            "user_id": str(user.id),
+            "has_flow_id": flow_id is not None,
+            "messages_count": len(req.messages),
+            "reasoning_effort": req.reasoning_effort,
+        },
+    )
 
     timeStart = time.time()
 
@@ -384,20 +404,26 @@ async def chatCompletionGenerate(
         # Fix type conversion for user_id
         user_credits = await get_user_credits((user.id), db)
         if user_credits <= 0:
-            track("generate_error", {
-                "user_id": str(user.id),
-                "error": "insufficient_credits",
-                "credits": user_credits
-            })
+            track(
+                "generate_error",
+                {
+                    "user_id": str(user.id),
+                    "error": "insufficient_credits",
+                    "credits": user_credits,
+                },
+            )
             raise HTTPException(status_code=402, detail="Insufficient credits")
 
         supported_models = await get_supported_models()
         if req.model not in supported_models:
-            track("generate_error", {
-                "user_id": str(user.id),
-                "error": "unsupported_model",
-                "model": req.model
-            })
+            track(
+                "generate_error",
+                {
+                    "user_id": str(user.id),
+                    "error": "unsupported_model",
+                    "model": req.model,
+                },
+            )
             raise HTTPException(status_code=400, detail="Unsupported model")
 
         model_config = supported_models[req.model]
@@ -447,12 +473,15 @@ async def chatCompletionGenerate(
                     async for message, data in stream_response(llmres):
                         if ttfs is None:
                             ttfs = time.time() - timeStart
-                            track("generate_first_token", {
-                                "user_id": str(user.id),
-                                "model": original_req_model,
-                                "ttfs": ttfs,
-                                "stream": req.stream
-                            })
+                            track(
+                                "generate_first_token",
+                                {
+                                    "user_id": str(user.id),
+                                    "model": original_req_model,
+                                    "ttfs": ttfs,
+                                    "stream": req.stream,
+                                },
+                            )
 
                         if "usage" in data:
                             usage = data["usage"]
@@ -460,10 +489,10 @@ async def chatCompletionGenerate(
                         yield message
 
                 except Exception as e:
-                    track("generate_stream_error", {
-                        "user_id": str(user.id),
-                        "error": str(e)
-                    })
+                    track(
+                        "generate_stream_error",
+                        {"user_id": str(user.id), "error": str(e)},
+                    )
                     logger.error(f"Generation error: {str(e)}")
                     yield f"data: {json.dumps({'error': str(e)})}\n\n"
                 finally:
@@ -483,10 +512,10 @@ async def chatCompletionGenerate(
                         )
 
                     except Exception as log_error:
-                        track("generate_log_error", {
-                            "user_id": str(user.id),
-                            "error": str(log_error)
-                        })
+                        track(
+                            "generate_log_error",
+                            {"user_id": str(user.id), "error": str(log_error)},
+                        )
                         logger.error(f"Log saving error: {str(log_error)}")
 
         if req.stream:
@@ -514,15 +543,18 @@ async def chatCompletionGenerate(
             result_text = content_json["choices"][0]["message"]["content"]
             ttfs = time.time() - timeStart
             usage = content_json.get("usage", {})
-            
-            track("generate_completion", {
-                "user_id": str(user.id),
-                "model": original_req_model,
-                "ttfs": ttfs,
-                "prompt_tokens": usage.get("prompt_tokens", 0),
-                "completion_tokens": usage.get("completion_tokens", 0),
-                "total_tokens": usage.get("total_tokens", 0)
-            })
+
+            track(
+                "generate_completion",
+                {
+                    "user_id": str(user.id),
+                    "model": original_req_model,
+                    "ttfs": ttfs,
+                    "prompt_tokens": usage.get("prompt_tokens", 0),
+                    "completion_tokens": usage.get("completion_tokens", 0),
+                    "total_tokens": usage.get("total_tokens", 0),
+                },
+            )
 
             # Handle machine_id safely
             machine_ip = llmres.headers.get("x-machine-ip", "")
@@ -550,10 +582,7 @@ async def chatCompletionGenerate(
             )
 
     except Exception as e:
-        track("generate_error", {
-            "user_id": str(user.id),
-            "error": str(e)
-        })
+        track("generate_error", {"user_id": str(user.id), "error": str(e)})
         logger.error(f"Request processing error: {str(e)}")
         raise HTTPException(
             status_code=500,
