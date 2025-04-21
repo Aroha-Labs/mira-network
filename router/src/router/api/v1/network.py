@@ -394,6 +394,7 @@ async def chatCompletionGenerate(
             "user_id": str(user.id),
             "has_flow_id": flow_id is not None,
             "messages_count": len(req.messages),
+            "reasoning_effort": req.reasoning_effort,
         },
     )
 
