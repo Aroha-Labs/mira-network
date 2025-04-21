@@ -75,21 +75,6 @@ export default function ChatBubble({
     return "high";
   };
 
-  const reasoningLevel = getReasoningLevel();
-  const reasoningColors = {
-    none: "text-gray-400",
-    low: "text-gray-500",
-    medium: "text-yellow-500",
-    high: "text-red-500",
-  };
-
-  const reasoningTooltips = {
-    none: "No reasoning available",
-    low: "Basic reasoning",
-    medium: "Detailed reasoning",
-    high: "Extensive reasoning",
-  };
-
   return (
     <div
       className={`group flex flex-col space-y-2 max-w-2xl mx-auto ${
