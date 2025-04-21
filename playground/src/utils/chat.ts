@@ -4,8 +4,9 @@ import api from "src/lib/axios";
 export interface Message {
   role: "user" | "assistant" | "system";
   content: string;
-  tool_calls?: ToolCall[];
-  tool_responses?: ToolResponse[];
+  reasoning?: string | undefined;
+  tool_calls?: ToolCall[] | undefined;
+  tool_responses?: ToolResponse[] | undefined;
 }
 
 interface StreamProcessor {
@@ -37,7 +38,7 @@ export interface Tool {
   function: FunctionDefinition;
 }
 
-interface ChatCompletionOptions {
+export interface ChatCompletionOptions {
   messages: Message[];
   model: string;
   variables?: Record<string, string>;
@@ -45,6 +46,7 @@ interface ChatCompletionOptions {
   flowId?: number;
   endpoint: string;
   tools?: Tool[];
+  reasoning_effort?: "low" | "medium" | "high";
 }
 
 export interface ToolCall {
@@ -85,6 +87,13 @@ async function getAuthHeaders() {
   };
 }
 
+// Potential sanitization function
+export function sanitizeText(text: string | undefined | null): string {
+  console.log("Sanitizing text:", text);
+  if (text === undefined || text === null) return '';
+  return text.replace(/\0/g, '').trim();
+}
+
 export async function processStream(
   response: Response,
   { onMessage, onError, onDone }: StreamProcessor
@@ -120,15 +129,55 @@ export async function processStream(
 
             // Direct content field (current implementation)
             if (parsed.content) {
-              onMessage(parsed.content);
+              onMessage({
+                role: "assistant",
+                content: sanitizeText(parsed.content),
+                reasoning: undefined
+              });
             }
+
             // OpenAI-style format with choices and delta
             else if (parsed.choices && parsed.choices.length > 0) {
               const choice = parsed.choices[0];
-              if (choice.delta && choice.delta.content) {
-                onMessage(choice.delta.content);
-              } else if (choice.message && choice.message.content) {
-                onMessage(choice.message.content);
+              if (choice.delta) {
+                // Handle both content and reasoning if present
+                const message: Partial<Message> = {
+                  role: choice.delta.role || "assistant",
+                  content: "",
+                  reasoning: undefined
+                };
+
+                // Handle content and reasoning separately to ensure they're preserved
+                if (choice.delta.content !== undefined) {
+                  message.content = sanitizeText(choice.delta.content);
+                }
+
+                if (choice.delta.reasoning !== undefined) {
+                  message.reasoning = sanitizeText(choice.delta.reasoning);
+                }
+
+                // Only send if we have either content or reasoning
+                if (message.content !== undefined || message.reasoning !== undefined) {
+                  onMessage(message as Message);
+                }
+              } else if (choice.message) {
+                const message: Partial<Message> = {
+                  role: "assistant",
+                  content: "",
+                  reasoning: undefined
+                };
+
+                if (choice.message.content !== undefined) {
+                  message.content = sanitizeText(choice.message.content);
+                }
+
+                if (choice.message.reasoning !== undefined) {
+                  message.reasoning = sanitizeText(choice.message.reasoning);
+                }
+
+                if (message.content !== undefined || message.reasoning !== undefined) {
+                  onMessage(message as Message);
+                }
               }
             }
             // Log unhandled formats to help debug
@@ -211,6 +260,7 @@ interface ChatRequestBody {
     api_key: string;
   } | null;
   flow_id?: number;
+  reasoning_effort?: "low" | "medium" | "high";
 }
 
 interface FlowRequestBody {
@@ -228,7 +278,7 @@ export async function streamChatCompletion(
 ) {
   try {
     const headers = await getAuthHeaders();
-    const { endpoint, flowId, systemPrompt, tools, ...chatOptions } = options;
+    const { endpoint, flowId, systemPrompt, tools, reasoning_effort, ...chatOptions } = options;
 
     // Convert tools to match backend's Tool model exactly
     const serializedTools = tools?.map((tool) => {
@@ -261,12 +311,19 @@ export async function streamChatCompletion(
         messages[0] = { ...systemMessage, content };
       }
 
-      body = {
+      // Only include reasoning_effort if it's not "low"
+      const requestBody: ChatRequestBody = {
         ...chatOptions,
         messages,
         tools: serializedTools,
         stream: true,
-      } as ChatRequestBody;
+      };
+
+      if (reasoning_effort && reasoning_effort !== "low") {
+        requestBody.reasoning_effort = reasoning_effort;
+      }
+
+      body = requestBody;
     } else {
       // Flow request - use existing format
       body = flowId
@@ -274,6 +331,7 @@ export async function streamChatCompletion(
           ...chatOptions,
           tools: serializedTools,
           stream: true,
+          ...(reasoning_effort && reasoning_effort !== "low" ? { reasoning_effort } : {}),
         } as ChatRequestBody)
         : ({
           req: {
@@ -284,6 +342,7 @@ export async function streamChatCompletion(
             ...chatOptions,
             tools: serializedTools,
             stream: true,
+            ...(reasoning_effort && reasoning_effort !== "low" ? { reasoning_effort } : {}),
           },
         } as FlowRequestBody);
     }

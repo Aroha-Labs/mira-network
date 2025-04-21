@@ -104,6 +104,7 @@ const getModelProvider = (
 type GetLlmCompletionRequest = OpenAI.ChatCompletionCreateParams & {
   model: string;
   modelProvider: ModelProvider;
+  reasoning_effort?: "low" | "medium" | "high" | undefined;
 };
 
 // LLM Completion function that handles streaming and non-streaming responses
@@ -113,6 +114,7 @@ async function getLlmCompletion({
   messages,
   stream = false,
   logger,
+  reasoning_effort
 }: GetLlmCompletionRequest & { logger: import('fastify').FastifyBaseLogger }) {
   logger.info({
     msg: 'Starting LLM completion request',
@@ -127,11 +129,33 @@ async function getLlmCompletion({
       baseURL: modelProvider.baseUrl,
     });
 
-    const response = await openai.chat.completions.create({
-      model,
-      messages,
-      stream,
-    });
+    let response;
+
+    if (reasoning_effort) {
+      logger.info({
+        reasoning_effort,
+        model,
+      });
+
+      response = await (openai.chat.completions.create({
+        model,
+        messages,
+        stream,
+        reasoning: {
+          effort: reasoning_effort,
+        },
+      } as any) as Promise<any>);
+      logger.info({
+        msg: 'LLM completion response',
+        response
+      });
+    } else {
+      response = await openai.chat.completions.create({
+        model,
+        messages,
+        stream,
+      });
+    }
 
     logger.info({
       msg: 'LLM completion request successful',
@@ -237,12 +261,15 @@ const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
       try {
         const [provider, modelName] = getModelProvider(model, modelProvider);
 
+        const reasoningEffort: "low" | "medium" | "high" | undefined = request.body.reasoning_effort || undefined;
+
         const response = await getLlmCompletion({
           model: modelName,
           modelProvider: provider,
           messages,
           stream: !!stream,
           logger: fastify.log,
+          reasoning_effort: reasoningEffort
         });
 
         if (!stream) {
