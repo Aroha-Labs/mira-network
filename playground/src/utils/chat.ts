@@ -91,7 +91,7 @@ async function getAuthHeaders() {
 export function sanitizeText(text: string | undefined | null): string {
   console.log("Sanitizing text:", text);
   if (text === undefined || text === null) return '';
-  return text.replace(/\0/g, '').trim();
+  return text
 }
 
 export async function processStream(
