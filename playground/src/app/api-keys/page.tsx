@@ -24,6 +24,7 @@ import toast from "react-hot-toast";
 import CopyToClipboardIcon from "src/components/CopyToClipboardIcon";
 import { Menu, Transition } from "@headlessui/react";
 import { Fragment } from "react";
+import { trackEvent } from "src/lib/mira";
 
 interface ApiKey {
   id: number;
@@ -124,6 +125,7 @@ const ApiKeyPage = () => {
   });
 
   const handleAddApiKey = () => {
+    trackEvent('api_key_add_modal_open', {});
     if (!description.trim()) {
       toast.error("Description is required");
       return;
@@ -174,10 +176,12 @@ const ApiKeyPage = () => {
   };
 
   const handleDeleteApiKey = (tokenId: string) => {
+    trackEvent('api_key_delete_click', {});
     setTokenToDelete(tokenId);
   };
 
   const confirmDeleteApiKey = () => {
+    trackEvent('api_key_delete_confirm', {});
     if (tokenToDelete) {
       deleteMutation.mutate(tokenToDelete);
     }
@@ -412,9 +416,8 @@ const ApiKeyPage = () => {
                                   {({ active }) => (
                                     <button
                                       onClick={() => handleDeleteApiKey(apiKey.token)}
-                                      className={`${
-                                        active ? "bg-red-50" : ""
-                                      } group flex items-center w-full px-4 py-2 text-sm text-red-600 hover:text-red-700`}
+                                      className={`${active ? "bg-red-50" : ""
+                                        } group flex items-center w-full px-4 py-2 text-sm text-red-600 hover:text-red-700`}
                                     >
                                       <TrashIcon className="mr-3 h-4 w-4" />
                                       Delete Key

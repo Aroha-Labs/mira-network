@@ -5,6 +5,7 @@ import { CheckIcon } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
 import api from "src/lib/axios";
 import { User } from "src/types/user";
+import { trackEvent } from "src/lib/mira";
 
 interface ManageUserRolesProps {
   user: User;
@@ -47,6 +48,13 @@ const ManageUserRoles = ({ user, onClose }: ManageUserRolesProps) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    trackEvent('admin_update_user_roles', {
+      user_id: user.user_id,
+      previous_roles: user.custom_claim?.roles || [],
+      new_roles: selectedRoles
+    });
+
     updateUserRolesMutation.mutate(selectedRoles);
   };
 
@@ -57,11 +65,10 @@ const ManageUserRoles = ({ user, onClose }: ManageUserRolesProps) => {
           {roles.map((role) => (
             <label
               key={role}
-              className={`flex items-center justify-between p-3 rounded-lg border ${
-                selectedRoles.includes(role)
-                  ? "border-blue-500 bg-blue-50"
-                  : "border-gray-200 hover:border-gray-300"
-              } cursor-pointer transition-colors duration-150`}
+              className={`flex items-center justify-between p-3 rounded-lg border ${selectedRoles.includes(role)
+                ? "border-blue-500 bg-blue-50"
+                : "border-gray-200 hover:border-gray-300"
+                } cursor-pointer transition-colors duration-150`}
             >
               <div className="flex items-center">
                 <div className="ml-3">
@@ -76,11 +83,10 @@ const ManageUserRoles = ({ user, onClose }: ManageUserRolesProps) => {
                 </div>
               </div>
               <div
-                className={`shrink-0 h-6 w-6 rounded-full border-2 flex items-center justify-center ${
-                  selectedRoles.includes(role)
-                    ? "border-blue-500 bg-blue-500"
-                    : "border-gray-300"
-                }`}
+                className={`shrink-0 h-6 w-6 rounded-full border-2 flex items-center justify-center ${selectedRoles.includes(role)
+                  ? "border-blue-500 bg-blue-500"
+                  : "border-gray-300"
+                  }`}
                 onClick={() => handleRoleChange(role)}
               >
                 {selectedRoles.includes(role) && (
