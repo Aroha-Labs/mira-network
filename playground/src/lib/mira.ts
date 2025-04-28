@@ -1,4 +1,4 @@
-import { MiraAnalytics } from 'mira-data-stream';
+import { MiraAnalytics } from '@mira-network/mira-data-stream';
 
 // Initialize with singleton pattern
 let miraInstance: MiraAnalytics | null = null;
