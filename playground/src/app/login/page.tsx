@@ -6,6 +6,7 @@ import { useSession } from "src/hooks/useSession";
 import React from "react";
 import { supabase } from "src/utils/supabase/client";
 import Loading from "src/components/PageLoading";
+import { trackEvent } from "src/lib/mira";
 
 export default function Login() {
   const router = useRouter();
@@ -36,6 +37,10 @@ export default function Login() {
 
   const handleLogin = async (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
     e.preventDefault();
+    trackEvent('login_click', {
+      provider: 'google',
+      redirect_path: redirect
+    });
     supabase.auth.signInWithOAuth({
       provider: "google",
       options: {

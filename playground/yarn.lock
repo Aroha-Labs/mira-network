@@ -3193,6 +3193,10 @@ minimist@^1.2.0, minimist@^1.2.6:
   resolved "https://registry.npmjs.org/minimist/-/minimist-1.2.8.tgz"
   integrity sha512-2yyAR8qBkN3YuheJanUpWC5U3bb5osDywNB8RzDVlDwDHbocAJveqqj1u8+SVD7jkWT4yvsHCpWqqWqAxb0zCA==
 
+"mira-data-stream@file:packages/mira-data-stream-0.1.0.tgz":
+  version "0.1.0"
+  resolved "file:packages/mira-data-stream-0.1.0.tgz#e32b9599979ee7269dc7c715a4eab5b80adc1bac"
+
 ms@^2.1.1, ms@^2.1.3:
   version "2.1.3"
   resolved "https://registry.npmjs.org/ms/-/ms-2.1.3.tgz"

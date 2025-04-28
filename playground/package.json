@@ -34,6 +34,7 @@
     "react-hot-toast": "^2.5.2",
     "react-markdown": "^10.0.1",
     "remark-gfm": "^4.0.1",
+    "mira-data-stream": "file:packages/mira-data-stream-0.1.0.tgz",
     "sass": "^1.86.3"
   },
   "devDependencies": {

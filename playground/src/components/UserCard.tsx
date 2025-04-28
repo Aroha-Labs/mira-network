@@ -12,6 +12,7 @@ import { USDollar } from "src/utils/currency";
 import MetricsModal from "./MetricsModal";
 import AddCreditsModal from "src/components/AddCreditsModal";
 import { formatDateTime, formatRelativeTime } from "src/utils/date";
+import { trackEvent } from "src/lib/mira";
 
 const RoleTag = ({ role }: { role: string }) => {
   const roleStyles = {
@@ -93,6 +94,9 @@ const UserCard = ({ user }: { user: User }) => {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
   const handleManageRoles = () => {
+    trackEvent('admin_manage_roles_click', {
+      user_id: user.user_id
+    });
     setIsRolesModalOpen(true);
   };
 
@@ -153,7 +157,12 @@ const UserCard = ({ user }: { user: User }) => {
                 {/* Desktop Actions */}
                 <div className="hidden lg:flex items-center gap-1">
                   <button
-                    onClick={() => setSelectedUserId(user.user_id)}
+                    onClick={() => {
+                      trackEvent('admin_view_metrics_click', {
+                        user_id: user.user_id
+                      });
+                      setSelectedUserId(user.user_id);
+                    }}
                     className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-md transition-colors"
                     title="View Metrics"
                   >
@@ -167,7 +176,12 @@ const UserCard = ({ user }: { user: User }) => {
                     <UserGroupIcon className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={() => setIsAddCreditsModalOpen(true)}
+                    onClick={() => {
+                      trackEvent('admin_add_credits_click', {
+                        user_id: user.user_id
+                      });
+                      setIsAddCreditsModalOpen(true);
+                    }}
                     className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-md transition-colors"
                     title="Add Credits"
                   >
@@ -196,7 +210,12 @@ const UserCard = ({ user }: { user: User }) => {
           <div className="lg:hidden flex items-center justify-between border-t border-gray-100 pt-3 mt-1">
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setSelectedUserId(user.user_id)}
+                onClick={() => {
+                  trackEvent('admin_view_metrics_click', {
+                    user_id: user.user_id
+                  });
+                  setSelectedUserId(user.user_id);
+                }}
                 className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-md transition-colors"
                 title="View Metrics"
               >
@@ -210,7 +229,12 @@ const UserCard = ({ user }: { user: User }) => {
                 <UserGroupIcon className="w-5 h-5" />
               </button>
               <button
-                onClick={() => setIsAddCreditsModalOpen(true)}
+                onClick={() => {
+                  trackEvent('admin_add_credits_click', {
+                    user_id: user.user_id
+                  });
+                  setIsAddCreditsModalOpen(true);
+                }}
                 className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-md transition-colors"
                 title="Add Credits"
               >
