@@ -5,6 +5,10 @@ import { useCaptcha } from "src/contexts/CaptchaContext";
 export const CaptchaModal: React.FC = () => {
   const { showCaptcha, verify } = useCaptcha();
 
+  if (!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY) {
+    throw new Error("NEXT_PUBLIC_TURNSTILE_SITE_KEY is not set");
+  }
+
   if (!showCaptcha) return null;
 
   return (

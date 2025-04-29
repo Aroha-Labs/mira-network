@@ -4,7 +4,7 @@ import Loading from "src/components/PageLoading";
 
 // Hook for protecting content
 export const useCaptchaProtection = () => {
-  const { isVerified, showCaptcha, verify, checkStatus } = useCaptcha();
+  const { isVerified, showCaptcha } = useCaptcha();
   return { isVerified, showCaptcha };
 };
 
