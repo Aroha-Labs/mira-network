@@ -46,7 +46,7 @@ transport = httpx.AsyncHTTPTransport(retries=3)
     response_description=verify_doc["response_description"],
     responses=verify_doc["responses"],
 )
-async def verify(req: VerifyRequest, db: DBSession):
+async def verify(req: VerifyRequest, db: DBSession, user: User = Depends(verify_user)):
     track(
         "verify_request",
         {
