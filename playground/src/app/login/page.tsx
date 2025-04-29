@@ -50,12 +50,6 @@ export default function Login() {
       provider: 'google',
       redirect_path: redirect
     });
-    supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}${redirect}`,
-      },
-    });
 
     if (!captchaToken) {
       // Show error to user that CAPTCHA is required
