@@ -14,6 +14,10 @@ export default function Login() {
   const searchParams = useSearchParams();
   const redirect = searchParams.get("redirect") || "/";
 
+  if (!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY) {
+    throw new Error("NEXT_PUBLIC_TURNSTILE_SITE_KEY environment variable is required");
+  }
+
   // Properly typed state
   const [captchaToken, setCaptchaToken] = useState<string | undefined>(undefined);
   const [isAuthenticating, setIsAuthenticating] = useState(false);

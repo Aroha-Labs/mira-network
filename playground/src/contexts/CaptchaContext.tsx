@@ -15,7 +15,6 @@ interface VerificationRecord {
   token: string;
 }
 
-const VERIFICATION_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 const STORAGE_KEY = "mira_captcha_verification";
 
 const CaptchaContext = createContext<CaptchaContextType>({
