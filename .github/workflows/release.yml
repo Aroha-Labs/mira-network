@@ -515,6 +515,7 @@ jobs:
           NEXT_PUBLIC_API_BASE_URL: https://api.mira.network
           NEXT_PUBLIC_LLM_BASE_URL: https://api.mira.network/v1
           NEXT_PUBLIC_VERSION: ${{ env.VERSION }}
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: 0x4AAAAAABV1i7eCmIhJlT-V
         run: yarn build
       - name: Publish to Cloudflare Pages
         uses: cloudflare/pages-action@v1
