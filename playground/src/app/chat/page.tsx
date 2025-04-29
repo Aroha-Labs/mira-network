@@ -13,6 +13,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useSession } from "src/hooks/useSession";
 import { Message, sanitizeText } from "src/utils/chat";
 import { Brain } from "lucide-react";
+import { trackEvent } from "src/lib/mira";
 import api from "src/lib/axios";
 
 const fetchChatCompletion = async (
@@ -176,6 +177,12 @@ export default function Chat() {
       return;
     }
 
+    trackEvent('chat_message_sent', {
+      model: selectedModel,
+      reasoning_effort: reasoningEffort,
+      message_length: i.length
+    });
+
     setIsSending(true);
     setErrorMessage("");
 
@@ -318,6 +325,7 @@ export default function Chat() {
   };
 
   const handleClearHistory = () => {
+    trackEvent('chat_clear_history', {});
     setShowConfirmModal(true);
   };
 
@@ -452,15 +460,14 @@ export default function Chat() {
               </select>
               <div className="absolute transform -translate-y-1/2 pointer-events-none left-3 top-1/2">
                 <Brain
-                  className={`w-4 h-4 ${
-                    reasoningEffort === "disabled"
-                      ? "text-gray-400"
-                      : reasoningEffort === "low"
-                        ? "text-blue-500"
-                        : reasoningEffort === "medium"
-                          ? "text-yellow-500"
-                          : "text-red-500"
-                  }`}
+                  className={`w-4 h-4 ${reasoningEffort === "disabled"
+                    ? "text-gray-400"
+                    : reasoningEffort === "low"
+                      ? "text-blue-500"
+                      : reasoningEffort === "medium"
+                        ? "text-yellow-500"
+                        : "text-red-500"
+                    }`}
                 />
               </div>
               <div className="absolute transform -translate-y-1/2 pointer-events-none right-2 top-1/2">

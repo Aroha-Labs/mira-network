@@ -6,6 +6,7 @@ import { useSession } from "src/hooks/useSession";
 import React from "react";
 import { supabase } from "src/utils/supabase/client";
 import Loading from "src/components/PageLoading";
+import { trackEvent } from "src/lib/mira";
 import { Turnstile } from "@marsidev/react-turnstile";
 
 export default function Login() {
@@ -45,6 +46,10 @@ export default function Login() {
 
   const handleLogin = async (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
     e.preventDefault();
+    trackEvent('login_click', {
+      provider: 'google',
+      redirect_path: redirect
+    });
 
     if (!captchaToken) {
       // Show error to user that CAPTCHA is required

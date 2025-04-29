@@ -3,6 +3,7 @@ import Modal from "src/components/Modal";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
 import api from "src/lib/axios";
+import { trackEvent } from "src/lib/mira";
 
 interface AddCreditsModalProps {
   userId: string;
@@ -35,6 +36,12 @@ const AddCreditsModal = ({ userId, userName, onClose }: AddCreditsModalProps) =>
 
   const handleAddCredits = (e: React.FormEvent) => {
     e.preventDefault();
+
+    trackEvent('admin_add_credits', {
+      user_id: userId,
+      amount: credits
+    });
+
     addCreditsMutation.mutate(credits);
   };
 
