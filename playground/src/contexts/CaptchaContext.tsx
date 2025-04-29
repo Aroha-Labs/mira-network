@@ -43,22 +43,6 @@ export const CaptchaProvider: React.FC<{ children: React.ReactNode }> = ({
     localStorage.setItem(STORAGE_KEY, JSON.stringify(record));
   };
 
-  const getStoredVerification = (): VerificationRecord | null => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) return null;
-
-    try {
-      const record: VerificationRecord = JSON.parse(stored);
-      // Check if verification is still valid (within 24 hours)
-      if (Date.now() - record.timestamp < VERIFICATION_DURATION) {
-        return record;
-      }
-    } catch (e) {
-      console.error("Error parsing stored verification:", e);
-    }
-    return null;
-  };
-
   const verify = async (token: string) => {
     if (!session?.user?.id) return;
 
