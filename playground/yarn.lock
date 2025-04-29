@@ -316,6 +316,11 @@
   resolved "https://registry.npmjs.org/@kurkle/color/-/color-0.3.4.tgz"
   integrity sha512-M5UknZPHRu3DEDWoipU6sE8PdkZ6Z/S+v4dD+Ke8IaNlpdSQah50lz1KtcFBa2vsdOnwbbnxJwVM4wty6udA5w==
 
+"@mira-network/mira-data-stream@^0.1.0":
+  version "0.1.0"
+  resolved "https://registry.yarnpkg.com/@mira-network/mira-data-stream/-/mira-data-stream-0.1.0.tgz#999f769ad948fb735c2eaf9b35d9ce21ec0ed9af"
+  integrity sha512-8whyjDJCORh8LXe5NqZFYb2Ip18zsmoGNYqVvT0cawoLerOH4tB7Y0ZupBHP2f1V+CXW2xn8MR+e+FuUxD5FKg==
+
 "@marsidev/react-turnstile@^1.1.0":
   version "1.1.0"
   resolved "https://registry.yarnpkg.com/@marsidev/react-turnstile/-/react-turnstile-1.1.0.tgz#2209c431baf2a18a104600999389f6fce2dc2553"
