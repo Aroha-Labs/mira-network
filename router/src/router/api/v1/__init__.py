@@ -9,6 +9,7 @@ from .proxy import router as proxy_router
 from .users import router as users_router  # Add users import
 from .wallet import router as wallet_router
 from .thread import router as thread_router
+from src.router.api.v1.captcha import router as captcha_router
 
 router = APIRouter()
 
@@ -23,5 +24,6 @@ router.include_router(proxy_router, tags=["proxy"])
 router.include_router(users_router, tags=["users"])  # Add users router
 router.include_router(wallet_router, tags=["wallet"])
 router.include_router(thread_router, tags=["thread"])
+router.include_router(captcha_router, prefix="/captcha", tags=["captcha"])
 
 __all__ = ["router"]

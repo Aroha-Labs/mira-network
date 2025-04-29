@@ -13,6 +13,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useSession } from "src/hooks/useSession";
 import { Message, sanitizeText } from "src/utils/chat";
 import { Brain } from "lucide-react";
+import api from "src/lib/axios";
 
 const fetchChatCompletion = async (
   messages: Message[],
@@ -100,12 +101,9 @@ const fetchChatCompletion = async (
 };
 
 const fetchSupportedModels = async () => {
-  const response = await fetch(`${LLM_BASE_URL}/models`);
-  if (!response.ok) {
-    throw new Error("Failed to fetch supported models");
-  }
-  const data = await response.json();
-  return data.data.map((model: { id: string }) => model.id);
+  const response = await api.get("/v1/models");
+  console.log("Supported models:", response.data);
+  return response.data.data.map((model: { id: string }) => model.id);
 };
 
 export default function Chat() {
