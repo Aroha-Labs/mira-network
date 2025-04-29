@@ -10,7 +10,7 @@ export const CaptchaModal: React.FC = () => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
       <div className="w-full max-w-md p-8 bg-white rounded-lg shadow-xl">
-        <h2 className="mb-4 text-2xl font-bold text-center">Verify You're Human</h2>
+        <h2 className="mb-4 text-2xl font-bold text-center">Verify You&apos;re Human</h2>
         <p className="mb-6 text-center text-gray-600">
           Please complete the verification to continue using Mira.
         </p>
