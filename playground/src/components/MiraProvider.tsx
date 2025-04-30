@@ -1,11 +1,11 @@
 // src/components/MiraProvider.tsx
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, Suspense } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { trackPageView } from '../lib/mira';
 
-export function MiraProvider({ children }: { children: React.ReactNode }) {
+function MiraAnalytics() {
     const pathname = usePathname();
     const searchParams = useSearchParams();
 
@@ -17,5 +17,16 @@ export function MiraProvider({ children }: { children: React.ReactNode }) {
         });
     }, [pathname, searchParams]);
 
-    return <>{children}</>;
+    return null;
+}
+
+export function MiraProvider({ children }: { children: React.ReactNode }) {
+    return (
+        <>
+            <Suspense fallback={null}>
+                <MiraAnalytics />
+            </Suspense>
+            {children}
+        </>
+    );
 }
