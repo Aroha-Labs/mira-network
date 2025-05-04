@@ -5,7 +5,7 @@ import Link from "next/link";
 import ChatBubble from "src/components/ChatBubble";
 // import SystemPromptInput from "src/components/SystemPromptInput";
 import { ChatBubbleBottomCenterIcon, StopIcon } from "@heroicons/react/24/outline";
-import { Cog6ToothIcon, ArrowPathIcon } from "@heroicons/react/24/solid";
+import { Cog6ToothIcon } from "@heroicons/react/24/solid";
 import Loading, { Spinner } from "src/components/PageLoading";
 import AutoGrowTextarea from "src/components/AutoGrowTextarea";
 import ConfirmModal from "src/components/ConfirmModal";
@@ -515,7 +515,7 @@ export default function Chat() {
             <div className="mb-2 text-xl font-medium">Start chatting with AI</div>
             <div className="max-w-md text-sm text-center text-gray-400">
               Send a message to begin your conversation. Use the configuration options to
-              customize the AI's response.
+              customize the AI&apos;s response.
             </div>
           </div>
         ) : (
