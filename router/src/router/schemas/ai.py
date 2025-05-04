@@ -43,6 +43,7 @@ class AiRequest(BaseModel):
     reasoning_effort: Optional[Literal["high", "medium", "low"]] = Field(
         None, title="Reasoning Effort"
     )
+    max_tokens: Optional[int] = Field(None, title="Max Tokens")
 
 
 class VerifyRequest(BaseModel):

@@ -105,6 +105,7 @@ type GetLlmCompletionRequest = OpenAI.ChatCompletionCreateParams & {
   model: string;
   modelProvider: ModelProvider;
   reasoning_effort?: "low" | "medium" | "high" | undefined;
+  max_tokens?: number;
 };
 
 // LLM Completion function that handles streaming and non-streaming responses
@@ -114,7 +115,8 @@ async function getLlmCompletion({
   messages,
   stream = false,
   logger,
-  reasoning_effort
+  reasoning_effort,
+  max_tokens
 }: GetLlmCompletionRequest & { logger: import('fastify').FastifyBaseLogger }) {
   logger.info({
     msg: 'Starting LLM completion request',
@@ -144,6 +146,7 @@ async function getLlmCompletion({
         reasoning: {
           effort: reasoning_effort,
         },
+        max_tokens: max_tokens || undefined
       } as any) as Promise<any>);
       logger.info({
         msg: 'LLM completion response',
@@ -154,6 +157,7 @@ async function getLlmCompletion({
         model,
         messages,
         stream,
+        max_tokens: max_tokens || undefined
       });
     }
 
@@ -245,7 +249,7 @@ const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
       const requestId = request.id;
       const startTime = Date.now();
 
-      const { model, modelProvider, messages, stream = false } = request.body;
+      const { model, modelProvider, messages, stream = false, max_tokens } = request.body;
 
       if (!messages || !messages.some((msg) => msg.role === "user")) {
         fastify.log.warn({
@@ -269,7 +273,8 @@ const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
           messages,
           stream: !!stream,
           logger: fastify.log,
-          reasoning_effort: reasoningEffort
+          reasoning_effort: reasoningEffort,
+          max_tokens: max_tokens || undefined
         });
 
         if (!stream) {
@@ -358,7 +363,7 @@ const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
 
         const response = await openai.chat.completions.create({
           model: modelName,
-          messages: messages as OpenAI.ChatCompletionMessageParam[], 
+          messages: messages as OpenAI.ChatCompletionMessageParam[],
           stream: false,
           tools: [{
             type: "function",
@@ -386,7 +391,7 @@ const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
 
 
         const toolCall = response.choices[0].message.tool_calls?.[0];
-        
+
         if (toolCall) {
           const args = JSON.parse(toolCall.function.arguments) as VerifyFunctionArgs;
           return {
