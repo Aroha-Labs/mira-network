@@ -5,6 +5,7 @@ import Link from "next/link";
 import ChatBubble from "src/components/ChatBubble";
 // import SystemPromptInput from "src/components/SystemPromptInput";
 import { ChatBubbleBottomCenterIcon, StopIcon } from "@heroicons/react/24/outline";
+import { Cog6ToothIcon, ArrowPathIcon } from "@heroicons/react/24/solid";
 import Loading, { Spinner } from "src/components/PageLoading";
 import AutoGrowTextarea from "src/components/AutoGrowTextarea";
 import ConfirmModal from "src/components/ConfirmModal";
@@ -22,7 +23,8 @@ const fetchChatCompletion = async (
   controller: AbortController,
   model: string,
   token: string,
-  reasoningEffort: "disabled" | "low" | "medium" | "high" | undefined
+  reasoningEffort: "disabled" | "low" | "medium" | "high" | undefined,
+  maxTokens?: number
 ) => {
   const response = await fetch(`${LLM_BASE_URL}/chat/completions`, {
     method: "POST",
@@ -35,6 +37,7 @@ const fetchChatCompletion = async (
       messages,
       stream: true,
       reasoning_effort: reasoningEffort,
+      max_tokens: maxTokens || undefined,
     }),
     signal: controller.signal,
   });
@@ -116,11 +119,13 @@ export default function Chat() {
   const [isSending, setIsSending] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [showConfig, setShowConfig] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const [selectedModel, setSelectedModel] = useState("");
   const [reasoningEffort, setReasoningEffort] = useState<
     "disabled" | "low" | "medium" | "high"
   >("disabled");
+  const [maxTokens, setMaxTokens] = useState<number | undefined>(undefined);
 
   const {
     data: supportedModelsData,
@@ -161,6 +166,11 @@ export default function Chat() {
     setReasoningEffort(e.target.value as "disabled" | "low" | "medium" | "high");
   };
 
+  const handleMaxTokensChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value ? parseInt(e.target.value, 10) : undefined;
+    setMaxTokens(value);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -177,10 +187,10 @@ export default function Chat() {
       return;
     }
 
-    trackEvent('chat_message_sent', {
+    trackEvent("chat_message_sent", {
       model: selectedModel,
       reasoning_effort: reasoningEffort,
-      message_length: i.length
+      message_length: i.length,
     });
 
     setIsSending(true);
@@ -228,7 +238,8 @@ export default function Chat() {
         abortControllerRef.current,
         selectedModel,
         userSession.access_token,
-        reasoningEffort === "disabled" ? undefined : reasoningEffort
+        reasoningEffort === "disabled" ? undefined : reasoningEffort,
+        maxTokens
       );
     } catch (error) {
       const err = error as Error;
@@ -311,7 +322,8 @@ export default function Chat() {
         abortControllerRef.current,
         selectedModel,
         userSession.access_token,
-        reasoningEffort === "disabled" ? undefined : reasoningEffort
+        reasoningEffort === "disabled" ? undefined : reasoningEffort,
+        maxTokens
       );
     } catch (error) {
       if ((error as Error).name !== "AbortError") {
@@ -325,7 +337,7 @@ export default function Chat() {
   };
 
   const handleClearHistory = () => {
-    trackEvent('chat_clear_history', {});
+    trackEvent("chat_clear_history", {});
     setShowConfirmModal(true);
   };
 
@@ -375,26 +387,136 @@ export default function Chat() {
   };
 
   return (
-    <div className="flex flex-col items-center flex-1 bg-gray-100">
-      <div className="flex self-start justify-center p-1 m-1 bg-white">
-        <select
-          value={selectedModel}
-          onChange={handleModelChange}
-          className="p-1 border border-gray-300 rounded-md focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+    <div className="flex flex-col items-center flex-1 min-h-screen bg-gray-50">
+      <div className="sticky top-0 z-10 flex items-center justify-between w-full p-3 bg-white border-b border-gray-200 shadow-sm">
+        <div className="flex items-center space-x-2">
+          <select
+            value={selectedModel}
+            onChange={handleModelChange}
+            className="p-2 text-sm transition-colors bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-blue-400"
+          >
+            {supportedModelsOptions.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          {messages.length > 0 && (
+            <button
+              onClick={handleClearHistory}
+              className="p-2 text-sm text-gray-600 transition-colors rounded-md hover:text-red-500 hover:bg-red-50 focus:outline-none"
+              title="Clear chat history"
+            >
+              Clear History
+            </button>
+          )}
+        </div>
+
+        <button
+          onClick={() => setShowConfig(!showConfig)}
+          className={`p-2 rounded-md transition-colors focus:outline-none ${showConfig ? "bg-blue-50 text-blue-600" : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"}`}
+          title="Configuration"
         >
-          {supportedModelsOptions.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
+          <Cog6ToothIcon className="w-5 h-5" />
+        </button>
       </div>
+
+      {showConfig && (
+        <div className="w-full p-4 transition-all duration-300 ease-in-out bg-white border-b border-gray-200 shadow-sm">
+          <div className="flex flex-wrap max-w-3xl gap-6 mx-auto">
+            <div className="flex flex-col gap-1">
+              <label
+                htmlFor="reasoning-effort"
+                className="text-sm font-medium text-gray-700"
+              >
+                Reasoning Depth
+              </label>
+              <div className="relative">
+                <select
+                  id="reasoning-effort"
+                  value={reasoningEffort}
+                  onChange={handleReasoningEffortChange}
+                  className="w-56 py-2 pl-10 pr-8 text-sm font-medium transition-all duration-200 ease-in-out bg-white border border-gray-300 rounded-lg shadow-sm appearance-none cursor-pointer hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Select reasoning depth"
+                >
+                  <option value="disabled" className="text-gray-700 bg-gray-50">
+                    💡 No Reasoning
+                  </option>
+                  <option value="low" className="text-blue-700 bg-blue-50">
+                    🤔 Basic Reasoning
+                  </option>
+                  <option value="medium" className="text-yellow-700 bg-yellow-50">
+                    🧐 Detailed Reasoning
+                  </option>
+                  <option value="high" className="text-red-700 bg-red-50">
+                    🤯 Deep Reasoning
+                  </option>
+                </select>
+                <div className="absolute transform -translate-y-1/2 pointer-events-none left-3 top-1/2">
+                  <Brain
+                    className={`w-4 h-4 ${
+                      reasoningEffort === "disabled"
+                        ? "text-gray-400"
+                        : reasoningEffort === "low"
+                          ? "text-blue-500"
+                          : reasoningEffort === "medium"
+                            ? "text-yellow-500"
+                            : "text-red-500"
+                    }`}
+                  />
+                </div>
+                <div className="absolute transform -translate-y-1/2 pointer-events-none right-2 top-1/2">
+                  <svg
+                    className="w-5 h-5 text-gray-400"
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </div>
+              </div>
+              <p className="mt-1 text-xs text-gray-500">
+                Choose how much reasoning the AI should use
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label htmlFor="max-tokens" className="text-sm font-medium text-gray-700">
+                Max Output Tokens
+              </label>
+              <input
+                id="max-tokens"
+                type="number"
+                value={maxTokens || ""}
+                onChange={handleMaxTokensChange}
+                placeholder="Unlimited"
+                className="w-40 p-2 text-sm transition-colors border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-blue-400"
+                min="1"
+                max="8192"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Limit response length (leave empty for default)
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* <SystemPromptInput onChange={handleSystemPromptChange} /> */}
       <div className="flex-1 w-full p-4 space-y-6 overflow-y-auto">
         {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-gray-500">
-            <ChatBubbleBottomCenterIcon className="w-12 h-12 mb-4" />
-            <div>Start chatting...</div>
+          <div className="flex flex-col items-center justify-center text-gray-500 h-96">
+            <ChatBubbleBottomCenterIcon className="w-16 h-16 mb-6 text-gray-300" />
+            <div className="mb-2 text-xl font-medium">Start chatting with AI</div>
+            <div className="max-w-md text-sm text-center text-gray-400">
+              Send a message to begin your conversation. Use the configuration options to
+              customize the AI's response.
+            </div>
           </div>
         ) : (
           messages.map((msg, index) => (
@@ -435,58 +557,11 @@ export default function Chat() {
           </div>
         )}
       </div>
-      <div className="sticky bottom-0 w-full p-4 bg-white border-t border-gray-300">
-        <div className="flex flex-col max-w-2xl gap-2 mx-auto">
+      <div className="sticky bottom-0 w-full p-4 bg-white border-t border-gray-200 shadow-lg">
+        <div className="flex flex-col max-w-3xl gap-2 mx-auto">
           <div className="flex justify-center space-x-2">
-            <div className="relative flex items-center gap-2">
-              <select
-                value={reasoningEffort}
-                onChange={handleReasoningEffortChange}
-                className="py-2 pl-10 pr-8 text-sm font-medium transition-all duration-200 ease-in-out bg-white border border-gray-300 rounded-lg shadow-sm appearance-none cursor-pointer hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Select reasoning depth"
-              >
-                <option value="disabled" className="text-gray-700 bg-gray-50">
-                  💡 No Reasoning
-                </option>
-                <option value="low" className="text-blue-700 bg-blue-50">
-                  🤔 Basic Reasoning
-                </option>
-                <option value="medium" className="text-yellow-700 bg-yellow-50">
-                  🧐 Detailed Reasoning
-                </option>
-                <option value="high" className="text-red-700 bg-red-50">
-                  🤯 Deep Reasoning
-                </option>
-              </select>
-              <div className="absolute transform -translate-y-1/2 pointer-events-none left-3 top-1/2">
-                <Brain
-                  className={`w-4 h-4 ${reasoningEffort === "disabled"
-                    ? "text-gray-400"
-                    : reasoningEffort === "low"
-                      ? "text-blue-500"
-                      : reasoningEffort === "medium"
-                        ? "text-yellow-500"
-                        : "text-red-500"
-                    }`}
-                />
-              </div>
-              <div className="absolute transform -translate-y-1/2 pointer-events-none right-2 top-1/2">
-                <svg
-                  className="w-5 h-5 text-gray-400"
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              </div>
-            </div>
             <AutoGrowTextarea
-              className="flex-1 p-2 border border-gray-300 resize-none rounded-l-md focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+              className="flex-1 p-3 text-base transition-colors border border-gray-300 rounded-l-lg shadow-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-blue-300"
               value={input}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
@@ -494,23 +569,33 @@ export default function Chat() {
               disabled={isSending}
             />
             <button
-              className="p-2 text-white bg-blue-500 rounded-r-md hover:bg-blue-600 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+              className="px-4 py-2 text-white transition-colors bg-blue-600 rounded-r-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
               onClick={() => sendMessage(input)}
               disabled={isSending}
             >
-              {isSending ? "Sending..." : "Send"}
+              {isSending ? (
+                <span className="flex items-center">
+                  <Spinner className="w-4 h-4 mr-2" />
+                  Sending
+                </span>
+              ) : (
+                "Send"
+              )}
             </button>
             {isSending && (
               <button
-                className="p-2 text-white bg-red-500 rounded-md hover:bg-red-600 focus:outline-hidden focus:ring-2 focus:ring-red-500"
+                className="p-2 text-white transition-colors bg-red-500 rounded-md shadow-sm hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
                 onClick={handleStop}
+                title="Stop generating"
               >
                 <StopIcon className="w-5 h-5" />
               </button>
             )}
           </div>
           {errorMessage && (
-            <div className="mt-2 text-sm text-center text-red-500">{errorMessage}</div>
+            <div className="px-3 py-2 mt-2 text-sm text-center text-red-600 border border-red-200 rounded-md bg-red-50">
+              {errorMessage}
+            </div>
           )}
         </div>
       </div>
