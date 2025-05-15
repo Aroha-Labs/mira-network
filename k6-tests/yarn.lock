@@ -2,7 +2,7 @@
 # yarn lockfile v1
 
 
-k6@^0.0.0:
-  version "0.0.0"
-  resolved "https://registry.yarnpkg.com/k6/-/k6-0.0.0.tgz#8c923200be0a68c578e8f5a32be96b1d8065cc3b"
-  integrity sha512-GAQSWayS2+LjbH5bkRi+pMPYyP1JSp7o+4j58ANZ762N/RH/SdlAT3CHHztnn8s/xgg8kYNM24Gd2IPo9b5W+g==
+"@types/k6@^1.0.2":
+  version "1.0.2"
+  resolved "https://registry.npmjs.org/@types/k6/-/k6-1.0.2.tgz"
+  integrity sha512-bpja1c7OXIJk06aPGN+Aw5f3QhP0PjvgX2Fwfa3rJUaUI+O1ZE3491g9hMjhH21ZlTaAhz7h6veyxaz/RqPUTg==

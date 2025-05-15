@@ -1,0 +1,8 @@
+{
+  "scripts": {
+    "test": "k6 run main.ts"
+  },
+  "dependencies": {
+    "@types/k6": "^1.0.2"
+  }
+}
