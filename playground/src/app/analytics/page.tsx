@@ -42,7 +42,7 @@ const fetchApiLogs = async (
     params: {
       start_date: startDate,
       end_date: endDate,
-      page_size: 1000, // Fetch a large number of logs to ensure we get all data
+      page_size: 10, // Fetch a large number of logs to ensure we get all data
     },
   });
   return response.data;
