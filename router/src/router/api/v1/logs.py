@@ -1,20 +1,20 @@
-from src.router.utils.logger import logger
-from typing import Optional, Literal
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlmodel import select
+from typing import Optional, Literal, Dict, Any, Union
+from datetime import datetime
 from src.router.core.types import User
-from src.router.models.logs import ApiLogs
-from src.router.db.session import DBSession
 from src.router.core.security import verify_user
-from sqlalchemy import func
-from sqlalchemy.types import Float
-from datetime import datetime, timedelta
 from src.router.utils.opensearch import (
     opensearch_client,
     OPENSEARCH_LLM_USAGE_LOG_INDEX,
 )
 from src.router.utils.nr import track
+from src.router.utils.logger import logger
+
 router = APIRouter()
+
+# Type aliases for OpenSearch queries
+OpenSearchQuery = Dict[str, Union[Dict[str, Any], str]]
+must_conditions: list[OpenSearchQuery] = []
 
 
 @router.get(
@@ -28,7 +28,7 @@ router = APIRouter()
 
 ### Query Parameters
 - `page`: Page number (default: 1)
-- `page_size`: Number of items per page (default: 10)
+- `page_size`: Number of items per page (default: 10, max: 100)
 - `start_date`: Filter logs after this date (ISO 8601 format)
 - `end_date`: Filter logs before this date (ISO 8601 format)
 - `machine_id`: Filter logs by machine ID
@@ -86,6 +86,11 @@ router = APIRouter()
         "detail": "Invalid order_by field"
     }
     ```
+    ```json
+    {
+        "detail": "page_size must be between 1 and 100"
+    }
+    ```
 - `401 Unauthorized`:
     ```json
     {
@@ -100,7 +105,7 @@ router = APIRouter()
     ```
 
 ### Notes
-- Response is paginated
+- Response is paginated with a maximum of 100 items per page
 - Dates should be provided in ISO 8601 format
 - Admin users can query logs for any user using the user_id parameter
 - Non-admin users can only access their own logs
@@ -152,7 +157,16 @@ router = APIRouter()
         400: {
             "description": "Bad Request - Invalid parameters",
             "content": {
-                "application/json": {"example": {"detail": "Invalid order_by field"}}
+                "application/json": {
+                    "examples": {
+                        "invalid_order": {
+                            "value": {"detail": "Invalid order_by field"}
+                        },
+                        "invalid_page_size": {
+                            "value": {"detail": "page_size must be between 1 and 100"}
+                        }
+                    }
+                }
             },
         },
         401: {
@@ -174,22 +188,34 @@ router = APIRouter()
     },
 )
 async def list_all_logs(
-    db: DBSession,
     user: User = Depends(verify_user),
-    page: int = Query(default=1, ge=1),
-    page_size: int = Query(default=10, ge=1, le=100),
-    start_date: Optional[datetime] = Query(default=None),
-    end_date: Optional[datetime] = Query(default=None),
-    machine_id: Optional[str] = Query(default=None),
-    model: Optional[str] = Query(default=None),
-    api_key_id: Optional[int] = Query(default=None),
-    user_id: Optional[str] = Query(default=None),
+    page: int = Query(default=1, ge=1, description="Page number"),
+    page_size: int = Query(default=10, ge=1, le=100, description="Number of items per page (max: 100)"),
+    start_date: Optional[datetime] = Query(default=None, description="Filter logs after this date (ISO 8601)"),
+    end_date: Optional[datetime] = Query(default=None, description="Filter logs before this date (ISO 8601)"),
+    machine_id: Optional[str] = Query(default=None, description="Filter by machine ID"),
+    model: Optional[str] = Query(default=None, description="Filter by model name"),
+    api_key_id: Optional[int] = Query(default=None, description="Filter by API key ID"),
+    user_id: Optional[str] = Query(default=None, description="Filter by user ID (admin only)"),
     order_by: Literal["created_at", "model", "machine_id"] = Query(
-        default="created_at"
+        default="created_at",
+        description="Field to sort by"
     ),
-    order: Literal["asc", "desc"] = Query(default="desc"),
-    flow_id: Optional[str] = Query(default=None),
+    order: Literal["asc", "desc"] = Query(default="desc", description="Sort direction"),
+    flow_id: Optional[str] = Query(default=None, description="Filter by flow ID"),
 ):
+    # Validate page_size
+    if page_size > 100:
+        track("list_api_logs_error", {
+            "user_id": str(user.id),
+            "error": "invalid_page_size",
+            "requested_page_size": page_size
+        })
+        raise HTTPException(
+            status_code=400,
+            detail="page_size must be between 1 and 100"
+        )
+
     track("list_api_logs_request", {
         "user_id": str(user.id),
         "page": page,
@@ -229,11 +255,11 @@ async def list_all_logs(
                 {"range": {"timestamp": {"lte": end_date.isoformat()}}}
             )
         if machine_id:
-            must_conditions.append({"term": {"machine_id": machine_id}})
+            must_conditions.append({"term": {"machine_id": str(machine_id)}})
         if model:
             must_conditions.append({"match": {"model": model}})
         if api_key_id:
-            must_conditions.append({"term": {"api_key_id": api_key_id}})
+            must_conditions.append({"term": {"api_key_id": str(api_key_id)}})
         if flow_id:
             must_conditions.append({"term": {"flow_id": flow_id}})
 
@@ -321,93 +347,65 @@ async def list_all_logs(
 @router.get(
     "/total-inference-calls",
     summary="Get Total Inference Calls",
-    description="""Retrieves the total count of inference API calls made by the authenticated user.
-
-### Authentication
-- Requires a valid authentication token
-- Token must be passed in the Authorization header
-
-### Response Format
-```json
-{
-    "total": int  // Total number of API calls made
-}
-```
-
-### Error Responses
-- `401 Unauthorized`:
-    ```json
-    {
-        "detail": "Could not validate credentials"
-    }
-    ```
-
-### Notes
-- Counts all API calls regardless of success or failure
-- Includes calls made with all API keys owned by the user
-- Historical calls are included (no date filtering)""",
-    response_description="Returns the total count of inference calls made by the user",
-    responses={
-        200: {
-            "description": "Successfully retrieved total count",
-            "content": {"application/json": {"example": {"total": 1500}}},
-        },
-        401: {
-            "description": "Unauthorized - Invalid or missing authentication",
-            "content": {
-                "application/json": {
-                    "example": {"detail": "Could not validate credentials"}
-                }
-            },
-        },
-    },
+    response_description="Returns the total number of inference calls made by the user",
 )
-async def total_inference_calls(db: DBSession, user: User = Depends(verify_user)):
+async def total_inference_calls(user: User = Depends(verify_user)):
     track("total_inference_calls_request", {"user_id": str(user.id)})
     
+    query = {
+        "query": {
+            "bool": {
+                "must": [
+                    {"match": {"user_id": user.id}},
+                    {"term": {"doc_type": "model_usage"}}
+                ]
+            }
+        },
+        "track_total_hits": True,
+        "size": 0
+    }
+
     try:
-        total = await db.exec(
-            select(func.count()).select_from(ApiLogs).where(ApiLogs.user_id == user.id)
+        response = opensearch_client.search(
+            index=OPENSEARCH_LLM_USAGE_LOG_INDEX,
+            body=query,
         )
-        total_count = total.first()
-        
+        total = response["hits"]["total"]["value"]
+
         track("total_inference_calls_response", {
             "user_id": str(user.id),
-            "total_count": total_count
+            "total_calls": total
         })
-        
-        return {"total": total_count}
+
+        return {"total": total}
     except Exception as e:
+        logger.error(f"Error getting total inference calls: {e}")
         track("total_inference_calls_error", {
             "user_id": str(user.id),
             "error": str(e)
         })
-        raise HTTPException(status_code=500, detail=f"Error fetching inference calls: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting total inference calls: {str(e)}"
+        )
 
 
 @router.get("/api-logs/metrics")
 async def get_logs_metrics(
-    db: DBSession,
     user: User = Depends(verify_user),
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
-    machine_id: Optional[int] = None,  # Type hint remains int
+    machine_id: Optional[str] = None,
     model: Optional[str] = None,
     api_key_id: Optional[int] = None,
     user_id: Optional[str] = None,
     flow_id: Optional[str] = None,
-    time_bucket: str = "hour",  # hour, day, week, month
 ):
-    track("logs_metrics_request", {
-        "user_id": str(user.id),
-        "is_admin": "admin" in user.roles,
-        "time_bucket": time_bucket,
-        "has_filters": any([start_date, end_date, machine_id, model, api_key_id, user_id, flow_id])
-    })
-    
-    # Handle permission errors
+    track("get_logs_metrics_request", {"user_id": str(user.id)})
+
+    # Access control
     if user_id and "admin" not in user.roles:
-        track("logs_metrics_error", {
+        track("get_logs_metrics_error", {
             "user_id": str(user.id),
             "error": "permission_denied",
             "requested_user_id": user_id
@@ -416,162 +414,228 @@ async def get_logs_metrics(
             status_code=403, detail="Only admins can query other users' logs"
         )
 
-    # Get time bucket function
-    time_bucket_fn = {
-        "hour": lambda x: func.date_trunc("hour", x),
-        "day": lambda x: func.date_trunc("day", x),
-        "week": lambda x: func.date_trunc("week", x),
-        "month": lambda x: func.date_trunc("month", x),
-    }[time_bucket]
+    # Build OpenSearch query
+    must_conditions = [{"term": {"doc_type": "model_usage"}}]
 
-    # Get default time range based on bucket
-    end_dt = datetime.fromisoformat(end_date) if end_date else datetime.utcnow()
-    if not start_date:
-        start_dt = end_dt - timedelta(
-            days={
-                "hour": 1,  # Last 24 hours
-                "day": 7,  # Last week
-                "week": 30,  # Last month
-                "month": 365,  # Last year
-            }[time_bucket]
-        )
+    # Add filters
+    if user_id:
+        must_conditions.append({"match": {"user_id": user_id}})
     else:
-        start_dt = datetime.fromisoformat(start_date)
+        if "admin" not in user.roles:
+            must_conditions.append({"match": {"user_id": user.id}})
 
-    # Build query with time bucket and date filtering
-    time_bucket_col = time_bucket_fn(ApiLogs.created_at).label("timestamp")
+    if start_date:
+        must_conditions.append(
+            {"range": {"timestamp": {"gte": start_date}}}
+        )
+    if end_date:
+        must_conditions.append(
+            {"range": {"timestamp": {"lte": end_date}}}
+        )
+    if machine_id:
+        must_conditions.append({"term": {"machine_id": str(machine_id)}})
+    if model:
+        must_conditions.append({"match": {"model": model}})
+    if api_key_id:
+        must_conditions.append({"term": {"api_key_id": str(api_key_id)}})
+    if flow_id:
+        must_conditions.append({"term": {"flow_id": flow_id}})
 
-    query = select(
-        time_bucket_col,
-        ApiLogs.model,
-        func.count().label("calls"),
-        func.coalesce(func.sum(ApiLogs.prompt_tokens), 0).label("prompt_tokens"),
-        func.coalesce(func.sum(ApiLogs.completion_tokens), 0).label(
-            "completion_tokens"
-        ),
-        func.coalesce(func.avg(ApiLogs.total_response_time), 0.0).label(
-            "avg_response_time"
-        ),
-        func.coalesce(func.avg(ApiLogs.ttft), 0.0).label("avg_ttft"),
-        func.coalesce(
-            func.sum(
-                ApiLogs.prompt_tokens
-                * func.cast(ApiLogs.model_pricing["prompt_token"].astext, Float)
-            ),
-            0.0,
-        ).label("prompt_cost"),
-        func.coalesce(
-            func.sum(
-                ApiLogs.completion_tokens
-                * func.cast(ApiLogs.model_pricing["completion_token"].astext, Float)
-            ),
-            0.0,
-        ).label("completion_cost"),
-    ).where(ApiLogs.created_at.between(start_dt, end_dt))
+    # Build aggregations
+    query = {
+        "query": {"bool": {"must": must_conditions}},
+        "aggs": {
+            "total_tokens": {"sum": {"field": "total_tokens"}},
+            "prompt_tokens": {"sum": {"field": "prompt_tokens"}},
+            "completion_tokens": {"sum": {"field": "completion_tokens"}},
+            "avg_response_time": {"avg": {"field": "total_response_time"}},
+            "avg_ttft": {"avg": {"field": "ttft"}},
+            "total_cost": {"sum": {"field": "cost"}},
+            "model_distribution": {
+                "terms": {
+                    "field": "model",
+                    "size": 100
+                }
+            }
+        },
+        "size": 0
+    }
+
+    try:
+        response = opensearch_client.search(
+            index=OPENSEARCH_LLM_USAGE_LOG_INDEX,
+            body=query,
+        )
+
+        aggs = response["aggregations"]
+        model_distribution = {
+            bucket["key"]: bucket["doc_count"]
+            for bucket in aggs["model_distribution"]["buckets"]
+        }
+
+        track("get_logs_metrics_response", {
+            "user_id": str(user.id),
+            "total_tokens": aggs["total_tokens"]["value"],
+            "models_count": len(model_distribution)
+        })
+
+        return {
+            "total_tokens": int(aggs["total_tokens"]["value"]),
+            "prompt_tokens": int(aggs["prompt_tokens"]["value"]),
+            "completion_tokens": int(aggs["completion_tokens"]["value"]),
+            "avg_response_time": float(aggs["avg_response_time"]["value"]) if aggs["avg_response_time"]["value"] is not None else 0.0,
+            "avg_ttft": float(aggs["avg_ttft"]["value"]) if aggs["avg_ttft"]["value"] is not None else 0.0,
+            "total_cost": float(aggs["total_cost"]["value"]) if aggs["total_cost"]["value"] is not None else 0.0,
+            "model_distribution": list(model_distribution.items())
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting logs metrics from OpenSearch: {e}")
+        track("get_logs_metrics_error", {
+            "user_id": str(user.id),
+            "error": str(e)
+        })
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting logs metrics: {str(e)}"
+        )
+
+
+@router.get(
+    "/usage-stats",
+    summary="Get Usage Statistics",
+    response_description="Returns usage statistics for the specified time period",
+)
+async def get_usage_stats(
+    user: User = Depends(verify_user),
+    start_date: Optional[datetime] = Query(default=None),
+    end_date: Optional[datetime] = Query(default=None),
+    machine_id: Optional[str] = Query(default=None),
+    model: Optional[str] = Query(default=None),
+    api_key_id: Optional[int] = Query(default=None),
+    user_id: Optional[str] = Query(default=None),
+    flow_id: Optional[str] = Query(default=None),
+    interval: str = Query(default="1h", description="Time bucket interval (e.g. 1h, 1d)"),
+):
+    track("get_usage_stats_request", {
+        "user_id": str(user.id),
+        "interval": interval
+    })
 
     # Access control
+    if user_id and "admin" not in user.roles:
+        track("get_usage_stats_error", {
+            "user_id": str(user.id),
+            "error": "permission_denied",
+            "requested_user_id": user_id
+        })
+        raise HTTPException(
+            status_code=403, detail="Only admins can query other users' logs"
+        )
+
+    # Build OpenSearch query
+    must_conditions = [{"term": {"doc_type": "model_usage"}}]
+
+    # Add filters
     if user_id:
-        if "admin" not in user.roles:
-            raise HTTPException(
-                status_code=403, detail="Only admins can query other users' logs"
-            )
-        query = query.where(ApiLogs.user_id == user_id)
+        must_conditions.append({"match": {"user_id": user_id}})
     else:
         if "admin" not in user.roles:
-            query = query.where(ApiLogs.user_id == user.id)
+            must_conditions.append({"match": {"user_id": user.id}})
 
-    # Apply filters
     if start_date:
-        query = query.where(ApiLogs.created_at >= start_date)
+        must_conditions.append(
+            {"range": {"timestamp": {"gte": start_date.isoformat()}}}
+        )
     if end_date:
-        query = query.where(ApiLogs.created_at <= end_date)
+        must_conditions.append(
+            {"range": {"timestamp": {"lte": end_date.isoformat()}}}
+        )
     if machine_id:
-        query = query.where(ApiLogs.machine_id == str(machine_id))  # Convert to string
+        must_conditions.append({"term": {"machine_id": str(machine_id)}})
     if model:
-        query = query.where(ApiLogs.model == model)
+        must_conditions.append({"match": {"model": model}})
     if api_key_id:
-        query = query.where(ApiLogs.api_key_id == api_key_id)
+        must_conditions.append({"term": {"api_key_id": str(api_key_id)}})
     if flow_id:
-        query = query.where(ApiLogs.flow_id == flow_id)
+        must_conditions.append({"term": {"flow_id": flow_id}})
 
-    # Group by timestamp and model, use the time_bucket_col directly
-    query = query.group_by(time_bucket_col, ApiLogs.model).order_by(time_bucket_col)
-
-    # Rest of the function remains the same
-    results = await db.exec(query)
-    results = results.all()
-
-    # Process results safely
-    time_series = {}
-    model_distribution = {}
-
-    for row in results:
-        timestamp = row.timestamp.isoformat()
-        if timestamp not in time_series:
-            time_series[timestamp] = {
-                "timestamp": timestamp,
-                "calls": 0,
-                "prompt_tokens": 0,
-                "completion_tokens": 0,
-                "avg_response_time": 0.0,
-                "avg_ttft": 0.0,
-                "prompt_cost": 0.0,
-                "completion_cost": 0.0,
+    # Build aggregations
+    query = {
+        "query": {"bool": {"must": must_conditions}},
+        "aggs": {
+            "usage_over_time": {
+                "date_histogram": {
+                    "field": "timestamp",
+                    "fixed_interval": interval,
+                    "format": "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
+                },
+                "aggs": {
+                    "by_model": {
+                        "terms": {"field": "model"},
+                        "aggs": {
+                            "prompt_tokens": {"sum": {"field": "prompt_tokens"}},
+                            "completion_tokens": {"sum": {"field": "completion_tokens"}},
+                            "total_tokens": {"sum": {"field": "total_tokens"}},
+                            "avg_response_time": {"avg": {"field": "total_response_time"}},
+                            "avg_ttft": {"avg": {"field": "ttft"}},
+                            "total_cost": {
+                                "sum": {
+                                    "script": {
+                                        "source": "doc['cost'].value"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
-
-        time_series[timestamp]["calls"] += row.calls or 0
-        time_series[timestamp]["prompt_tokens"] += row.prompt_tokens or 0
-        time_series[timestamp]["completion_tokens"] += row.completion_tokens or 0
-        time_series[timestamp]["avg_response_time"] = row.avg_response_time or 0.0
-        time_series[timestamp]["avg_ttft"] = row.avg_ttft or 0.0
-        time_series[timestamp]["prompt_cost"] += row.prompt_cost or 0.0
-        time_series[timestamp]["completion_cost"] += row.completion_cost or 0.0
-
-        if row.model not in model_distribution:
-            model_distribution[row.model] = {
-                "model": row.model,
-                "count": row.calls or 0,
-            }
-
-    # Safe summary calculations
-    total_calls = sum(ts["calls"] for ts in time_series.values())
-
-    track("logs_metrics_response", {
-        "user_id": str(user.id),
-        "total_calls": total_calls,
-        "time_series_points": len(time_series),
-        "model_count": len(model_distribution)
-    })
-    
-    return {
-        "summary": {
-            "total_calls": total_calls,
-            "total_tokens": sum(
-                (ts["prompt_tokens"] or 0) + (ts["completion_tokens"] or 0)
-                for ts in time_series.values()
-            ),
-            "avg_response_time": (
-                sum(
-                    (ts["avg_response_time"] or 0.0) * ts["calls"]
-                    for ts in time_series.values()
-                )
-                / total_calls
-                if total_calls > 0
-                else 0.0
-            ),
-            "avg_ttft": (
-                sum(
-                    (ts["avg_ttft"] or 0.0) * ts["calls"] for ts in time_series.values()
-                )
-                / total_calls
-                if total_calls > 0
-                else 0.0
-            ),
-            "total_cost": sum(
-                (ts["prompt_cost"] or 0.0) + (ts["completion_cost"] or 0.0)
-                for ts in time_series.values()
-            ),
         },
-        "time_series": list(time_series.values()),
-        "model_distribution": list(model_distribution.values()),
+        "size": 0
     }
+
+    try:
+        response = opensearch_client.search(
+            index=OPENSEARCH_LLM_USAGE_LOG_INDEX,
+            body=query,
+        )
+
+        # Transform results
+        results = []
+        for bucket in response["aggregations"]["usage_over_time"]["buckets"]:
+            timestamp = bucket["key_as_string"]
+            
+            models_data = []
+            for model_bucket in bucket["by_model"]["buckets"]:
+                models_data.append({
+                    "model": model_bucket["key"],
+                    "prompt_tokens": int(model_bucket["prompt_tokens"]["value"]),
+                    "completion_tokens": int(model_bucket["completion_tokens"]["value"]),
+                    "total_tokens": int(model_bucket["total_tokens"]["value"]),
+                    "avg_response_time": float(model_bucket["avg_response_time"]["value"]) if model_bucket["avg_response_time"]["value"] is not None else 0.0,
+                    "avg_ttft": float(model_bucket["avg_ttft"]["value"]) if model_bucket["avg_ttft"]["value"] is not None else 0.0,
+                    "total_cost": float(model_bucket["total_cost"]["value"]) if model_bucket["total_cost"]["value"] is not None else 0.0
+                })
+
+            results.append({
+                "timestamp": timestamp,
+                "models": models_data
+            })
+
+        track("get_usage_stats_response", {
+            "user_id": str(user.id),
+            "total_buckets": len(results)
+        })
+
+        return {"results": results}
+
+    except Exception as e:
+        logger.error(f"Error getting usage stats from OpenSearch: {e}")
+        track("get_usage_stats_error", {
+            "user_id": str(user.id),
+            "error": str(e)
+        })
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting usage statistics: {str(e)}"
+        )
