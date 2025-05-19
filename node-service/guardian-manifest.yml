@@ -1,10 +1,10 @@
 kind: Service
 metadata:
   # --- Required ---
-  name: router # Unique identifier for this service (e.g., kebab-case)
+  name: node-service # Unique identifier for this service (e.g., kebab-case)
 
   # --- Optional ---
-  displayName: "Router" # Human-readable name for UIs
+  displayName: "Node Service" # Human-readable name for UIs
   description: "Manages the routing of requests to the appropriate service."
   annotations: # For custom metadata, operational notes, etc.
     last-reviewed-by: "sarim@arohalabs.com"
@@ -24,9 +24,9 @@ spec:
 
 
   techStack: # List of key technologies used
-    - "Language: Python 3.11"
-    - "Framework: FastAPI"
-    - "Database Client: SQLAlchemy"
+    - "Language: Nodejs"
+    - "Framework: Fastify"
+    - "Database Client: Sequelize"
     - "Cache: Redis"
 
   links: # Important URLs related to the service
@@ -42,8 +42,3 @@ spec:
   # ID of a ChecklistTemplate defined in Guardian.
   # The Guardian platform will use this to associate readiness checks.
   # defaultChecklistTemplateId: "standard-api-prod-checklist-v1"
-
-  dependencies:
-    - name: node-service # Name of another service (its metadata.name) or an external dependency
-      relationship: "requires-for-llm-calling" # How this service depends on the other
-      critical: true # If true, this dependency is vital for core functionality
