@@ -11,3 +11,5 @@ spec:
   serviceManifests:
     - path: router/guardian-manifest.yml
       # description: "Manifest for the Mira Network router service." # Optional description for this entry  
+    - path: node-service/guardian-manifest.yml
+      # description: "Manifest for the Mira Network node service." # Optional description for this entry
