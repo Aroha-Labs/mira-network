@@ -291,12 +291,12 @@ export default function Workbench() {
     }
 
     // Track terminal execution
-    trackEvent('terminal_execution', {
+    trackEvent("terminal_execution", {
       flow_id: selectedFlow.id,
       flow_name: selectedFlow.name,
       model: selectedModel || "claude-3-opus-20240229",
       has_variables: Object.keys(variables).length > 0,
-      has_tools: tools.length > 0
+      has_tools: tools.length > 0,
     });
 
     try {
@@ -343,11 +343,11 @@ export default function Workbench() {
               setPreviewMessage((prev) =>
                 prev
                   ? {
-                    ...prev,
-                    content: chunk.content || prev.content,
-                    tool_calls: chunk.tool_calls || prev.tool_calls,
-                    tool_responses: chunk.tool_responses || prev.tool_responses,
-                  }
+                      ...prev,
+                      content: chunk.content || prev.content,
+                      tool_calls: chunk.tool_calls || prev.tool_calls,
+                      tool_responses: chunk.tool_responses || prev.tool_responses,
+                    }
                   : null
               );
             }
@@ -420,9 +420,9 @@ export default function Workbench() {
   const handleSaveFlow = async () => {
     if (!selectedFlow) return;
 
-    trackEvent('terminal_flow_save', {
+    trackEvent("terminal_flow_save", {
       flow_id: selectedFlow.id,
-      flow_name: selectedFlow.name
+      flow_name: selectedFlow.name,
     });
 
     try {
@@ -478,7 +478,7 @@ export default function Workbench() {
   const handleCreateFlow = async () => {
     if (isCreatingFlow) return;
 
-    trackEvent('terminal_flow_create', {});
+    trackEvent("terminal_flow_create", {});
 
     try {
       setIsCreatingFlow(true);
@@ -518,9 +518,9 @@ export default function Workbench() {
   const handleUpdateFlowName = async (flowId: string, newName: string) => {
     if (isUpdatingFlowName || !newName.trim()) return;
 
-    trackEvent('terminal_flow_rename', {
+    trackEvent("terminal_flow_rename", {
       flow_id: flowId,
-      new_name: newName
+      new_name: newName,
     });
 
     try {
@@ -603,10 +603,11 @@ export default function Workbench() {
       {toast && (
         <div className="fixed z-50 top-4 right-4 animate-fade-in">
           <div
-            className={`px-4 py-3 rounded-lg shadow-lg ${toast.type === "success"
-              ? "bg-green-50 border border-green-200"
-              : "bg-red-50 border border-red-200"
-              }`}
+            className={`px-4 py-3 rounded-lg shadow-lg ${
+              toast.type === "success"
+                ? "bg-green-50 border border-green-200"
+                : "bg-red-50 border border-red-200"
+            }`}
           >
             <div className="flex items-center space-x-2">
               {toast.type === "success" ? (
@@ -615,8 +616,9 @@ export default function Workbench() {
                 <div className="w-2 h-2 bg-red-500 rounded-full" />
               )}
               <p
-                className={`text-sm font-medium ${toast.type === "success" ? "text-green-800" : "text-red-800"
-                  }`}
+                className={`text-sm font-medium ${
+                  toast.type === "success" ? "text-green-800" : "text-red-800"
+                }`}
               >
                 {toast.message}
               </p>
@@ -636,8 +638,9 @@ export default function Workbench() {
 
       {/* Flow Slider - Update classes for mobile */}
       <div
-        className={`absolute inset-y-0 left-0 z-30 w-full md:w-96 transform transition-transform duration-300 ease-in-out ${isSliderOpen ? "translate-x-0" : "-translate-x-full"
-          }`}
+        className={`absolute inset-y-0 left-0 z-30 w-full md:w-96 transform transition-transform duration-300 ease-in-out ${
+          isSliderOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
       >
         <div ref={sliderRef} className="relative flex flex-col h-full bg-white shadow-xl">
           {/* Simple overlay to disable panel when any operation is in progress */}
@@ -657,8 +660,9 @@ export default function Workbench() {
                 <button
                   onClick={handleCreateFlow}
                   disabled={isCreatingFlow}
-                  className={`inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 transition-colors group relative ${isCreatingFlow ? "opacity-75 cursor-not-allowed" : ""
-                    }`}
+                  className={`inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 transition-colors group relative ${
+                    isCreatingFlow ? "opacity-75 cursor-not-allowed" : ""
+                  }`}
                 >
                   {isCreatingFlow ? (
                     <>
@@ -716,8 +720,9 @@ export default function Workbench() {
                   <button
                     onClick={handleSaveFlow}
                     disabled={isSavingFlow}
-                    className={`inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 transition-colors ${isSavingFlow ? "opacity-75 cursor-not-allowed" : ""
-                      }`}
+                    className={`inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 transition-colors ${
+                      isSavingFlow ? "opacity-75 cursor-not-allowed" : ""
+                    }`}
                   >
                     {isSavingFlow ? (
                       <>
@@ -784,10 +789,11 @@ export default function Workbench() {
                       setIsSliderOpen(false);
                     }
                   }}
-                  className={`w-full p-4 text-left transition-all rounded-xl border relative group ${selectedFlow?.id === flow.id
-                    ? "bg-linear-to-br from-indigo-50 to-white border-indigo-200 shadow-xs"
-                    : "border-gray-200 hover:border-indigo-200 hover:bg-linear-to-br hover:from-gray-50 hover:to-white"
-                    }`}
+                  className={`w-full p-4 text-left transition-all rounded-xl border relative group ${
+                    selectedFlow?.id === flow.id
+                      ? "bg-linear-to-br from-indigo-50 to-white border-indigo-200 shadow-xs"
+                      : "border-gray-200 hover:border-indigo-200 hover:bg-linear-to-br hover:from-gray-50 hover:to-white"
+                  }`}
                 >
                   {selectedFlow?.id === flow.id && (
                     <div className="absolute border-2 border-indigo-500 pointer-events-none -inset-px rounded-xl"></div>
@@ -817,6 +823,41 @@ export default function Workbench() {
                       ) : (
                         <div className="font-medium text-gray-900 transition-colors group-hover:text-indigo-600">
                           {flow.name}
+                          <div className="inline-flex items-center ml-2 text-xs text-gray-500">
+                            <span>ID: {flow.id}</span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigator.clipboard.writeText(flow.id).then(() => {
+                                  const tooltip = e.currentTarget.querySelector(
+                                    ".copy-tooltip"
+                                  ) as HTMLElement;
+                                  if (tooltip) {
+                                    tooltip.textContent = "Copied!";
+                                    tooltip.classList.remove("opacity-0");
+                                    setTimeout(() => {
+                                      tooltip.textContent = "Copy ID";
+                                      tooltip.classList.add("opacity-0");
+                                    }, 1000);
+                                  }
+                                });
+                              }}
+                              className="relative inline-flex items-center p-1 ml-1 text-gray-400 transition-all rounded hover:text-indigo-600 hover:bg-indigo-50 group/copy"
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                viewBox="0 0 24 24"
+                                fill="currentColor"
+                                className="w-3.5 h-3.5"
+                              >
+                                <path d="M7.5 3.375c0-1.036.84-1.875 1.875-1.875h.375a3.75 3.75 0 013.75 3.75v1.875C13.5 8.161 14.34 9 15.375 9h1.875A3.75 3.75 0 0121 12.75v3.375C21 17.16 20.16 18 19.125 18h-9.75A1.875 1.875 0 017.5 16.125V3.375z" />
+                                <path d="M15 5.25a5.23 5.23 0 00-1.279-3.434 9.768 9.768 0 016.963 6.963A5.23 5.23 0 0017.25 7.5h-1.875A.375.375 0 0115 7.125V5.25zM4.875 6H6v10.125A3.375 3.375 0 009.375 19.5H16.5v1.125c0 1.035-.84 1.875-1.875 1.875h-9.75A1.875 1.875 0 013 20.625V7.875C3 6.839 3.84 6 4.875 6z" />
+                              </svg>
+                              <span className="absolute px-2 py-1 mb-2 text-xs font-medium text-white transition-opacity -translate-x-1/2 bg-gray-900 rounded opacity-0 pointer-events-none copy-tooltip bottom-full left-1/2 whitespace-nowrap">
+                                Copy ID
+                              </span>
+                            </button>
+                          </div>
                         </div>
                       )}
                       <div className="flex items-center space-x-1">
@@ -831,10 +872,11 @@ export default function Workbench() {
                             }
                           }}
                           disabled={isUpdatingFlowName && editingFlowName === flow.id}
-                          className={`p-1.5 text-gray-400 rounded-md hover:text-indigo-600 hover:bg-indigo-50 transition-colors ${isUpdatingFlowName && editingFlowName === flow.id
-                            ? "opacity-75 cursor-not-allowed"
-                            : ""
-                            }`}
+                          className={`p-1.5 text-gray-400 rounded-md hover:text-indigo-600 hover:bg-indigo-50 transition-colors ${
+                            isUpdatingFlowName && editingFlowName === flow.id
+                              ? "opacity-75 cursor-not-allowed"
+                              : ""
+                          }`}
                         >
                           {isUpdatingFlowName && editingFlowName === flow.id ? (
                             <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24">
@@ -926,8 +968,9 @@ export default function Workbench() {
         {/* Toggle Slider Button - Fixed below top bar */}
         <button
           onClick={() => setIsSliderOpen(true)}
-          className={`fixed top-17 left-6 z-20 p-2 bg-white border border-gray-200 rounded-full shadow-sm hover:bg-white hover:border-gray-300 hover:shadow-md transition-all duration-200 ${isSliderOpen ? "hidden" : "flex items-center space-x-2"
-            }`}
+          className={`fixed top-17 left-6 z-20 p-2 bg-white border border-gray-200 rounded-full shadow-sm hover:bg-white hover:border-gray-300 hover:shadow-md transition-all duration-200 ${
+            isSliderOpen ? "hidden" : "flex items-center space-x-2"
+          }`}
         >
           <Bars3Icon className="w-5 h-5 text-gray-400 group-hover:text-gray-600" />
           <span className="hidden text-sm font-medium text-gray-500 group-hover:text-gray-700 md:inline">
@@ -940,19 +983,21 @@ export default function Workbench() {
           <div className="fixed z-20 flex items-center p-1 space-x-2 -translate-x-1/2 bg-white rounded-full shadow-lg bottom-4 left-1/2">
             <button
               onClick={() => setActivePanel("left")}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${activePanel === "left"
-                ? "bg-indigo-100 text-indigo-700"
-                : "text-gray-500 hover:text-gray-700"
-                }`}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                activePanel === "left"
+                  ? "bg-indigo-100 text-indigo-700"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
             >
               Edit
             </button>
             <button
               onClick={() => setActivePanel("right")}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${activePanel === "right"
-                ? "bg-indigo-100 text-indigo-700"
-                : "text-gray-500 hover:text-gray-700"
-                }`}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                activePanel === "right"
+                  ? "bg-indigo-100 text-indigo-700"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
             >
               Preview
             </button>
@@ -961,8 +1006,9 @@ export default function Workbench() {
 
         {/* Left Panel - Update for mobile */}
         <div
-          className={`flex flex-col w-full md:w-1/2 pt-12 p-6 overflow-y-auto border-r border-gray-200 transition-all duration-300 ${isMobileView && activePanel === "right" ? "hidden" : "block"
-            }`}
+          className={`flex flex-col w-full md:w-1/2 pt-12 p-6 overflow-y-auto border-r border-gray-200 transition-all duration-300 ${
+            isMobileView && activePanel === "right" ? "hidden" : "block"
+          }`}
         >
           {selectedFlow ? (
             <>
@@ -1020,10 +1066,11 @@ export default function Workbench() {
                                     [key]: newValue,
                                   }));
                                 }}
-                                className={`flex-1 px-3 py-1.5 text-sm border rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all ${!value || value.trim() === ""
-                                  ? "border-red-300 bg-red-50"
-                                  : "border-gray-300 bg-white hover:border-gray-400"
-                                  }`}
+                                className={`flex-1 px-3 py-1.5 text-sm border rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all ${
+                                  !value || value.trim() === ""
+                                    ? "border-red-300 bg-red-50"
+                                    : "border-gray-300 bg-white hover:border-gray-400"
+                                }`}
                                 placeholder="Required"
                               />
                             </div>
@@ -1059,10 +1106,11 @@ export default function Workbench() {
                     {conversation.map((message, index) => (
                       <div
                         key={index}
-                        className={`border rounded-lg ${message.role === "user"
-                          ? "bg-blue-50 border-blue-200"
-                          : "bg-white border-gray-200"
-                          }`}
+                        className={`border rounded-lg ${
+                          message.role === "user"
+                            ? "bg-blue-50 border-blue-200"
+                            : "bg-white border-gray-200"
+                        }`}
                       >
                         <div className="flex items-center justify-between px-4 py-2 border-b border-inherit">
                           <div className="flex items-center space-x-2">
@@ -1076,10 +1124,11 @@ export default function Workbench() {
                                 };
                                 setConversation(newMessages);
                               }}
-                              className={`px-2 py-1 text-xs font-medium rounded-md border-0 focus:ring-1 focus:ring-indigo-500 ${message.role === "user"
-                                ? "bg-blue-100 text-blue-700"
-                                : "bg-gray-100 text-gray-700"
-                                }`}
+                              className={`px-2 py-1 text-xs font-medium rounded-md border-0 focus:ring-1 focus:ring-indigo-500 ${
+                                message.role === "user"
+                                  ? "bg-blue-100 text-blue-700"
+                                  : "bg-gray-100 text-gray-700"
+                              }`}
                             >
                               <option value="user">user</option>
                               <option value="assistant">assistant</option>
@@ -1136,8 +1185,9 @@ export default function Workbench() {
 
               {/* Tools Editor - Moved to the bottom */}
               <div
-                className={`border border-gray-200 rounded-lg bg-linear-to-b from-gray-50 to-white ${sectionsOpen.tools ? "flex-1" : ""
-                  }`}
+                className={`border border-gray-200 rounded-lg bg-linear-to-b from-gray-50 to-white ${
+                  sectionsOpen.tools ? "flex-1" : ""
+                }`}
               >
                 <div
                   className="flex items-center justify-between px-4 py-3 border-b border-gray-200 cursor-pointer bg-linear-to-b from-gray-100 to-gray-50 hover:from-gray-200 hover:to-gray-100"
@@ -1293,20 +1343,22 @@ export default function Workbench() {
 
         {/* Right Panel - Update for mobile */}
         <div
-          className={`flex flex-col w-full md:w-1/2 p-6 bg-gray-50 transition-all duration-300 ${isMobileView && activePanel === "left" ? "hidden" : "block"
-            }`}
+          className={`flex flex-col w-full md:w-1/2 p-6 bg-gray-50 transition-all duration-300 ${
+            isMobileView && activePanel === "left" ? "hidden" : "block"
+          }`}
         >
           {/* Header Controls - Make more compact for mobile */}
           <div className="flex flex-col justify-between mb-6 space-y-4 md:flex-row md:items-center md:space-y-0">
             <div className="flex flex-wrap items-center gap-4">
               <div className="flex items-center space-x-2">
                 <div
-                  className={`w-2 h-2 rounded-full ${isLoading
-                    ? "bg-yellow-500 animate-pulse"
-                    : conversation.length === 0
-                      ? "bg-gray-400"
-                      : "bg-green-500"
-                    }`}
+                  className={`w-2 h-2 rounded-full ${
+                    isLoading
+                      ? "bg-yellow-500 animate-pulse"
+                      : conversation.length === 0
+                        ? "bg-gray-400"
+                        : "bg-green-500"
+                  }`}
                 ></div>
                 <span className="text-sm font-medium text-gray-600">
                   {isLoading
@@ -1396,8 +1448,9 @@ export default function Workbench() {
                 <button
                   onClick={handleAddToConversation}
                   disabled={!previewMessage || isGenerating}
-                  className={`px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center space-x-1 disabled:opacity-50 disabled:cursor-not-allowed ${(!previewMessage || isGenerating) && "opacity-50 cursor-not-allowed"
-                    }`}
+                  className={`px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center space-x-1 disabled:opacity-50 disabled:cursor-not-allowed ${
+                    (!previewMessage || isGenerating) && "opacity-50 cursor-not-allowed"
+                  }`}
                 >
                   <CheckIcon className="w-4 h-4" />
                   <span>Add to Conversation</span>
@@ -1405,11 +1458,13 @@ export default function Workbench() {
                 <button
                   onClick={() => setShowVerification(!showVerification)}
                   disabled={!previewMessage || isGenerating}
-                  className={`px-3 py-1 ${showVerification
-                    ? "bg-gray-600 hover:bg-gray-700"
-                    : "bg-green-600 hover:bg-green-700"
-                    } text-white rounded flex items-center space-x-1 disabled:opacity-50 disabled:cursor-not-allowed ${(!previewMessage || isGenerating) && "opacity-50 cursor-not-allowed"
-                    }`}
+                  className={`px-3 py-1 ${
+                    showVerification
+                      ? "bg-gray-600 hover:bg-gray-700"
+                      : "bg-green-600 hover:bg-green-700"
+                  } text-white rounded flex items-center space-x-1 disabled:opacity-50 disabled:cursor-not-allowed ${
+                    (!previewMessage || isGenerating) && "opacity-50 cursor-not-allowed"
+                  }`}
                 >
                   <ChartBarIcon className="w-4 h-4" />
                   <span>{showVerification ? "Hide Verification" : "Verify"}</span>
@@ -1464,13 +1519,15 @@ export default function Workbench() {
 
       {/* Full-screen verification panel */}
       <div
-        className={`fixed inset-0 bg-black/50 backdrop-blur-xs z-50 transition-all duration-300 ${showVerification ? "opacity-100" : "opacity-0 pointer-events-none"
-          }`}
+        className={`fixed inset-0 bg-black/50 backdrop-blur-xs z-50 transition-all duration-300 ${
+          showVerification ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
         onClick={() => setShowVerification(false)}
       >
         <div
-          className={`absolute inset-y-0 right-0 w-full md:w-2/3 lg:w-1/2 bg-white shadow-2xl transform transition-transform duration-300 ease-out ${showVerification ? "translate-x-0" : "translate-x-full"
-            } flex flex-col h-full`}
+          className={`absolute inset-y-0 right-0 w-full md:w-2/3 lg:w-1/2 bg-white shadow-2xl transform transition-transform duration-300 ease-out ${
+            showVerification ? "translate-x-0" : "translate-x-full"
+          } flex flex-col h-full`}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -1509,10 +1566,10 @@ export default function Workbench() {
                     messages={
                       verificationSystemMessage
                         ? [
-                          { role: "system", content: verificationSystemMessage },
-                          ...conversation,
-                          previewMessage,
-                        ]
+                            { role: "system", content: verificationSystemMessage },
+                            ...conversation,
+                            previewMessage,
+                          ]
                         : [...conversation, previewMessage]
                     }
                     models={models}
