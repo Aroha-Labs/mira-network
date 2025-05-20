@@ -1,7 +1,6 @@
 import re
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
-from src.router.models.logs import ApiLogs
 from sqlmodel import select, func
 from src.router.api.v1.network import chatCompletionGenerate
 from src.router.core.security import verify_user
@@ -41,12 +40,15 @@ async def create_flow(
     db: DBSession,
     user: User = Depends(verify_user),
 ):
-    track("create_flow_request", {
-        "user_id": str(user.id),
-        "flow_name": flow.name,
-        "variables_count": len(extract_variables(flow.system_prompt))
-    })
-    
+    track(
+        "create_flow_request",
+        {
+            "user_id": str(user.id),
+            "flow_name": flow.name,
+            "variables_count": len(extract_variables(flow.system_prompt)),
+        },
+    )
+
     variables = extract_variables(flow.system_prompt)
 
     new_flow = Flows(
@@ -141,13 +143,16 @@ async def get_flow(flow_id: str, db: DBSession):
     if not flow:
         track("get_flow_error", {"flow_id": flow_id, "error": "flow_not_found"})
         raise HTTPException(status_code=404, detail="Flow not found")
-    
-    track("get_flow_success", {
-        "flow_id": flow_id,
-        "flow_name": flow.name,
-        "variables_count": len(flow.variables)
-    })
-    
+
+    track(
+        "get_flow_success",
+        {
+            "flow_id": flow_id,
+            "flow_name": flow.name,
+            "variables_count": len(flow.variables),
+        },
+    )
+
     return flow
 
 
@@ -243,44 +248,52 @@ async def get_flow(flow_id: str, db: DBSession):
         },
     },
 )
-async def update_flow(flow_id: str, flow: FlowRequest, db: DBSession, user: User = Depends(verify_user)):
+async def update_flow(
+    flow_id: str, flow: FlowRequest, db: DBSession, user: User = Depends(verify_user)
+):
     # existing_flow = db.query(Flows).filter(Flows.id == flow_id).first()
     existing_flow = await db.exec(select(Flows).where(Flows.id == int(flow_id)))
     existing_flow = existing_flow.first()
 
     if not existing_flow:
-        track("update_flow_error", {
-            "flow_id": flow_id,
-            "error": "flow_not_found",
-            "user_id": str(user.id)
-        })
+        track(
+            "update_flow_error",
+            {"flow_id": flow_id, "error": "flow_not_found", "user_id": str(user.id)},
+        )
         raise HTTPException(status_code=404, detail="Flow not found")
-    
+
     # Check if user is authorized to update this flow
     is_admin = False
-    is_admin = 'admin' in user.roles
-    
+    is_admin = "admin" in user.roles
+
     if existing_flow.user_id != str(user.id) and not is_admin:
-        track("update_flow_error", {
-            "flow_id": flow_id,
-            "error": "not_authorized",
-            "user_id": str(user.id),
-            "flow_owner_id": existing_flow.user_id
-        })
+        track(
+            "update_flow_error",
+            {
+                "flow_id": flow_id,
+                "error": "not_authorized",
+                "user_id": str(user.id),
+                "flow_owner_id": existing_flow.user_id,
+            },
+        )
         raise HTTPException(
-            status_code=403,
-            detail="Not authorized to modify this flow"
+            status_code=403, detail="Not authorized to modify this flow"
         )
 
     # Save old values for tracking
     old_variables_count = len(existing_flow.variables or [])
-    
+
     existing_flow.system_prompt = flow.system_prompt
     existing_flow.name = flow.name
     existing_flow.variables = extract_variables(flow.system_prompt)
 
     await db.commit()
     await db.refresh(existing_flow)
+
+    # delete from redis and lru cache
+    await redis_client.delete(f"flow:{flow_id}")
+    get_cached_flow.cache_clear()
+
     return existing_flow
 
 
@@ -364,11 +377,10 @@ async def delete_flow(flow_id: str, db: DBSession, user: User = Depends(verify_u
     existing_flow = existing_flow.first()
 
     if not existing_flow:
-        track("delete_flow_error", {
-            "flow_id": flow_id,
-            "error": "flow_not_found",
-            "user_id": str(user.id)
-        })
+        track(
+            "delete_flow_error",
+            {"flow_id": flow_id, "error": "flow_not_found", "user_id": str(user.id)},
+        )
         raise HTTPException(status_code=404, detail="Flow not found")
 
     await db.delete(existing_flow)
@@ -617,11 +629,14 @@ async def generate_with_flow_id(
 
     logger.info(f"Generating with flow ID: {flow_id}")
     if any(msg.role == "system" for msg in req.messages):
-        track("flow_completion_error", {
-            "flow_id": flow_id,
-            "error": "system_message_not_allowed",
-            "user_id": str(user.id)
-        })
+        track(
+            "flow_completion_error",
+            {
+                "flow_id": flow_id,
+                "error": "system_message_not_allowed",
+                "user_id": str(user.id),
+            },
+        )
         raise HTTPException(
             status_code=400,
             detail="System message is not allowed in request",
@@ -636,6 +651,7 @@ async def generate_with_flow_id(
     # Try LRU cache first, then Redis, then database
 
     flow = await get_cached_flow(flow_id_int)
+    logger.info(f"Flow: {flow}")
     logger.info(f"Flow lru cache: {get_cached_flow.cache_info()}")
     if not flow:
         flow = await db.exec(select(Flows).where(Flows.id == flow_id_int))
@@ -651,11 +667,10 @@ async def generate_with_flow_id(
             get_cached_flow.cache_clear()  # Clear LRU cache to update with new value
 
     if not flow:
-        track("flow_completion_error", {
-            "flow_id": flow_id,
-            "error": "flow_not_found",
-            "user_id": str(user.id)
-        })
+        track(
+            "flow_completion_error",
+            {"flow_id": flow_id, "error": "flow_not_found", "user_id": str(user.id)},
+        )
         raise HTTPException(status_code=404, detail="Flow not found")
 
     system_prompt = flow.system_prompt
@@ -663,23 +678,29 @@ async def generate_with_flow_id(
 
     if required_vars:
         if req.variables is None:
-            track("flow_completion_error", {
-                "flow_id": flow_id,
-                "error": "variables_required",
-                "user_id": str(user.id)
-            })
+            track(
+                "flow_completion_error",
+                {
+                    "flow_id": flow_id,
+                    "error": "variables_required",
+                    "user_id": str(user.id),
+                },
+            )
             raise HTTPException(
                 status_code=400,
                 detail="Variables are required but none were provided",
             )
         missing_vars = [var for var in required_vars if var not in req.variables]
         if missing_vars:
-            track("flow_completion_error", {
-                "flow_id": flow_id,
-                "error": "missing_variables",
-                "missing_vars": ", ".join(missing_vars),
-                "user_id": str(user.id)
-            })
+            track(
+                "flow_completion_error",
+                {
+                    "flow_id": flow_id,
+                    "error": "missing_variables",
+                    "missing_vars": ", ".join(missing_vars),
+                    "user_id": str(user.id),
+                },
+            )
             raise HTTPException(
                 status_code=400,
                 detail=f"Missing required variables: {', '.join(missing_vars)}",
@@ -691,13 +712,16 @@ async def generate_with_flow_id(
             )
 
     req.messages.insert(0, Message(role="system", content=system_prompt))
-    
-    track("flow_completion_processing", {
-        "flow_id": flow_id,
-        "model": req.model,
-        "user_id": str(user.id),
-        "variables_count": len(required_vars) if required_vars else 0
-    })
+
+    track(
+        "flow_completion_processing",
+        {
+            "flow_id": flow_id,
+            "model": req.model,
+            "user_id": str(user.id),
+            "variables_count": len(required_vars) if required_vars else 0,
+        },
+    )
 
     try:
         response = await chatCompletionGenerate(
