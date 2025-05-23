@@ -46,9 +46,9 @@ export default function Login() {
 
   const handleLogin = async (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
     e.preventDefault();
-    trackEvent('login_click', {
-      provider: 'google',
-      redirect_path: redirect
+    trackEvent("login_click", {
+      provider: "google",
+      redirect_path: redirect,
     });
 
     if (!captchaToken) {

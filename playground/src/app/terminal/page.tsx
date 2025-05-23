@@ -18,11 +18,13 @@ import {
   ChartBarIcon,
   // TrashIcon, // Temporarily commented out
 } from "@heroicons/react/24/solid";
-import { PlayIcon, Bars3Icon } from "@heroicons/react/24/outline";
+import { PlayIcon, Bars3Icon, CodeBracketIcon } from "@heroicons/react/24/outline";
+import { QuestionMarkCircleIcon } from "@heroicons/react/24/outline";
 import api from "src/lib/axios";
 import { Message, streamChatCompletion, Tool } from "src/utils/chat";
 import { useQueryClient } from "@tanstack/react-query";
 import MetricsModal from "src/components/MetricsModal";
+import FlowAPIExamplesModal from "src/components/FlowAPIExamplesModal";
 import Link from "next/link";
 import { useSession } from "src/hooks/useSession";
 import { MessageVerification } from "src/components/MessageVerification";
@@ -143,6 +145,7 @@ export default function Workbench() {
   const [isSliderOpen, setIsSliderOpen] = useState(true);
   const [selectedModel, setSelectedModel] = useState<string>("");
   const [showMetrics, setShowMetrics] = useState(false);
+  const [showAPIExamples, setShowAPIExamples] = useState(false);
   const [isSavingFlow, setIsSavingFlow] = useState(false);
   const [isCreatingFlow, setIsCreatingFlow] = useState(false);
 
@@ -633,6 +636,17 @@ export default function Workbench() {
           onClose={() => setShowMetrics(false)}
           flowId={selectedFlow.id}
           title={`Metrics for Flow: ${selectedFlow.name}`}
+        />
+      )}
+
+      {/* Add API Examples Modal */}
+      {showAPIExamples && selectedFlow && (
+        <FlowAPIExamplesModal
+          onClose={() => setShowAPIExamples(false)}
+          flowId={selectedFlow.id}
+          flowName={selectedFlow.name}
+          variables={Object.keys(variables)}
+          tools={tools}
         />
       )}
 
@@ -1184,7 +1198,7 @@ export default function Workbench() {
               </div>
 
               {/* Tools Editor - Moved to the bottom */}
-              <div
+              {/* <div
                 className={`border border-gray-200 rounded-lg bg-linear-to-b from-gray-50 to-white ${
                   sectionsOpen.tools ? "flex-1" : ""
                 }`}
@@ -1331,7 +1345,7 @@ export default function Workbench() {
                     )}
                   </div>
                 )}
-              </div>
+              </div> */}
             </>
           ) : (
             <div className="flex flex-col items-center justify-center flex-1 text-gray-500">
@@ -1390,6 +1404,16 @@ export default function Workbench() {
               </div>
             </div>
             <div className="flex items-center space-x-3">
+              <Link
+                href="/help/flows"
+                className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors group relative"
+              >
+                <QuestionMarkCircleIcon className="w-4 h-4 md:mr-1.5" />
+
+                <span className="absolute px-2 py-1 mb-2 text-xs font-medium text-white transition-opacity bg-gray-900 rounded-sm opacity-0 bottom-full left-1/2 group-hover:opacity-100 whitespace-nowrap">
+                  How to use flows
+                </span>
+              </Link>
               {selectedFlow && (
                 <button
                   onClick={() => setShowMetrics(true)}
@@ -1399,6 +1423,24 @@ export default function Workbench() {
 
                   <span className="absolute px-2 py-1 mb-2 text-xs font-medium text-white transition-opacity bg-gray-900 rounded-sm opacity-0 bottom-full left-1/2 group-hover:opacity-100 whitespace-nowrap">
                     View flow metrics and analytics
+                  </span>
+                </button>
+              )}
+              {selectedFlow && (
+                <button
+                  onClick={() => {
+                    trackEvent("terminal_api_examples_view", {
+                      flow_id: selectedFlow.id,
+                      flow_name: selectedFlow.name,
+                    });
+                    setShowAPIExamples(true);
+                  }}
+                  className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors group relative"
+                >
+                  <CodeBracketIcon className="w-4 h-4 md:mr-1.5" />
+
+                  <span className="absolute px-2 py-1 mb-2 text-xs font-medium text-white transition-opacity bg-gray-900 rounded-sm opacity-0 bottom-full left-1/2 group-hover:opacity-100 whitespace-nowrap">
+                    View API integration examples
                   </span>
                 </button>
               )}
