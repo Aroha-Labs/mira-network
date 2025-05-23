@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware import Middleware
 from contextlib import asynccontextmanager
 from src.router.db.session import async_engine
+from src.router.utils.metrics import PrometheusMiddleware
 
 
 @asynccontextmanager
@@ -56,7 +57,8 @@ app = FastAPI(
             allow_credentials=True,
             allow_methods=["*"],
             allow_headers=["*"],
-        )
+        ),
+        Middleware(PrometheusMiddleware)
     ],
 )
 
