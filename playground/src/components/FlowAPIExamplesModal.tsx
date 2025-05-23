@@ -11,7 +11,6 @@ interface FlowAPIExamplesModalProps {
   flowId: string;
   flowName: string;
   variables?: string[];
-  tools?: any[];
 }
 
 export default function FlowAPIExamplesModal({
@@ -19,7 +18,6 @@ export default function FlowAPIExamplesModal({
   flowId,
   flowName,
   variables = [],
-  tools = [],
 }: FlowAPIExamplesModalProps) {
   const [activeTab, setActiveTab] = useState<"nodejs" | "python">("nodejs");
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
@@ -104,7 +102,7 @@ print(response.json())`;
               <div>
                 <h2 className="text-xl font-semibold text-gray-900">API Integration</h2>
                 <p className="text-sm text-gray-500">
-                  Call "{flowName}" flow programmatically
+                  Call &ldquo;{flowName}&rdquo; flow programmatically
                 </p>
               </div>
             </div>
@@ -175,7 +173,7 @@ print(response.json())`;
                 </div>
               )}
 
-              {tools.length > 0 && (
+              {/* {tools.length > 0 && (
                 <div className="p-3 rounded-lg bg-gray-50">
                   <div className="text-xs font-medium tracking-wide text-gray-500 uppercase">
                     Tools
@@ -184,7 +182,7 @@ print(response.json())`;
                     {tools.length} tool(s) configured
                   </div>
                 </div>
-              )}
+              )} */}
             </div>
 
             {/* Code Examples */}

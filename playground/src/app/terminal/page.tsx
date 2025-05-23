@@ -9,7 +9,6 @@ import {
   XMarkIcon,
   ChevronRightIcon,
   PencilIcon,
-  WrenchIcon,
   ChevronUpIcon,
   ChevronDownIcon,
   ArrowDownTrayIcon,
@@ -646,7 +645,6 @@ export default function Workbench() {
           flowId={selectedFlow.id}
           flowName={selectedFlow.name}
           variables={Object.keys(variables)}
-          tools={tools}
         />
       )}
 
