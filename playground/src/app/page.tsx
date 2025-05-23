@@ -33,7 +33,7 @@ export default function Home() {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-100">
         <div
-          className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-sm relative"
+          className="relative px-4 py-3 text-red-700 bg-red-100 border border-red-400 rounded-sm"
           role="alert"
         >
           <strong className="font-bold">Error: </strong>
@@ -44,10 +44,10 @@ export default function Home() {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center flex-1 bg-gray-100 p-4 space-y-4">
-      <img src="/img/logo.svg" alt="Mira Network Logo" className="h-12 w-auto" />
+    <div className="flex flex-col items-center justify-center flex-1 p-4 space-y-4 bg-gray-100">
+      <img src="/img/logo.svg" alt="Mira Network Logo" className="w-auto h-12" />
       <h1 className="text-sm font-bold text-gray-800">Console | Mira Network</h1>
-      <p className="text-sm text-gray-600 text-center max-w-md">
+      <p className="max-w-md text-sm text-center text-gray-600">
         A distributed system for managing and interacting with various LLM providers
         through a unified interface
       </p>
@@ -55,13 +55,62 @@ export default function Home() {
       <UserInfo user={userSession?.user}>
         <AnalyticsSection />
       </UserInfo>
-      <div className="bg-white p-4 rounded-sm shadow-sm w-full max-w-md">
-        <div className="flex justify-between items-center">
+
+      {/* Getting Started Section - Moved to top for prominence */}
+      <div className="w-full max-w-md mt-6">
+        <div className="p-4 border border-indigo-200 rounded-lg bg-gradient-to-r from-indigo-50 to-blue-50">
+          <div className="flex items-start space-x-3">
+            <div className="flex-shrink-0">
+              <svg
+                className="w-6 h-6 text-indigo-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-sm font-medium text-indigo-900">New to Flows?</h3>
+              <p className="mt-1 text-xs text-indigo-700">
+                Learn how to create and manage AI workflows with our interactive terminal.
+              </p>
+              <Link
+                href="/help/flows"
+                className="inline-flex items-center mt-2 text-xs font-medium text-indigo-600 hover:text-indigo-800"
+              >
+                View Getting Started Guide
+                <svg
+                  className="w-3 h-3 ml-1"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5l7 7-7 7"
+                  />
+                </svg>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="w-full max-w-md p-4 bg-white rounded-sm shadow-sm">
+        <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-gray-600">Credits remaining</p>
-            <div className="font-bold text-lg">
+            <div className="text-lg font-bold">
               {isUserLoading ? (
-                <div className="animate-pulse bg-gray-300 h-6 w-12 rounded-sm mt-1"></div>
+                <div className="w-12 h-6 mt-1 bg-gray-300 rounded-sm animate-pulse"></div>
               ) : userSession?.user ? (
                 <Link
                   href="/credit-history"
@@ -74,11 +123,11 @@ export default function Home() {
               )}
             </div>
           </div>
-          <div className="flex items-center text-gray-700 rounded-full px-3 py-1 ml-4 border border-gray-300 bg-gray-200 cursor-not-allowed text-sm">
+          <div className="flex items-center px-3 py-1 ml-4 text-sm text-gray-700 bg-gray-200 border border-gray-300 rounded-full cursor-not-allowed">
             Buy more credits
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5 ml-1"
+              className="w-5 h-5 ml-1"
               viewBox="0 0 20 20"
               fill="currentColor"
             >
@@ -93,11 +142,12 @@ export default function Home() {
       </div>
       <LinkBox href="/api-logs" label="View API Logs" isDisabled={!userSession?.user} />
       <LinkBox href="/api-keys" label="Manage API Keys" isDisabled={!userSession?.user} />
+      <LinkBox href="/terminal" label="AI Flow Builder" isDisabled={!userSession?.user} />
       <LinkBox href="/network" label="Network" isDisabled={!userSession?.user} />
       <Link
         href="/privacy-policy.html"
         target="_blank"
-        className="text-blue-400 underline decoration-dotted hover:decoration-solid mt-4 text-xs pb-16"
+        className="pb-16 mt-4 text-xs text-blue-400 underline decoration-dotted hover:decoration-solid"
       >
         Privacy Policy
       </Link>

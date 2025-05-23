@@ -58,27 +58,13 @@ const ChartShimmer = () => (
 
 // Add new types for the metrics response
 interface MetricsResponse {
-  summary: {
-    total_calls: number;
-    total_tokens: number;
-    avg_response_time: number;
-    avg_ttft: number;
-    total_cost: number;
-  };
-  time_series: {
-    timestamp: string;
-    calls: number;
-    prompt_tokens: number;
-    completion_tokens: number;
-    avg_response_time: number;
-    avg_ttft: number;
-    prompt_cost: number;
-    completion_cost: number;
-  }[];
-  model_distribution: {
-    model: string;
-    count: number;
-  }[];
+  total_tokens: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  avg_response_time: number;
+  avg_ttft: number;
+  total_cost: number;
+  model_distribution: [string, number][];
 }
 
 const MetricsModal = ({
@@ -177,123 +163,35 @@ const MetricsModal = ({
   const chartData = useMemo(() => {
     if (!data) return null;
 
-    const labels = data.time_series.map((entry) => {
-      const date = parseISO(entry.timestamp);
-      switch (dateRangeState) {
-        case "1":
-          return format(date, "HH:mm");
-        case "7":
-          return format(date, "EEE, MMM d");
-        case "30":
-          return `Week ${format(date, "w")}`;
-        case "90":
-          return format(date, "MMM, yy");
-        default:
-          return format(date, "MMM d");
-      }
-    });
-
+    // Since we don't have time series data, we'll create simple aggregate visualizations
     return {
-      calls: {
-        labels,
-        datasets: [
-          {
-            label: "Number of Calls",
-            data: data.time_series.map((entry) => entry.calls),
-            backgroundColor: "rgba(99, 102, 241, 0.5)",
-          },
-        ],
-      },
-      tokens: {
-        labels,
-        datasets: [
-          {
-            type: "bar" as const,
-            label: "Completion Tokens",
-            data: data.time_series.map((entry) => entry.completion_tokens),
-            backgroundColor: "rgba(75, 192, 192, 0.5)",
-            stack: "tokens",
-            order: 2,
-          },
-          {
-            type: "bar" as const,
-            label: "Prompt Tokens",
-            data: data.time_series.map((entry) => entry.prompt_tokens),
-            backgroundColor: "rgba(54, 162, 235, 0.5)",
-            stack: "tokens",
-            order: 2,
-          },
-          {
-            type: "line" as const,
-            label: "Total Tokens",
-            data: data.time_series.map(
-              (entry) => entry.prompt_tokens + entry.completion_tokens
-            ),
-            borderColor: "rgb(234, 179, 8)",
-            borderWidth: 2,
-            tension: 0.1,
-            pointStyle: "circle",
-            pointRadius: 4,
-            pointHoverRadius: 6,
-            order: 1,
-          },
-        ],
-      },
-      responseTime: {
-        labels,
-        datasets: [
-          {
-            label: "Response Time (ms)",
-            data: data.time_series.map((entry) => entry.avg_response_time),
-            borderColor: "rgb(255, 99, 132)",
-            tension: 0.1,
-          },
-        ],
-      },
-      cost: {
-        labels,
-        datasets: [
-          {
-            label: "Completion Cost",
-            data: data.time_series.map((entry) => entry.completion_cost),
-            backgroundColor: "rgba(75, 192, 192, 0.5)",
-            stack: "cost",
-          },
-          {
-            label: "Prompt Cost",
-            data: data.time_series.map((entry) => entry.prompt_cost),
-            backgroundColor: "rgba(54, 162, 235, 0.5)",
-            stack: "cost",
-          },
-        ],
-      },
-      ttft: {
-        labels,
-        datasets: [
-          {
-            label: "Time to First Token (ms)",
-            data: data.time_series.map((entry) => entry.avg_ttft),
-            borderColor: "rgb(168, 85, 247)",
-            tension: 0.1,
-          },
-        ],
-      },
       models: {
-        labels: data.model_distribution.map((entry) => entry.model),
+        labels: data.model_distribution.map(([model]) => model),
         datasets: [
           {
-            data: data.model_distribution.map((entry) => entry.count),
+            data: data.model_distribution.map(([, count]) => count),
             backgroundColor: [
               "rgba(255, 99, 132, 0.5)",
               "rgba(54, 162, 235, 0.5)",
               "rgba(255, 206, 86, 0.5)",
               "rgba(75, 192, 192, 0.5)",
+              "rgba(153, 102, 255, 0.5)",
+              "rgba(255, 159, 64, 0.5)",
             ],
           },
         ],
       },
+      tokens: {
+        labels: ["Prompt Tokens", "Completion Tokens"],
+        datasets: [
+          {
+            data: [data.prompt_tokens, data.completion_tokens],
+            backgroundColor: ["rgba(54, 162, 235, 0.5)", "rgba(75, 192, 192, 0.5)"],
+          },
+        ],
+      },
     };
-  }, [data, dateRangeState]);
+  }, [data]);
 
   // Update chart options for the tokens chart
   const getChartOptions = useCallback((type: string) => {
@@ -405,18 +303,10 @@ const MetricsModal = ({
     if (isLoading) {
       return (
         <div className="space-y-4">
-          <div className="bg-white px-2 py-1.5 rounded-lg shadow-xs border border-gray-100 flex justify-end gap-1.5">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="w-12 h-8">
-                <Shimmer />
-              </div>
-            ))}
-          </div>
-
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {renderMetricBlock("Cost Distribution", null, null, false, true)}
+            {renderMetricBlock("Total Cost", null, null, false, true)}
             {renderMetricBlock("Token Usage", null, null, false, true)}
-            {renderMetricBlock("Time to First Token", null, null, false, true)}
+            {renderMetricBlock("Avg TTFT", null, null, false, true)}
             {renderMetricBlock("Avg Response Time", null, null, false, true)}
           </div>
 
@@ -439,8 +329,6 @@ const MetricsModal = ({
               </div>
             </div>
           </div>
-
-          {renderMetricBlock("Total Calls", null, null, true, true)}
         </div>
       );
     }
@@ -460,59 +348,18 @@ const MetricsModal = ({
 
     return (
       <div className="space-y-4">
-        {/* Date range buttons */}
-        <div className="bg-white px-2 py-1.5 rounded-lg shadow-xs border border-gray-100 flex justify-between items-center">
-          <div className="text-sm text-gray-500">
-            {data.time_series.length ? `${data.time_series.length} total logs` : ""}
-          </div>
-          <div className="flex gap-1.5 overflow-x-auto">
-            {[
-              { value: "1", label: "24h" },
-              { value: "7", label: "7d" },
-              { value: "30", label: "30d" },
-              { value: "90", label: "3m" },
-            ].map(({ value, label }) => (
-              <button
-                key={value}
-                onClick={() => setDateRangeState(value)}
-                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors duration-200 ${
-                  dateRangeState === value
-                    ? "bg-blue-500 text-white shadow-xs"
-                    : "bg-gray-50 text-gray-600 hover:bg-gray-100"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {renderMetricBlock(
-            "Cost Distribution",
-            `$${data.summary.total_cost.toFixed(4)}`,
-            chartData && <Bar data={chartData.cost} options={getChartOptions("cost")} />
-          )}
+          {renderMetricBlock("Total Cost", `$${data.total_cost.toFixed(4)}`, null)}
           {renderMetricBlock(
             "Token Usage",
-            data.summary.total_tokens.toLocaleString(),
-            chartData && (
-              <Chart
-                type="bar"
-                data={chartData.tokens}
-                options={getChartOptions("tokens")}
-              />
-            )
+            data.total_tokens.toLocaleString(),
+            chartData && <Doughnut data={chartData.tokens} options={chartOptions} />
           )}
-          {renderMetricBlock(
-            "Time to First Token",
-            `${data.summary.avg_ttft.toFixed(2)}ms`,
-            chartData && <Line data={chartData.ttft} options={chartOptions} />
-          )}
+          {renderMetricBlock("Avg TTFT", `${data.avg_ttft.toFixed(2)}ms`, null)}
           {renderMetricBlock(
             "Avg Response Time",
-            `${data.summary.avg_response_time.toFixed(2)}ms`,
-            chartData && <Line data={chartData.responseTime} options={chartOptions} />
+            `${data.avg_response_time.toFixed(2)}ms`,
+            null
           )}
         </div>
 
@@ -524,16 +371,14 @@ const MetricsModal = ({
           <div className="p-3">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div className="space-y-1.5 text-sm">
-                {data.model_distribution.map((entry) => (
+                {data.model_distribution.map(([model, count]) => (
                   <div
-                    key={entry.model}
+                    key={model}
                     className="flex items-center justify-between px-2 py-1 rounded-sm bg-gray-50"
                   >
-                    <span className="mr-2 text-xs text-gray-600 truncate">
-                      {entry.model}
-                    </span>
+                    <span className="mr-2 text-xs text-gray-600 truncate">{model}</span>
                     <span className="text-xs font-medium text-gray-900">
-                      {entry.count} calls
+                      {count} calls
                     </span>
                   </div>
                 ))}
@@ -562,14 +407,6 @@ const MetricsModal = ({
             </div>
           </div>
         </div>
-
-        {/* Total Calls */}
-        {renderMetricBlock(
-          "Total Calls",
-          data.summary.total_calls.toString(),
-          chartData && <Bar data={chartData.calls} options={chartOptions} />,
-          true
-        )}
       </div>
     );
   };
