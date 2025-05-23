@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useSession } from "src/hooks/useSession";
 import Modal from "./Modal";
-import { useState, useMemo, useCallback } from "react";
+import { useMemo } from "react";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -14,8 +14,7 @@ import {
   Legend,
   ArcElement,
 } from "chart.js";
-import { Line, Bar, Doughnut, Chart } from "react-chartjs-2";
-import { format, parseISO } from "date-fns";
+import { Doughnut } from "react-chartjs-2";
 import api from "src/lib/axios";
 
 ChartJS.register(
@@ -78,7 +77,6 @@ const MetricsModal = ({
   flowId,
 }: MetricsModalProps) => {
   const { data: userSession } = useSession();
-  const [dateRangeState, setDateRangeState] = useState("7");
 
   const chartOptions = useMemo(
     () => ({
@@ -131,18 +129,8 @@ const MetricsModal = ({
       userId,
       modelFilter,
       dateRange,
-      dateRangeState,
     ],
     queryFn: async () => {
-      const timeBucket =
-        dateRangeState === "1"
-          ? "hour"
-          : dateRangeState === "7"
-            ? "day"
-            : dateRangeState === "30"
-              ? "week"
-              : "month";
-
       const resp = await api.get("/api-logs/metrics", {
         params: {
           ...(flowId && { flow_id: flowId }),
@@ -152,7 +140,6 @@ const MetricsModal = ({
           ...(modelFilter && { model: modelFilter }),
           ...(dateRange?.startDate && { start_date: dateRange.startDate }),
           ...(dateRange?.endDate && { end_date: dateRange.endDate }),
-          time_bucket: timeBucket,
         },
       });
       return resp.data;
@@ -192,84 +179,6 @@ const MetricsModal = ({
       },
     };
   }, [data]);
-
-  // Update chart options for the tokens chart
-  const getChartOptions = useCallback((type: string) => {
-    const baseOptions = {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: {
-          display: type === "tokens", // Only show legend for tokens chart
-          position: "top" as const,
-        },
-      },
-      scales: {
-        x: {
-          ticks: {
-            maxRotation: 45,
-            minRotation: 45,
-            autoSkip: true,
-            maxTicksLimit: window?.innerWidth < 768 ? 5 : 10,
-          },
-        },
-      },
-    };
-
-    if (type === "tokens" || type === "cost") {
-      return {
-        ...baseOptions,
-        plugins: {
-          legend: {
-            display: true,
-            position: "top" as const,
-          },
-        },
-        scales: {
-          ...baseOptions.scales,
-          y: {
-            stacked: true,
-            title: {
-              display: true,
-              text: type === "tokens" ? "Number of Tokens" : "Cost ($)",
-            },
-          },
-          x: {
-            ...baseOptions.scales.x,
-            stacked: true,
-          },
-        },
-      };
-    }
-
-    if (type === "tokens") {
-      return {
-        ...baseOptions,
-        plugins: {
-          legend: {
-            display: true,
-            position: "top" as const,
-          },
-        },
-        scales: {
-          ...baseOptions.scales,
-          y: {
-            stacked: false,
-            title: {
-              display: true,
-              text: "Number of Tokens",
-            },
-          },
-          x: {
-            ...baseOptions.scales.x,
-            stacked: true,
-          },
-        },
-      };
-    }
-
-    return baseOptions;
-  }, []);
 
   const renderMetricBlock = (
     title: string,

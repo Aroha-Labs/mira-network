@@ -28,7 +28,7 @@ export default function FlowsHelpPage() {
               href="/terminal"
               className="inline-flex items-center text-sm text-indigo-600 hover:text-indigo-800"
             >
-              Open Terminal
+              Open Flow Builder
               <PlayIcon className="w-4 h-4 ml-1" />
             </Link>
           </div>
@@ -68,7 +68,7 @@ export default function FlowsHelpPage() {
                 <div className="p-4 bg-gray-100 border-l-4 border-indigo-500 rounded-lg">
                   <p className="text-sm text-gray-700">
                     💡 <strong>Tip:</strong> You can access the flow builder from the home
-                    page by clicking "Terminal" or directly at{" "}
+                    page by clicking &ldquo;AI Flow Builder&rdquo; or directly at{" "}
                     <code className="px-1 bg-gray-200 rounded">/terminal</code>
                   </p>
                 </div>
@@ -96,7 +96,8 @@ export default function FlowsHelpPage() {
                   <div className="flex items-center space-x-2 text-sm text-gray-600">
                     <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                     <span>
-                      A new flow will be created with the default name "New Flow"
+                      A new flow will be created with the default name &ldquo;New
+                      Flow&rdquo;
                     </span>
                   </div>
                 </div>
@@ -118,8 +119,8 @@ export default function FlowsHelpPage() {
                 </p>
                 <div className="p-4 border border-yellow-200 rounded-lg bg-yellow-50">
                   <p className="text-sm text-yellow-800">
-                    ⚠️ <strong>Remember:</strong> Click "Save Changes" button to persist
-                    your flow name and configuration.
+                    ⚠️ <strong>Remember:</strong> Click &ldquo;Save Changes&rdquo; button
+                    to persist your flow name and configuration.
                   </p>
                 </div>
               </div>
@@ -135,8 +136,8 @@ export default function FlowsHelpPage() {
                   Configure System Prompt
                 </h3>
                 <p className="mb-3 text-gray-600">
-                  Write your system prompt in the "System Prompt" section. Use variables
-                  with double curly braces for dynamic content.
+                  Write your system prompt in the &ldquo;System Prompt&rdquo; section. Use
+                  variables with double curly braces for dynamic content.
                 </p>
                 <div className="p-4 font-mono text-sm text-gray-100 bg-gray-900 rounded-lg">
                   <div className="text-green-400"># Example System Prompt</div>
@@ -168,8 +169,8 @@ export default function FlowsHelpPage() {
               <div className="flex-1">
                 <h3 className="mb-2 text-lg font-medium text-gray-900">Add Messages</h3>
                 <p className="mb-3 text-gray-600">
-                  In the "Messages" section, click "Add Message" to create conversation
-                  examples or context.
+                  In the &ldquo;Messages&rdquo; section, click &ldquo;Add Message&rdquo;
+                  to create conversation examples or context.
                 </p>
                 <div className="space-y-3">
                   <div className="p-3 border border-blue-200 rounded-lg bg-blue-50">
@@ -179,7 +180,7 @@ export default function FlowsHelpPage() {
                       </span>
                     </div>
                     <p className="text-sm text-gray-700">
-                      What's the weather like today?
+                      What&apos;s the weather like today?
                     </p>
                   </div>
                   <div className="p-3 border border-gray-200 rounded-lg bg-gray-50">
@@ -189,7 +190,7 @@ export default function FlowsHelpPage() {
                       </span>
                     </div>
                     <p className="text-sm text-gray-700">
-                      I'd be happy to help you with weather information...
+                      I&apos;d be happy to help you with weather information...
                     </p>
                   </div>
                 </div>
@@ -269,7 +270,7 @@ export default function FlowsHelpPage() {
             </div>
 
             {/* Tools */}
-            {/* <div className="p-6 bg-white border border-gray-200 rounded-lg">
+            <div className="p-6 bg-white border border-gray-200 rounded-lg">
               <div className="flex items-center mb-4 space-x-3">
                 <div className="p-2 bg-orange-100 rounded-lg">
                   <svg
@@ -303,7 +304,7 @@ export default function FlowsHelpPage() {
                   {`{ "type": "function", "function": {...} }`}
                 </code>
               </div>
-            </div> */}
+            </div>
 
             {/* Variables */}
             <div className="p-6 bg-white border border-gray-200 rounded-lg">
@@ -453,7 +454,7 @@ export default function FlowsHelpPage() {
               href="/terminal"
               className="inline-flex items-center px-6 py-3 font-medium text-indigo-600 transition-colors bg-white rounded-lg hover:bg-gray-50"
             >
-              Open Terminal
+              Open Flow Builder
               <PlayIcon className="w-5 h-5 ml-2" />
             </Link>
           </div>
