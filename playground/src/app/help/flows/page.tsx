@@ -270,7 +270,7 @@ export default function FlowsHelpPage() {
             </div>
 
             {/* Tools */}
-            <div className="p-6 bg-white border border-gray-200 rounded-lg">
+            {/* <div className="p-6 bg-white border border-gray-200 rounded-lg">
               <div className="flex items-center mb-4 space-x-3">
                 <div className="p-2 bg-orange-100 rounded-lg">
                   <svg
@@ -304,7 +304,7 @@ export default function FlowsHelpPage() {
                   {`{ "type": "function", "function": {...} }`}
                 </code>
               </div>
-            </div>
+            </div> */}
 
             {/* Variables */}
             <div className="p-6 bg-white border border-gray-200 rounded-lg">
