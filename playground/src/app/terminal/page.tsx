@@ -15,7 +15,6 @@ import {
   UserCircleIcon,
   CheckIcon,
   ChartBarIcon,
-  // TrashIcon, // Temporarily commented out
 } from "@heroicons/react/24/solid";
 import { PlayIcon, Bars3Icon, CodeBracketIcon } from "@heroicons/react/24/outline";
 import { QuestionMarkCircleIcon } from "@heroicons/react/24/outline";
@@ -30,7 +29,6 @@ import { MessageVerification } from "src/components/MessageVerification";
 import ReactMarkdown from "src/components/ReactMarkdown";
 import { trackEvent } from "src/lib/mira";
 
-// Update the Flow interface
 interface Flow {
   id: string;
   name: string;
