@@ -390,7 +390,7 @@ async def delete_flow(flow_id: str, db: DBSession, user: User = Depends(verify_u
     return {"message": "Flow deleted successfully"}
 
 
-@alru_cache(maxsize=100, ttl=3600)  # 1 hour TTL
+@alru_cache(maxsize=100, ttl=300)  # 5 minutes
 async def get_cached_flow(flow_id: int) -> Optional[Flows]:
     """Get flow from cache with TTL, using async_lru package"""
     logger.info(f"Cache miss for flow_id: {flow_id}")
