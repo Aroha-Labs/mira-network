@@ -346,7 +346,7 @@ export default function Workbench() {
                 prev
                   ? {
                       ...prev,
-                      content: chunk.content || prev.content,
+                      content: prev.content + chunk.content,
                       tool_calls: chunk.tool_calls || prev.tool_calls,
                       tool_responses: chunk.tool_responses || prev.tool_responses,
                     }
