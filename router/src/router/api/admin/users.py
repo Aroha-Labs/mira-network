@@ -329,17 +329,6 @@ async def add_credit(
     new_credit = current_credit + request.amount
     await redis_client.incrbyfloat(redis_key, request.amount)
 
-    # Update DB using value from redis
-    user_data.credits = new_credit
-    user_data.updated_at = datetime.utcnow()
-
-    credit_history = UserCreditsHistory(
-        user_id=request.user_id,
-        amount=request.amount,
-        description=request.description,
-        created_at=datetime.utcnow(),
-    )
-
     # Prepare credit history document for OpenSearch
     credit_history_doc = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -353,21 +342,16 @@ async def add_credit(
         "admin_user_id": user.id,
     }
 
-    db.add(credit_history)
     try:
-        # Send document to OpenSearch asynchronously and commit DB transaction
-        await asyncio.gather(
-            asyncio.get_event_loop().run_in_executor(
-                None,
-                lambda: opensearch_client.index(
-                    index=OPENSEARCH_CREDITS_INDEX,
-                    body=credit_history_doc,
-                ),
+        # Send document to OpenSearch asynchronously
+        await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: opensearch_client.index(
+                index=OPENSEARCH_CREDITS_INDEX,
+                body=credit_history_doc,
             ),
-            db.commit(),
         )
     except Exception as e:
-        await db.rollback()
         logger.error(f"Error adding credit or sending to OpenSearch: {e}")
         raise HTTPException(status_code=500, detail=f"Error adding credit: {e}")
 
