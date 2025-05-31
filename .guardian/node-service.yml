@@ -26,7 +26,7 @@ spec:
   techStack: # List of key technologies used
     - "Language: Nodejs"
     - "Framework: Fastify"
-    - "Database Client: Sequelize"
+    - "Database Client: Postgres"
     - "Cache: Redis"
 
   links: # Important URLs related to the service
