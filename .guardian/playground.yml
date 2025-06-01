@@ -28,6 +28,8 @@ spec:
     - "Framework: Next.js"
 
   links: # Important URLs related to the service
+    - name: "Website"
+      url: "https://console.mira.network"
     - name: "Source Code (Github)"
       url: "https://github.com/Aroha-Labs/mira-network/"
 
