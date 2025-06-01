@@ -24,20 +24,18 @@ spec:
 
 
   techStack: # List of key technologies used
-    - "Language: Python 3.11"
+    - "Language: Python 3.10"
     - "Framework: FastAPI"
     - "Database Client: SQLAlchemy"
-    - "Cache: Redis"
+    - "Cache: Valkey"
 
   links: # Important URLs related to the service
-    - name: "Source Code (GitLab)"
-      url: "https://gitlab.example.com/alpha-squad/user-profile-api"
-    - name: "API Documentation (Swagger UI)"
-      url: "https://api.example.com/user-profile/docs"
+    - name: "Source Code (Github)"
+      url: "https://github.com/Aroha-Labs/mira-network/"
+    - name: "API Documentation"
+      url: "https://api.mira.network/docs"
     - name: "Primary Dashboard (Grafana)"
-      url: "https://grafana.example.com/d/user-profile-api-overview"
-    - name: "Runbook (Confluence)"
-      url: "https://confluence.example.com/display/ENG/UserProfileAPI+Runbook"
+      url: "http://3.87.207.168:3000/d/mira-network-api-dashboard/mira-network-api-monitoring?orgId=1&from=now-6h&to=now&timezone=browser&refresh=30s"
 
   # ID of a ChecklistTemplate defined in Guardian.
   # The Guardian platform will use this to associate readiness checks.
