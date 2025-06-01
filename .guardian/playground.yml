@@ -1,0 +1,41 @@
+kind: Service
+metadata:
+  # --- Required ---
+  name: playground # Unique identifier for this service (e.g., kebab-case)
+
+  # --- Optional ---
+  displayName: "Playground" # Human-readable name for UIs
+  description: "A playground for testing and developing new features."
+  annotations: # For custom metadata, operational notes, etc.
+    last-reviewed-by: "sarim@arohalabs.com"
+    review-date: "2025-06-01"
+spec:
+  # --- Required ---
+  owner:
+    team: mira-network # Team slug or ID responsible for this service
+    email: sarim@arohalabs.com # Optional: Contact email for the team
+
+  lifecycle: production # Current stage: e.g., development, beta, production, deprecated, retired
+  
+  # --- Optional ---
+  tier: tier1 # Criticality: e.g., tier1 (most critical) to tier4 (least critical)
+  type: frontend # Nature of the service: e.g., api, frontend, worker, cronjob, database, library
+  partOf: mira-network # Logical grouping: name of a larger system/platform
+
+
+  techStack: # List of key technologies used
+    - "Language: React"
+    - "Framework: Next.js"
+
+  links: # Important URLs related to the service
+    - name: "Source Code (Github)"
+      url: "https://github.com/Aroha-Labs/mira-network/"
+
+  # ID of a ChecklistTemplate defined in Guardian.
+  # The Guardian platform will use this to associate readiness checks.
+  # defaultChecklistTemplateId: "standard-api-prod-checklist-v1"
+
+  dependencies:
+    - name: router # Name of another service (its metadata.name) or an external dependency
+      relationship: "bff" # How this service depends on the other
+      critical: true # If true, this dependency is vital for core functionality
