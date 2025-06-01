@@ -30,14 +30,8 @@ spec:
     - "Cache: Redis"
 
   links: # Important URLs related to the service
-    - name: "Source Code (GitLab)"
-      url: "https://gitlab.example.com/alpha-squad/user-profile-api"
-    - name: "API Documentation (Swagger UI)"
-      url: "https://api.example.com/user-profile/docs"
-    - name: "Primary Dashboard (Grafana)"
-      url: "https://grafana.example.com/d/user-profile-api-overview"
-    - name: "Runbook (Confluence)"
-      url: "https://confluence.example.com/display/ENG/UserProfileAPI+Runbook"
+    - name: "Source Code (Github)"
+      url: "https://github.com/Aroha-Labs/mira-network/"
 
   # ID of a ChecklistTemplate defined in Guardian.
   # The Guardian platform will use this to associate readiness checks.
