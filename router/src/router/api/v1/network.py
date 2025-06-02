@@ -5,7 +5,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from src.router.utils.user import get_user_credits
 from src.router.utils.machine import get_machine_id
-from src.router.core.config import NODE_SERVICE_URL
+from src.router.core.config import NODE_SERVICE_URL, DATA_STREAM_API_URL, DATA_STREAM_SERVICE_KEY
 from src.router.core.settings_types import SETTINGS_MODELS
 from src.router.core.types import User
 from src.router.db.session import DBSession
@@ -15,6 +15,7 @@ from src.router.schemas.ai import AiRequest, VerifyRequest
 import time
 import httpx
 import json
+import uuid
 from src.router.utils.settings import get_setting_value
 from src.router.utils.settings import get_supported_models
 import asyncio
@@ -272,8 +273,55 @@ async def save_log(
         "description": f"Used {total_tokens} tokens. Prompt tokens: {prompt_tokens}, Completion tokens: {completion_tokens}",
     }
 
+    # Prepare data for data stream API
+    data_stream_payload = {
+        "event_name": "llm_usage",
+        "user_id": str(user.id),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "properties": {
+            "api_key_id": user.api_key_id,
+            "log_id": str(uuid.uuid4()),
+            "walletAddress": "0x0000000000000000000000000000000000000000",
+            "model": req.model,
+            "original_model": original_req_model,
+            "prompt_tokens": usage.get("prompt_tokens", 0),
+            "completion_tokens": usage.get("completion_tokens", 0),
+            "total_tokens": usage.get("total_tokens", 0),
+            "ttft": ttfs,
+            "total_response_time": time.time() - timeStart,
+            "machine_id": str(machine_id),
+            "flow_id": flow_id,
+            "cost": cost,
+            "previous_balance": user_credits,
+            "new_balance": str(new_credit),
+            "doc_type": "model_usage",
+        }
+    }
+
+    async def send_to_data_stream():
+        if not DATA_STREAM_API_URL or not DATA_STREAM_SERVICE_KEY:
+            logger.warning("DATA_STREAM_API_URL or DATA_STREAM_SERVICE_KEY not configured, skipping data stream logging")
+            return
+
+        try:
+            async with httpx.AsyncClient() as client:
+                print(DATA_STREAM_API_URL)
+                response = await client.post(
+                    f"{DATA_STREAM_API_URL}/api/v1/track",
+                    json=data_stream_payload,
+                    headers={
+                        "X-Write-Key": DATA_STREAM_SERVICE_KEY,
+                        "Content-Type": "application/json"
+                    },
+                    timeout=5.0  # 5 second timeout
+                )
+                if response.status_code != 200:
+                    logger.error(f"Failed to send log to data stream API: {response.status_code} {response.text}")
+        except Exception as e:
+            logger.error(f"Error sending log to data stream API: {str(e)}")
+
     try:
-        # Send both documents to OpenSearch asynchronously
+        # Send documents to OpenSearch and data stream API asynchronously
         await asyncio.gather(
             asyncio.get_event_loop().run_in_executor(
                 None,
@@ -289,6 +337,7 @@ async def save_log(
                     body=credit_history_doc,
                 ),
             ),
+            send_to_data_stream(),
         )
     except Exception as e:
         track("save_log_error", {"user_id": str(user.id), "error": str(e)})
