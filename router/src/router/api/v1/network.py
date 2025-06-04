@@ -98,7 +98,7 @@ async def verify(req: VerifyRequest, db: DBSession, user: User = Depends(verify_
     async def process_model(model, idx):
         try:
             # Get or create session ID
-            session_id = await get_or_create_session_id(str(user.id))
+            # session_id = await get_or_create_session_id(str(user.id))
             
             # Note: This assumes LiteLLM supports a verify endpoint
             # You might need to adjust this based on LiteLLM's actual API
@@ -115,7 +115,7 @@ async def verify(req: VerifyRequest, db: DBSession, user: User = Depends(verify_
                         "generation_id": f"verify-gen-{user.id}-{idx}-{int(time.time())}",
                         "trace_id": f"verify-trace-{user.id}-{int(time.time())}",
                         "trace_user_id": str(user.id),
-                        "session_id": session_id
+                        # "session_id": session_id
                     }
                 }
             )
@@ -447,9 +447,9 @@ async def chatCompletionGenerate(
             completion_params["max_tokens"] = req.max_tokens
 
         # Get or create session ID for Langfuse tracking
-        session_id = await get_or_create_session_id(str(user.id))
+        # session_id = await get_or_create_session_id(str(user.id))
 
-        logger.info(f"Session ID: {session_id}")
+        # logger.info(f"Session ID: {session_id}")
         logger.info(f"User ID: {user.id}")
 
         # Add metadata for tracking
@@ -459,7 +459,7 @@ async def chatCompletionGenerate(
                 "generation_id": f"chat-gen-{user.id}-{int(time.time())}",
                 "trace_id": f"chat-trace-{user.id}-{int(time.time())}",
                 "trace_user_id": str(user.id),
-                "session_id": session_id
+                # "session_id": session_id
             }
         }
 
