@@ -9,6 +9,9 @@ JWT_SECRET = os.getenv(
 
 NODE_SERVICE_URL = os.getenv("NODE_SERVICE_URL")
 
+# LiteLLM Configuration
+LITELLM_API_KEY = os.getenv("LITELLM_API_KEY")
+
 # OpenSearch Configuration
 OPENSEARCH_BASE_URL = os.getenv("OPENSEARCH_BASE_URL", "")
 OPENSEARCH_USER = os.getenv("OPENSEARCH_USER", "")

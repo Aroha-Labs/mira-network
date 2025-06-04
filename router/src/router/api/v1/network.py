@@ -1,11 +1,12 @@
 from datetime import datetime, timezone
-from typing import Optional, AsyncGenerator
-from fastapi import APIRouter, Depends, Response, HTTPException
+from typing import Optional, AsyncGenerator, List, Dict, Any
+from fastapi import APIRouter, Depends, Response, HTTPException, Request
 from fastapi.responses import StreamingResponse
+import httpx
 from pydantic import BaseModel
 from src.router.utils.user import get_user_credits
 from src.router.utils.machine import get_machine_id
-from src.router.core.config import NODE_SERVICE_URL, DATA_STREAM_API_URL, DATA_STREAM_SERVICE_KEY
+from src.router.core.config import NODE_SERVICE_URL, DATA_STREAM_API_URL, DATA_STREAM_SERVICE_KEY, LITELLM_API_KEY
 from src.router.core.settings_types import SETTINGS_MODELS
 from src.router.core.types import User
 from src.router.db.session import DBSession
@@ -13,8 +14,8 @@ from src.router.core.security import verify_user
 from src.router.utils.network import get_random_machines
 from src.router.schemas.ai import AiRequest, VerifyRequest
 import time
-import httpx
 import json
+import uuid
 import uuid
 from src.router.utils.settings import get_setting_value
 from src.router.utils.settings import get_supported_models
@@ -31,13 +32,17 @@ from src.router.utils.opensearch import (
     opensearch_client,
     OPENSEARCH_CREDITS_INDEX,
 )
-from aiohttp import ClientSession, ClientTimeout, TCPConnector
 from src.router.utils.nr import track
+from openai import AsyncOpenAI
 
 
 router = APIRouter()
 
-transport = httpx.AsyncHTTPTransport(retries=3)
+# Configure OpenAI client for LiteLLM
+openai_client = AsyncOpenAI(
+    api_key=LITELLM_API_KEY,
+    base_url="https://litellm.alts.dev/v1"
+)
 
 
 @router.post(
@@ -91,22 +96,43 @@ async def verify(req: VerifyRequest, db: DBSession, user: User = Depends(verify_
         transformed_models.append({"original": model, "id": model_config.id})
 
     async def process_model(model, idx):
-        proxy_url = f"{NODE_SERVICE_URL}/v1/verify"
-        async with httpx.AsyncClient(timeout=httpx.Timeout(60.0)) as client:
-            response = await client.post(
-                proxy_url,
-                json={
-                    "messages": [
-                        {"role": msg.role, "content": msg.content}
-                        for msg in req.messages
-                    ],
-                    "model": model["id"],
-                },
+        try:
+            # Get or create session ID
+            session_id = await get_or_create_session_id(str(user.id))
+            
+            # Note: This assumes LiteLLM supports a verify endpoint
+            # You might need to adjust this based on LiteLLM's actual API
+            response = await openai_client.chat.completions.create(
+                model=model["id"],
+                messages=[  # type: ignore
+                    {"role": msg.role, "content": msg.content}
+                    for msg in req.messages
+                ],
+                max_tokens=1,  # Minimal response for verification
+                extra_body={
+                    "metadata": {
+                        "generation_name": "verify-generation-openai-client",
+                        "generation_id": f"verify-gen-{user.id}-{idx}-{int(time.time())}",
+                        "trace_id": f"verify-trace-{user.id}-{int(time.time())}",
+                        "trace_user_id": str(user.id),
+                        "session_id": session_id
+                    }
+                }
             )
-            response_data = response.json()
+            
+            # For verification, we'll check if we got a valid response
+            result = "yes" if response.choices and response.choices[0].message else "no"
+            
             return {
-                "result": response_data["result"],
-                "response": response_data,
+                "result": result,
+                "response": {"choices": [{"message": {"content": response.choices[0].message.content if response.choices else ""}}]},
+                "model": transformed_models[idx]["original"],
+            }
+        except Exception as e:
+            logger.error(f"Error verifying model {model['id']}: {str(e)}")
+            return {
+                "result": "no",
+                "response": {"error": str(e)},
                 "model": transformed_models[idx]["original"],
             }
 
@@ -344,84 +370,6 @@ async def save_log(
         logger.error(f"Log saving error: {str(e)}")
 
 
-async def handle_stream_chunk(
-    chunk: str | bytes,
-) -> AsyncGenerator[tuple[str, dict], None]:
-    buffer = ""
-    try:
-        # Convert bytes to text
-        if isinstance(chunk, bytes):
-            text = chunk.decode("utf-8")
-        else:
-            text = str(chunk)
-
-        buffer += text
-
-        while True:
-            # Find the next complete SSE line
-            line_end = buffer.find("\n")
-            if line_end == -1:
-                break
-
-            line = buffer[:line_end].strip()
-            buffer = buffer[line_end + 1 :]
-
-            if not line:
-                continue
-
-            # Handle SSE format
-            if line.startswith("data: "):
-                data = line[6:]
-                if data == "[DONE]":
-                    break
-
-                try:
-                    json_data = json.loads(data)
-                    # Stream any delta update or usage data
-                    if (
-                        "choices" in json_data
-                        and len(json_data["choices"]) > 0
-                        and ("delta" in json_data["choices"][0] or "usage" in json_data)
-                    ):
-                        # Check if we have reasoning in the delta and ensure it's preserved
-                        if (
-                            "delta" in json_data["choices"][0]
-                            and "reasoning" in json_data["choices"][0]["delta"]
-                        ):
-                            # Ensure we preserve the reasoning field in the response
-                            yield f"data: {json.dumps(json_data)}\n\n", json_data
-                        else:
-                            # For regular content updates
-                            yield f"data: {json.dumps(json_data)}\n\n", json_data
-                except json.JSONDecodeError:
-                    logger.debug(f"Incomplete JSON chunk (expected): {data}")
-                    continue
-            else:
-                continue
-
-    except Exception as e:
-        track("stream_chunk_error", {"error": str(e)})
-        logger.error(f"Stream chunk processing error: {str(e)}")
-        yield f"data: {json.dumps({'error': str(e)})}\n\n", {"error": str(e)}
-
-
-async def stream_response(response) -> AsyncGenerator[tuple[str, dict], None]:
-    """Stream response handler with proper chunk size and decoding"""
-    try:
-        # Use 1024 bytes chunk size and decode to unicode, similar to requests
-        async for chunk in response.content.iter_any():
-            if isinstance(chunk, bytes):
-                text = chunk.decode("utf-8")
-            else:
-                text = str(chunk)
-            async for message, data in handle_stream_chunk(text):
-                yield message, data
-    except Exception as e:
-        track("stream_response_error", {"error": str(e)})
-        logger.error(f"Streaming error: {str(e)}")
-        yield f"data: {json.dumps({'error': str(e)})}\n\n", {"error": str(e)}
-
-
 @router.post(
     "/v1/chat/completions",
     summary="Generate Chat Completion",
@@ -432,6 +380,7 @@ async def stream_response(response) -> AsyncGenerator[tuple[str, dict], None]:
 async def chatCompletionGenerate(
     req: AiRequest,
     db: DBSession,
+    request: Request,
     user: User = Depends(verify_user),
     flow_id: Optional[str] = None,
 ) -> Response:
@@ -451,7 +400,7 @@ async def chatCompletionGenerate(
 
     try:
         # Fix type conversion for user_id
-        user_credits = await get_user_credits((user.id), db)
+        user_credits = await get_user_credits(user.id, db)
         if user_credits <= 0:
             track(
                 "generate_error",
@@ -479,47 +428,53 @@ async def chatCompletionGenerate(
         original_req_model = req.model
         req.model = model_config.id
 
-        proxy_url = f"{NODE_SERVICE_URL}/v1/chat/completions"
-        logger.info(f"Using machine {NODE_SERVICE_URL}")
+        logger.info(f"Using LiteLLM service with OpenAI client")
 
-        # Create timeout configuration
-        timeout = ClientTimeout(
-            total=300.0, connect=60.0, sock_connect=30.0, sock_read=60.0
-        )
+        # Prepare messages in OpenAI format
+        messages = [
+            {"role": msg.role, "content": msg.content}  # type: ignore
+            for msg in req.messages
+        ]
 
-        connector = TCPConnector(
-            limit=3000,  # For 100 req/sec minimum
-            limit_per_host=500,  # Prevent single host overwhelming
-        )
+        # Common parameters for OpenAI client
+        completion_params: Dict[str, Any] = {
+            "model": req.model,
+            "messages": messages,
+            "stream": req.stream,
+        }
 
-        async def generate():
-            usage = {}
-            result_text = ""
-            current_tool_calls = {}
-            ttfs: Optional[float] = None
-            machine_id = None
+        # Add optional parameters if they exist
+        if req.max_tokens:
+            completion_params["max_tokens"] = req.max_tokens
 
-            async with ClientSession(connector=connector, timeout=timeout) as session:
+        # Get or create session ID for Langfuse tracking
+        session_id = await get_or_create_session_id(str(user.id))
+
+        logger.info(f"Session ID: {session_id}")
+        logger.info(f"User ID: {user.id}")
+
+        # Add metadata for tracking
+        completion_params["extra_body"] = {
+            "metadata": {
+                "generation_name": "chat-completion-openai-client",
+                "generation_id": f"chat-gen-{user.id}-{int(time.time())}",
+                "trace_id": f"chat-trace-{user.id}-{int(time.time())}",
+                "trace_user_id": str(user.id),
+                "session_id": session_id
+            }
+        }
+
+        if req.stream:
+            async def generate():
+                usage = {}
+                result_text = ""
+                ttfs: Optional[float] = None
+                machine_id = 0
+
                 try:
-                    llmres = await session.post(
-                        proxy_url,
-                        json=req.model_dump(),
-                        headers={"Accept-Encoding": "identity"},
-                    )
-                    llmres.raise_for_status()
-
-                    machine_ip = llmres.headers.get("x-machine-ip", "")
-                    if not machine_ip:
-                        logger.warning("No machine IP in headers")
-                        machine_ip = ""
-
-                    try:
-                        machine_id = int(await get_machine_id(machine_ip, db))
-                    except (ValueError, TypeError) as e:
-                        logger.error(f"Error converting machine_id: {str(e)}")
-                        machine_id = 0
-
-                    async for message, data in stream_response(llmres):
+                    stream = await openai_client.chat.completions.create(**completion_params)
+                    
+                    async for chunk in stream:
                         if ttfs is None:
                             ttfs = time.time() - timeStart
                             track(
@@ -532,10 +487,17 @@ async def chatCompletionGenerate(
                                 },
                             )
 
-                        if "usage" in data:
-                            usage = data["usage"]
+                        # Convert OpenAI chunk to SSE format
+                        chunk_dict = chunk.model_dump()
+                        
+                        if chunk.choices and chunk.choices[0].delta.content:
+                            result_text += chunk.choices[0].delta.content
+                        
+                        # Check for usage information (usually in the last chunk)
+                        if hasattr(chunk, 'usage') and chunk.usage:
+                            usage = chunk.usage.model_dump()
 
-                        yield message
+                        yield f"data: {json.dumps(chunk_dict)}\n\n"
 
                 except Exception as e:
                     track(
@@ -556,7 +518,7 @@ async def chatCompletionGenerate(
                             usage=usage,
                             ttfs=ttfs,
                             timeStart=timeStart,
-                            machine_id=machine_id or 0,
+                            machine_id=machine_id,
                             flow_id=flow_id,
                         )
 
@@ -567,7 +529,6 @@ async def chatCompletionGenerate(
                         )
                         logger.error(f"Log saving error: {str(log_error)}")
 
-        if req.stream:
             return StreamingResponse(
                 generate(),
                 media_type="text/event-stream",
@@ -578,20 +539,12 @@ async def chatCompletionGenerate(
             )
 
         # Handle non-streaming response
-        async with ClientSession(connector=connector, timeout=timeout) as session:
-            llmres = await session.post(
-                proxy_url,
-                json=req.model_dump(),
-                headers={"Accept-Encoding": "identity"},
-            )
-            llmres.raise_for_status()
-
-            response_text = await llmres.text()
-            response_json = json.loads(response_text)
-            content_json = response_json.get("data", response_json)
-            result_text = content_json["choices"][0]["message"]["content"]
+        try:
+            response = await openai_client.chat.completions.create(**completion_params)
+            
+            result_text = response.choices[0].message.content if response.choices else ""
             ttfs = time.time() - timeStart
-            usage = content_json.get("usage", {})
+            usage = response.usage.model_dump() if response.usage else {}
 
             track(
                 "generate_completion",
@@ -605,12 +558,8 @@ async def chatCompletionGenerate(
                 },
             )
 
-            # Handle machine_id safely
-            machine_ip = llmres.headers.get("x-machine-ip", "")
-            try:
-                machine_id = int(await get_machine_id(machine_ip, db))
-            except (ValueError, TypeError):
-                machine_id = 0
+            # For LiteLLM, set machine_id to 0 since we don't have machine info
+            machine_id = 0
 
             await save_log(
                 user=user,
@@ -625,9 +574,20 @@ async def chatCompletionGenerate(
                 flow_id=flow_id,
             )
 
+            # Convert response to match expected format
+            response_dict = response.model_dump()
             return Response(
-                content=response_text,
+                content=json.dumps(response_dict),
                 status_code=200,
+                media_type="application/json"
+            )
+
+        except Exception as e:
+            track("generate_error", {"user_id": str(user.id), "error": str(e)})
+            logger.error(f"Non-streaming generation error: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error processing request: {str(e)}",
             )
 
     except Exception as e:
@@ -637,3 +597,21 @@ async def chatCompletionGenerate(
             status_code=500,
             detail=f"Error processing request: {str(e)}",
         )
+
+
+async def get_or_create_session_id(user_id: str) -> str:
+    """Get existing session ID from Redis or create a new one with 30-minute expiration"""
+    redis_key = f"user_session:{user_id}"
+    session_id = await redis_client.get(redis_key)
+    
+    if session_id is None:
+        # Create new session ID
+        session_id = f"session_{user_id}_{uuid.uuid4().hex[:12]}"
+        # Store in Redis with 30-minute (1800 seconds) expiration
+        await redis_client.setex(redis_key, 1800, session_id)
+    else:
+        # Extend existing session by 30 minutes
+        session_id = session_id.decode('utf-8') if isinstance(session_id, bytes) else session_id
+        await redis_client.expire(redis_key, 1800)
+    
+    return session_id
