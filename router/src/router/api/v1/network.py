@@ -380,7 +380,6 @@ async def save_log(
 async def chatCompletionGenerate(
     req: AiRequest,
     db: DBSession,
-    request: Request,
     user: User = Depends(verify_user),
     flow_id: Optional[str] = None,
 ) -> Response:
