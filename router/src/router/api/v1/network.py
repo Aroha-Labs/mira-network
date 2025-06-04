@@ -425,9 +425,9 @@ async def chatCompletionGenerate(
 
         model_config = supported_models[req.model]
         original_req_model = req.model
+        logger.info(f"Using LiteLLM service with OpenAI client {req.model}")
         req.model = model_config.id
-
-        logger.info(f"Using LiteLLM service with OpenAI client")
+        logger.info(f"Using LiteLLM service with OpenAI client {req.model}")
 
         # Prepare messages in OpenAI format
         messages = [
@@ -437,7 +437,7 @@ async def chatCompletionGenerate(
 
         # Common parameters for OpenAI client
         completion_params: Dict[str, Any] = {
-            "model": req.model,
+            "model": original_req_model,
             "messages": messages,
             "stream": req.stream,
         }
@@ -472,7 +472,7 @@ async def chatCompletionGenerate(
 
                 try:
                     stream = await openai_client.chat.completions.create(**completion_params)
-                    
+
                     async for chunk in stream:
                         if ttfs is None:
                             ttfs = time.time() - timeStart
@@ -488,10 +488,10 @@ async def chatCompletionGenerate(
 
                         # Convert OpenAI chunk to SSE format
                         chunk_dict = chunk.model_dump()
-                        
+
                         if chunk.choices and chunk.choices[0].delta.content:
                             result_text += chunk.choices[0].delta.content
-                        
+
                         # Check for usage information (usually in the last chunk)
                         if hasattr(chunk, 'usage') and chunk.usage:
                             usage = chunk.usage.model_dump()
@@ -540,7 +540,7 @@ async def chatCompletionGenerate(
         # Handle non-streaming response
         try:
             response = await openai_client.chat.completions.create(**completion_params)
-            
+
             result_text = response.choices[0].message.content if response.choices else ""
             ttfs = time.time() - timeStart
             usage = response.usage.model_dump() if response.usage else {}
