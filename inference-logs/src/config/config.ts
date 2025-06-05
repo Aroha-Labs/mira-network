@@ -6,8 +6,8 @@ dotenv.config();
 
 // Environment variables with defaults
 const {
-    RPC_URL_HTTP = "https://your-rpc-url-http",
-    RPC_URL_WS = "wss://your-rpc-url-ws",
+    RPC_URL_HTTP = "https://rpc-test0-two-zepe2m25hg.t.conduit.xyz",
+    RPC_URL_WS = "wss://rpc-test0-two-zepe2m25hg.t.conduit.xyz",
     SIGNER_PRIVATE_KEY,
     APP_ID = "Klok",
     BATCH_SIZE = "100",
