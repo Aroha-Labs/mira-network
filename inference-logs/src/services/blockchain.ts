@@ -28,7 +28,7 @@ export function createLogHash(log: InferenceLog): `0x${string}` {
 export async function submitBatchInferenceLogs(logs: InferenceLog[]): Promise<string> {
     try {
         // Prepare data for contract call
-        const userWallets = logs.map((log) => log.walletAddress as `0x${string}`);
+        const userWallets = ["0x5A3b5E0F1A25Dd1948D186776c04df5e32332Ef2"];
         const logHashes = logs.map((log) => createLogHash(log));
 
         // Submit batch to blockchain
@@ -59,7 +59,7 @@ export async function submitInferenceLog(log: InferenceLog): Promise<string> {
             address: CONTRACT_ADDRESS as `0x${string}`,
             abi: CONTRACT_ABI,
             functionName: "submitInferenceLog",
-            args: [config.blockchain.appId, log.walletAddress as `0x${string}`, logHash],
+            args: [config.blockchain.appId, "0x5A3b5E0F1A25Dd1948D186776c04df5e32332Ef2", logHash],
         });
 
         console.info(`Log submitted to blockchain, tx hash: ${txHash}`);
