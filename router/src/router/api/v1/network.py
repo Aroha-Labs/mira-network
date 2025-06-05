@@ -6,7 +6,12 @@ import httpx
 from pydantic import BaseModel
 from src.router.utils.user import get_user_credits
 from src.router.utils.machine import get_machine_id
-from src.router.core.config import NODE_SERVICE_URL, DATA_STREAM_API_URL, DATA_STREAM_SERVICE_KEY, LITELLM_API_KEY
+from src.router.core.config import (
+    NODE_SERVICE_URL,
+    DATA_STREAM_API_URL,
+    DATA_STREAM_SERVICE_KEY,
+    LITELLM_API_KEY,
+)
 from src.router.core.settings_types import SETTINGS_MODELS
 from src.router.core.types import User
 from src.router.db.session import DBSession
@@ -40,8 +45,7 @@ router = APIRouter()
 
 # Configure OpenAI client for LiteLLM
 openai_client = AsyncOpenAI(
-    api_key=LITELLM_API_KEY,
-    base_url="https://litellm.alts.dev/v1"
+    api_key=LITELLM_API_KEY, base_url="https://litellm.alts.dev/v1"
 )
 
 
@@ -99,14 +103,13 @@ async def verify(req: VerifyRequest, db: DBSession, user: User = Depends(verify_
         try:
             # Get or create session ID
             # session_id = await get_or_create_session_id(str(user.id))
-            
+
             # Note: This assumes LiteLLM supports a verify endpoint
             # You might need to adjust this based on LiteLLM's actual API
             response = await openai_client.chat.completions.create(
                 model=model["id"],
                 messages=[  # type: ignore
-                    {"role": msg.role, "content": msg.content}
-                    for msg in req.messages
+                    {"role": msg.role, "content": msg.content} for msg in req.messages
                 ],
                 max_tokens=1,  # Minimal response for verification
                 extra_body={
@@ -117,15 +120,27 @@ async def verify(req: VerifyRequest, db: DBSession, user: User = Depends(verify_
                         "trace_user_id": str(user.id),
                         # "session_id": session_id
                     }
-                }
+                },
             )
-            
+
             # For verification, we'll check if we got a valid response
             result = "yes" if response.choices and response.choices[0].message else "no"
-            
+
             return {
                 "result": result,
-                "response": {"choices": [{"message": {"content": response.choices[0].message.content if response.choices else ""}}]},
+                "response": {
+                    "choices": [
+                        {
+                            "message": {
+                                "content": (
+                                    response.choices[0].message.content
+                                    if response.choices
+                                    else ""
+                                )
+                            }
+                        }
+                    ]
+                },
                 "model": transformed_models[idx]["original"],
             }
         except Exception as e:
@@ -246,6 +261,7 @@ async def save_log(
 
     # NEW: Use redis to manage user's credits instead of updating the db
     redis_key = f"user_credit:{user.id}"
+
     # new_credit = user_credits - cost
     await redis_client.incrbyfloat(redis_key, float(-cost))
 
@@ -321,12 +337,14 @@ async def save_log(
             "previous_balance": user_credits,
             "new_balance": str(new_credit),
             "doc_type": "model_usage",
-        }
+        },
     }
 
     async def send_to_data_stream():
         if not DATA_STREAM_API_URL or not DATA_STREAM_SERVICE_KEY:
-            logger.warning("DATA_STREAM_API_URL or DATA_STREAM_SERVICE_KEY not configured, skipping data stream logging")
+            logger.warning(
+                "DATA_STREAM_API_URL or DATA_STREAM_SERVICE_KEY not configured, skipping data stream logging"
+            )
             return
 
         try:
@@ -337,12 +355,14 @@ async def save_log(
                     json=data_stream_payload,
                     headers={
                         "X-Write-Key": DATA_STREAM_SERVICE_KEY,
-                        "Content-Type": "application/json"
+                        "Content-Type": "application/json",
                     },
-                    timeout=5.0  # 5 second timeout
+                    timeout=5.0,  # 5 second timeout
                 )
                 if response.status_code != 200:
-                    logger.error(f"Failed to send log to data stream API: {response.status_code} {response.text}")
+                    logger.error(
+                        f"Failed to send log to data stream API: {response.status_code} {response.text}"
+                    )
         except Exception as e:
             logger.error(f"Error sending log to data stream API: {str(e)}")
 
@@ -464,6 +484,7 @@ async def chatCompletionGenerate(
         }
 
         if req.stream:
+
             async def generate():
                 usage = {}
                 result_text = ""
@@ -471,7 +492,12 @@ async def chatCompletionGenerate(
                 machine_id = 0
 
                 try:
-                    stream = await openai_client.chat.completions.create(**completion_params)
+                    stream = await openai_client.chat.completions.create(
+                        **completion_params,
+                        stream_options={
+                            "include_usage": True,
+                        },
+                    )
 
                     async for chunk in stream:
                         if ttfs is None:
@@ -493,7 +519,7 @@ async def chatCompletionGenerate(
                             result_text += chunk.choices[0].delta.content
 
                         # Check for usage information (usually in the last chunk)
-                        if hasattr(chunk, 'usage') and chunk.usage:
+                        if hasattr(chunk, "usage") and chunk.usage:
                             usage = chunk.usage.model_dump()
 
                         yield f"data: {json.dumps(chunk_dict)}\n\n"
@@ -541,7 +567,9 @@ async def chatCompletionGenerate(
         try:
             response = await openai_client.chat.completions.create(**completion_params)
 
-            result_text = response.choices[0].message.content if response.choices else ""
+            result_text = (
+                response.choices[0].message.content if response.choices else ""
+            )
             ttfs = time.time() - timeStart
             usage = response.usage.model_dump() if response.usage else {}
 
@@ -578,7 +606,7 @@ async def chatCompletionGenerate(
             return Response(
                 content=json.dumps(response_dict),
                 status_code=200,
-                media_type="application/json"
+                media_type="application/json",
             )
 
         except Exception as e:
@@ -602,7 +630,7 @@ async def get_or_create_session_id(user_id: str) -> str:
     """Get existing session ID from Redis or create a new one with 30-minute expiration"""
     redis_key = f"user_session:{user_id}"
     session_id = await redis_client.get(redis_key)
-    
+
     if session_id is None:
         # Create new session ID
         session_id = f"session_{user_id}_{uuid.uuid4().hex[:12]}"
@@ -610,7 +638,9 @@ async def get_or_create_session_id(user_id: str) -> str:
         await redis_client.setex(redis_key, 1800, session_id)
     else:
         # Extend existing session by 30 minutes
-        session_id = session_id.decode('utf-8') if isinstance(session_id, bytes) else session_id
+        session_id = (
+            session_id.decode("utf-8") if isinstance(session_id, bytes) else session_id
+        )
         await redis_client.expire(redis_key, 1800)
-    
+
     return session_id
