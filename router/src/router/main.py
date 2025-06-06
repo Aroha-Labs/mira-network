@@ -4,6 +4,7 @@ from src.router.api.v1 import router as v1_router
 from src.router.api.admin import router as admin_router
 import uvicorn
 from prometheus_fastapi_instrumentator import Instrumentator
+from prometheus_fastapi_instrumentator.metrics import requests
 from scalar_fastapi import get_scalar_api_reference
 import os
 from src.router.utils.redis import cleanup
@@ -16,7 +17,9 @@ from src.router.utils.metrics import PrometheusMiddleware
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
+    # # Startup - expose metrics endpoint
+    # instrumentator.expose(app)
+    
     try:
         yield
     # Shutdown
@@ -61,19 +64,22 @@ app = FastAPI(
     ],
 )
 
-# Setup Prometheus metrics with enhanced configuration
+# Setup Prometheus metrics with explicit configuration
+
 instrumentator = Instrumentator(
-    should_group_status_codes=False,  # Keep individual status codes
-    should_ignore_untemplated=True,   # Ignore non-templated paths
-    should_instrument_requests_inprogress=True,  # Track requests in progress
-    excluded_handlers=["/health"],    # Don't track health endpoint
-    inprogress_name="http_requests_inprogress",
+    should_group_status_codes=False,
+    should_ignore_untemplated=False,  # Track all paths
+    should_instrument_requests_inprogress=True,
+    excluded_handlers=["/health"],
 )
 
-# Add standard metrics
+# Add the requests metric explicitly
+instrumentator.add(requests())
+
+# Instrument and expose
 instrumentator.instrument(app).expose(app)
 
-# Add custom middleware after instrumentator for additional error tracking
+# Add custom middleware for additional error tracking
 app.add_middleware(PrometheusMiddleware)
 
 # Include routers
