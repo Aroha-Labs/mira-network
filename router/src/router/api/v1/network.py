@@ -349,12 +349,11 @@ async def save_log(
 
         try:
             async with httpx.AsyncClient() as client:
-                print(DATA_STREAM_API_URL)
                 response = await client.post(
                     f"{DATA_STREAM_API_URL}/api/v1/track",
                     json=data_stream_payload,
                     headers={
-                        "X-Write-Key": DATA_STREAM_SERVICE_KEY,
+                        "Write-Key": DATA_STREAM_SERVICE_KEY,
                         "Content-Type": "application/json",
                     },
                     timeout=5.0,  # 5 second timeout
