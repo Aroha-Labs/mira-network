@@ -1,4 +1,4 @@
-from prometheus_client import Counter, Histogram
+from prometheus_client import Counter, Histogram, Gauge
 from typing import Dict, Any
 import time
 from fastapi import Request, Response
@@ -24,12 +24,38 @@ REQUEST_LATENCY = Histogram(
     ['method', 'endpoint', 'status_code']
 )
 
+# Additional custom metrics (complementing prometheus-fastapi-instrumentator)
+REQUEST_SIZE = Histogram(
+    'http_request_size_bytes',
+    'HTTP request size in bytes',
+    ['method', 'endpoint']
+)
+
+RESPONSE_SIZE = Histogram(
+    'http_response_size_bytes',
+    'HTTP response size in bytes',
+    ['method', 'endpoint', 'status_code']
+)
+
 class PrometheusMiddleware(BaseHTTPMiddleware):
     def __init__(self, app: ASGIApp):
         super().__init__(app)
 
     async def dispatch(self, request: Request, call_next):
         start_time = time.time()
+        
+        # Track request size
+        request_size = 0
+        if hasattr(request, 'headers') and 'content-length' in request.headers:
+            try:
+                request_size = int(request.headers['content-length'])
+            except (ValueError, TypeError):
+                request_size = 0
+        
+        REQUEST_SIZE.labels(
+            method=request.method,
+            endpoint=request.url.path
+        ).observe(request_size)
         
         try:
             response = await call_next(request)
@@ -41,6 +67,20 @@ class PrometheusMiddleware(BaseHTTPMiddleware):
                 endpoint=request.url.path,
                 status_code=response.status_code
             ).observe(process_time)
+            
+            # Track response size
+            response_size = 0
+            if hasattr(response, 'headers') and 'content-length' in response.headers:
+                try:
+                    response_size = int(response.headers['content-length'])
+                except (ValueError, TypeError):
+                    response_size = 0
+            
+            RESPONSE_SIZE.labels(
+                method=request.method,
+                endpoint=request.url.path,
+                status_code=response.status_code
+            ).observe(response_size)
             
             # Record error if status code is 4xx or 5xx
             if response.status_code >= 400:

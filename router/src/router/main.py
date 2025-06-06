@@ -58,11 +58,24 @@ app = FastAPI(
             allow_methods=["*"],
             allow_headers=["*"],
         ),
-        Middleware(PrometheusMiddleware)
     ],
 )
 
-Instrumentator().instrument(app).expose(app)
+# Setup Prometheus metrics with enhanced configuration
+instrumentator = Instrumentator(
+    should_group_status_codes=False,  # Keep individual status codes
+    should_ignore_untemplated=True,   # Ignore non-templated paths
+    should_respect_env_var=True,      # Allow env var control
+    should_instrument_requests_inprogress=True,  # Track requests in progress
+    excluded_handlers=["/health", "/metrics"],   # Don't track these
+    inprogress_name="http_requests_inprogress",
+)
+
+# Add standard metrics
+instrumentator.instrument(app).expose(app)
+
+# Add custom middleware after instrumentator for additional error tracking
+app.add_middleware(PrometheusMiddleware)
 
 # Include routers
 app.include_router(v1_router)
