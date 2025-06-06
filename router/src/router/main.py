@@ -65,9 +65,8 @@ app = FastAPI(
 instrumentator = Instrumentator(
     should_group_status_codes=False,  # Keep individual status codes
     should_ignore_untemplated=True,   # Ignore non-templated paths
-    should_respect_env_var=True,      # Allow env var control
     should_instrument_requests_inprogress=True,  # Track requests in progress
-    excluded_handlers=["/health", "/metrics"],   # Don't track these
+    excluded_handlers=["/health"],    # Don't track health endpoint
     inprogress_name="http_requests_inprogress",
 )
 
