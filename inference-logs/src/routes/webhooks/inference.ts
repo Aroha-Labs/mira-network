@@ -60,25 +60,41 @@ const inferenceWebhook: FastifyPluginAsync = async (fastify, opts): Promise<void
 
                 fastify.log.info(`Received ${logs.length} inference logs`);
 
-                // If only one log, use single submission
-                if (logs.length === 1) {
-                    const txHash = await submitInferenceLog(logs[0]);
+                try {
+                    // If only one log, use single submission
+                    if (logs.length === 1) {
+                        const txHash = await submitInferenceLog(logs[0]);
+                        return {
+                            success: true,
+                            message: "Log submitted to blockchain",
+                            txHash,
+                            processedLogs: 1,
+                        };
+                    }
+
+                    // For multiple logs, use batch submission with throttling
+                    const txHash = await submitBatchInferenceLogs(logs);
                     return {
                         success: true,
-                        message: "Log submitted to blockchain",
+                        message: "Logs batch submitted to blockchain",
                         txHash,
-                        processedLogs: 1,
+                        processedLogs: logs.length,
                     };
+                } catch (error) {
+                    // Check if error is due to rate limiting
+                    const errorMsg = (error as Error).message || '';
+                    if (errorMsg.includes('Rate limit exceeded')) {
+                        fastify.log.warn(`Rate limit exceeded, responding with 429 status`);
+                        return reply.code(429).send({
+                            success: false,
+                            message: "Rate limit exceeded for blockchain submissions. Please retry with fewer logs or after a delay.",
+                            error: errorMsg,
+                        });
+                    }
+                    
+                    // For other errors, throw to be caught by outer try/catch
+                    throw error;
                 }
-
-                // For multiple logs, use batch submission
-                const txHash = await submitBatchInferenceLogs(logs);
-                return {
-                    success: true,
-                    message: "Logs batch submitted to blockchain",
-                    txHash,
-                    processedLogs: logs.length,
-                };
             } catch (error) {
                 fastify.log.error(error);
                 return reply.code(500).send({
