@@ -28,8 +28,18 @@ export function createLogHash(log: InferenceLog): `0x${string}` {
 export async function submitBatchInferenceLogs(logs: InferenceLog[]): Promise<string> {
     try {
         // Prepare data for contract call
-        const userWallets = ["0x5A3b5E0F1A25Dd1948D186776c04df5e32332Ef2"];
         const logHashes = logs.map((log) => createLogHash(log));
+        
+        // Create an array of user wallets that matches the length of logHashes
+        // If logs have wallet addresses, use them, otherwise use the default address
+        const userWallets = logs.map((log) => 
+            (log.walletAddress && log.walletAddress.startsWith('0x')) 
+                ? log.walletAddress as `0x${string}` 
+                : "0x5A3b5E0F1A25Dd1948D186776c04df5e32332Ef2"
+        );
+        
+        console.info(`Submitting batch of ${logs.length} logs to blockchain`);
+        console.info(`User wallets array length: ${userWallets.length}, Log hashes array length: ${logHashes.length}`);
 
         // Submit batch to blockchain
         const txHash = await walletClient.writeContract({
@@ -53,13 +63,18 @@ export async function submitBatchInferenceLogs(logs: InferenceLog[]): Promise<st
 export async function submitInferenceLog(log: InferenceLog): Promise<string> {
     try {
         const logHash = createLogHash(log);
+        
+        // Use the log's wallet address if available, otherwise use default
+        const userWallet = (log.walletAddress && log.walletAddress.startsWith('0x')) 
+            ? log.walletAddress as `0x${string}`
+            : "0x5A3b5E0F1A25Dd1948D186776c04df5e32332Ef2";
 
         // Submit log to blockchain
         const txHash = await walletClient.writeContract({
             address: CONTRACT_ADDRESS as `0x${string}`,
             abi: CONTRACT_ABI,
             functionName: "submitInferenceLog",
-            args: [config.blockchain.appId, "0x5A3b5E0F1A25Dd1948D186776c04df5e32332Ef2", logHash],
+            args: [config.blockchain.appId, userWallet, logHash],
         });
 
         console.info(`Log submitted to blockchain, tx hash: ${txHash}`);
