@@ -40,8 +40,15 @@ const inferenceWebhook: FastifyPluginAsync = async (fastify, opts): Promise<void
                 },
             },
         },
+        bodyLimit: 10 * 1024 * 1024, // Set limit to 10MB
         handler: async (request, reply) => {
             try {
+                // Log if request was compressed
+                const contentEncoding = request.headers['content-encoding'];
+                if (contentEncoding) {
+                    fastify.log.info(`Received compressed request with encoding: ${contentEncoding}`);
+                }
+
                 const { logs } = request.body;
 
                 if (!logs || logs.length === 0) {
