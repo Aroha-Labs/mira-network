@@ -13,7 +13,7 @@ const walletClient = createWalletClient({
 });
 
 // Configuration for rate limiting
-const MAX_BATCH_SIZE = 50; // Maximum number of logs per batch to prevent rate limit errors
+const MAX_BATCH_SIZE = 100; // Maximum number of logs per batch to prevent rate limit errors
 let lastSubmissionTime = 0;
 const MIN_SUBMISSION_INTERVAL = 5000; // Minimum 5 seconds between submissions
 
