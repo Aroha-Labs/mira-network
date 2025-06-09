@@ -104,6 +104,7 @@ async def docs():
     return get_scalar_api_reference(
         openapi_url="/openapi.json",
         title=app.title,
+        scalar_theme="solarized",
     )
 
 

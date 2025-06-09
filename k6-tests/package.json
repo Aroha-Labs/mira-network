@@ -3,6 +3,7 @@
     "test": "k6 run main.ts"
   },
   "dependencies": {
-    "@types/k6": "^1.0.2"
+    "@types/k6": "^1.0.2",
+    "openai": "^4.103.0"
   }
 }
