@@ -1,5 +1,4 @@
-import { Chain, createPublicClient, http } from "viem";
-import { privateKeyToAccount } from "viem/accounts";
+import { Chain } from "viem";
 import * as dotenv from "dotenv";
 
 // Load environment variables from .env file
@@ -19,9 +18,9 @@ const {
 } = process.env;
 
 // Config validation
-const requiredEnvVars = [
-    "SIGNER_PRIVATE_KEY",
-];
+// const requiredEnvVars = [
+//     "SIGNER_PRIVATE_KEY",
+// ];
 
 // Convert string values to appropriate types
 export const config = {
