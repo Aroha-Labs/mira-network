@@ -13,8 +13,8 @@ const {
     APP_ID = "Klok",
     BATCH_SIZE = "100",
     // Gas settings in wei (1 gwei = 1e9 wei)
-    MAX_FEE_PER_GAS = "1000000000", // 1 gwei in wei
-    MAX_PRIORITY_FEE_PER_GAS = "1000000000", // 1 gwei in wei
+    // MAX_FEE_PER_GAS = "1000000", // 0.001 gwei in wei
+    // MAX_PRIORITY_FEE_PER_GAS = "1000000", // 0.001 gwei in wei
 } = process.env;
 
 // Config validation
@@ -32,8 +32,8 @@ export const config = {
         signerPrivateKey: SIGNER_PRIVATE_KEY!,
         rpcUrlHttp: RPC_URL_HTTP,
         rpcUrlWs: RPC_URL_WS,
-        maxFeePerGas: BigInt(MAX_FEE_PER_GAS),
-        maxPriorityFeePerGas: BigInt(MAX_PRIORITY_FEE_PER_GAS),
+        // maxFeePerGas: BigInt(MAX_FEE_PER_GAS),
+        // maxPriorityFeePerGas: BigInt(MAX_PRIORITY_FEE_PER_GAS),
     },
 };
 
