@@ -1,7 +1,6 @@
 import { join } from 'node:path'
 import AutoLoad, { AutoloadPluginOptions } from '@fastify/autoload'
 import { FastifyPluginAsync, FastifyServerOptions } from 'fastify'
-import { validateConfig } from './config/config'
 
 export interface AppOptions extends FastifyServerOptions, Partial<AutoloadPluginOptions> {
 
@@ -14,8 +13,6 @@ const app: FastifyPluginAsync<AppOptions> = async (
   fastify,
   opts
 ): Promise<void> => {
-  // Validate configuration on startup
-  validateConfig();
 
   // Log startup information
   fastify.log.info('Starting inference logs webhook service');
