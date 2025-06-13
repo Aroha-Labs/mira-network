@@ -12,8 +12,8 @@ services:
     environment:
       - NODE_ENV=production
       - SIGNER_PRIVATE_KEY=${SIGNER_PRIVATE_KEY}
-      - RPC_URL_HTTP=https://rpc-test0-two-zepe2m25hg.t.conduit.xyz
-      - RPC_URL_WS=wss://rpc-test0-two-zepe2m25hg.t.conduit.xyz
+      - RPC_URL_HTTP=https://sepolia.base.org
+      - RPC_URL_WS=wss://sepolia.base.org
       - APP_ID=Klok
       - BATCH_SIZE=100
       - PORT=3000

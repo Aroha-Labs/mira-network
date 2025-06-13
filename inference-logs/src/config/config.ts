@@ -1,4 +1,5 @@
-import { Chain } from "viem";
+import { Chain, createPublicClient, http } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
 import * as dotenv from "dotenv";
 
 // Load environment variables from .env file
@@ -6,28 +7,21 @@ dotenv.config();
 
 // Environment variables with defaults
 const {
-    RPC_URL_HTTP = "https://rpc-test0-two-zepe2m25hg.t.conduit.xyz",
-    RPC_URL_WS = "wss://rpc-test0-two-zepe2m25hg.t.conduit.xyz",
+    // Base Sepolia testnet RPC endpoints
+    RPC_URL_HTTP = "https://sepolia.base.org",
+    RPC_URL_WS = "wss://sepolia.base.org",
     SIGNER_PRIVATE_KEY,
     APP_ID = "Klok",
     BATCH_SIZE = "100",
+    // Gas settings in wei (1 gwei = 1e9 wei)
+    MAX_FEE_PER_GAS = "1000000000", // 1 gwei in wei
+    MAX_PRIORITY_FEE_PER_GAS = "1000000000", // 1 gwei in wei
 } = process.env;
 
 // Config validation
 const requiredEnvVars = [
     "SIGNER_PRIVATE_KEY",
 ];
-
-// Validate all required environment variables
-export function validateConfig() {
-    const missing = requiredEnvVars.filter((envVar) => !process.env[envVar]);
-    if (missing.length > 0) {
-        throw new Error(
-            `Missing required environment variables: ${missing.join(", ")}`
-        );
-    }
-    console.info("Configuration validated successfully");
-}
 
 // Convert string values to appropriate types
 export const config = {
@@ -39,13 +33,15 @@ export const config = {
         signerPrivateKey: SIGNER_PRIVATE_KEY!,
         rpcUrlHttp: RPC_URL_HTTP,
         rpcUrlWs: RPC_URL_WS,
+        maxFeePerGas: BigInt(MAX_FEE_PER_GAS),
+        maxPriorityFeePerGas: BigInt(MAX_PRIORITY_FEE_PER_GAS),
     },
 };
 
 // Chain configuration for viem
 export const chain: Chain = {
-    id: 48499,
-    name: "voyager",
+    id: 84532, // Base Sepolia testnet chain ID
+    name: "Base Sepolia",
     nativeCurrency: {
         name: "ETH",
         symbol: "ETH",
@@ -57,4 +53,5 @@ export const chain: Chain = {
             webSocket: [config.blockchain.rpcUrlWs],
         },
     },
-}; 
+};
+
