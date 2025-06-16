@@ -104,14 +104,49 @@ async def verify(req: VerifyRequest, db: DBSession, user: User = Depends(verify_
             # Get or create session ID
             # session_id = await get_or_create_session_id(str(user.id))
 
-            # Note: This assumes LiteLLM supports a verify endpoint
-            # You might need to adjust this based on LiteLLM's actual API
+            # Define the verification tool for yes/no with reason
+            verification_tool = {
+                "type": "function",
+                "function": {
+                    "name": "provide_verification_result",
+                    "description": "Provide a yes or no verification result with a detailed reason",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "result": {
+                                "type": "string",
+                                "enum": ["yes", "no"],
+                                "description": "The verification result - either 'yes' or 'no'",
+                            },
+                            "reason": {
+                                "type": "string",
+                                "description": "Detailed explanation for the verification result",
+                            },
+                        },
+                        "required": ["result", "reason"],
+                    },
+                },
+            }
+
+            # Create verification prompt
+            verification_messages = [
+                {
+                    "role": "system",
+                    "content": "You are a verification assistant. Analyze the conversation and provide a yes/no result with a detailed reason using the provided tool.",
+                }
+            ]
+            verification_messages.extend(
+                [{"role": msg.role, "content": msg.content} for msg in req.messages]
+            )
+
             response = await openai_client.chat.completions.create(
-                model=model["id"],
-                messages=[  # type: ignore
-                    {"role": msg.role, "content": msg.content} for msg in req.messages
-                ],
-                max_tokens=1,  # Minimal response for verification
+                model=model["original"],
+                messages=verification_messages,  # type: ignore
+                tools=[verification_tool],  # type: ignore
+                tool_choice={
+                    "type": "function",
+                    "function": {"name": "provide_verification_result"},
+                },
                 extra_body={
                     "metadata": {
                         "generation_name": "verify-generation-openai-client",
@@ -123,30 +158,31 @@ async def verify(req: VerifyRequest, db: DBSession, user: User = Depends(verify_
                 },
             )
 
-            # For verification, we'll check if we got a valid response
-            result = "yes" if response.choices and response.choices[0].message else "no"
+            # Extract verification result from tool call
+            result = "no"
+            reason = "No valid response received"
+
+            if response.choices and response.choices[0].message.tool_calls:
+                tool_call = response.choices[0].message.tool_calls[0]
+                if tool_call.function.name == "provide_verification_result":
+                    try:
+                        args = json.loads(tool_call.function.arguments)
+                        result = args.get("result", "no")
+                        reason = args.get("reason", "No reason provided")
+                    except (json.JSONDecodeError, KeyError):
+                        result = "no"
+                        reason = "Failed to parse verification result"
 
             return {
                 "result": result,
-                "response": {
-                    "choices": [
-                        {
-                            "message": {
-                                "content": (
-                                    response.choices[0].message.content
-                                    if response.choices
-                                    else ""
-                                )
-                            }
-                        }
-                    ]
-                },
+                "response": {"choices": [{"message": {"content": reason}}]},
                 "model": transformed_models[idx]["original"],
             }
         except Exception as e:
             logger.error(f"Error verifying model {model['id']}: {str(e)}")
             return {
                 "result": "no",
+                "reason": f"Error during verification: {str(e)}",
                 "response": {"error": str(e)},
                 "model": transformed_models[idx]["original"],
             }
@@ -496,6 +532,7 @@ async def chatCompletionGenerate(
                         stream_options={
                             "include_usage": True,
                         },
+                        timeout=5,
                     )
 
                     async for chunk in stream:
@@ -564,7 +601,9 @@ async def chatCompletionGenerate(
 
         # Handle non-streaming response
         try:
-            response = await openai_client.chat.completions.create(**completion_params)
+            response = await openai_client.chat.completions.create(
+                **completion_params, timeout=1
+            )
 
             result_text = (
                 response.choices[0].message.content if response.choices else ""
