@@ -18,6 +18,11 @@ class FlowChatCompletion(BaseModel):
     stream: bool = False
     tools: Optional[list[Tool]] = Field(None, title="Tools")
     tool_choice: Optional[str] = Field("auto", title="Tool Choice")
+    os: Optional[str] = Field(
+        "web",
+        title="Operating System",
+        description="The operating system type (e.g., 'mobile', 'desktop', 'web', 'ios', 'android')",
+    )
 
 
 class FlowUpdateRequest(BaseModel):

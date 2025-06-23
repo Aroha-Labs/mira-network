@@ -1,6 +1,6 @@
 import re
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlmodel import select, func
 from src.router.api.v1.network import chatCompletionGenerate
 from src.router.core.security import verify_user
@@ -732,6 +732,7 @@ async def generate_with_flow_id(
                 model_provider=None,
                 tools=req.tools,
                 tool_choice=req.tool_choice,
+                os=req.os or "web",
             ),
             flow_id=flow_id,
             user=user,
