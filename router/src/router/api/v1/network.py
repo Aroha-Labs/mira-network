@@ -88,6 +88,19 @@ async def verify(req: VerifyRequest, db: DBSession, user: User = Depends(verify_
             detail="Minimum yes must be less than or equal to the number of models",
         )
 
+    # Check user credits before processing
+    user_credits = await get_user_credits(user.id, db)
+    if user_credits <= 0:
+        track(
+            "verify_error",
+            {
+                "user_id": str(user.id),
+                "error": "insufficient_credits",
+                "credits": user_credits,
+            },
+        )
+        raise HTTPException(status_code=402, detail="Insufficient credits")
+
     supported_models = await get_supported_models()
 
     # Validate and transform all models
@@ -173,10 +186,14 @@ async def verify(req: VerifyRequest, db: DBSession, user: User = Depends(verify_
                         result = "no"
                         reason = "Failed to parse verification result"
 
+            # Get usage information from the response
+            usage = response.usage.model_dump() if response.usage else {}
+
             return {
                 "result": result,
                 "response": {"choices": [{"message": {"content": reason}}]},
                 "model": transformed_models[idx]["original"],
+                "usage": usage,
             }
         except Exception as e:
             logger.error(f"Error verifying model {model['id']}: {str(e)}")
@@ -185,12 +202,56 @@ async def verify(req: VerifyRequest, db: DBSession, user: User = Depends(verify_
                 "reason": f"Error during verification: {str(e)}",
                 "response": {"error": str(e)},
                 "model": transformed_models[idx]["original"],
+                "usage": {},
             }
 
     # Make parallel requests
     results = await asyncio.gather(
         *[process_model(model, idx) for idx, model in enumerate(transformed_models)]
     )
+
+    # Calculate total cost and deduct credits
+    total_cost = 0.0
+    sm = await get_setting_value(
+        "SUPPORTED_MODELS",
+        SETTINGS_MODELS["SUPPORTED_MODELS"],
+    )
+
+    for result in results:
+        if "usage" in result and result["usage"]:
+            usage = result["usage"]
+            model_name = result["model"]
+
+            # Get model config for pricing
+            model_config = sm.root.get(model_name)
+            if model_config:
+                prompt_tokens = usage.get("prompt_tokens", 0)
+                completion_tokens = usage.get("completion_tokens", 0)
+
+                prompt_tokens_cost = prompt_tokens * model_config.prompt_token
+                completion_tokens_cost = (
+                    completion_tokens * model_config.completion_token
+                )
+                model_cost = prompt_tokens_cost + completion_tokens_cost
+                total_cost += model_cost
+
+    # Deduct credits using Redis
+    if total_cost > 0:
+        redis_key = f"user_credit:{user.id}"
+        await redis_client.incrbyfloat(redis_key, float(-total_cost))
+
+        logger.info(
+            f"Verification cost: ${total_cost:.6f} deducted from user {user.id}"
+        )
+
+        track(
+            "verify_cost",
+            {
+                "user_id": str(user.id),
+                "total_cost": total_cost,
+                "models_count": len(results),
+            },
+        )
 
     yes_count = sum(1 for result in results if result["result"] == "yes")
     if yes_count >= req.min_yes:
