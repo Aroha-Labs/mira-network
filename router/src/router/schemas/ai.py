@@ -44,6 +44,11 @@ class AiRequest(BaseModel):
         None, title="Reasoning Effort"
     )
     max_tokens: Optional[int] = Field(None, title="Max Tokens")
+    os: Optional[str] = Field(
+        "web",
+        title="Operating System",
+        description="The operating system type (e.g., 'mobile', 'desktop', 'web', 'ios', 'android')",
+    )
 
 
 class VerifyRequest(BaseModel):

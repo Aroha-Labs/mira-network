@@ -322,6 +322,7 @@ async def save_log(
         "request": req.model_dump(),
         "response": result_text,
         "doc_type": "model_usage",
+        "os": req.os or "web",
     }
 
     credit_history_doc = {
@@ -373,6 +374,7 @@ async def save_log(
             "previous_balance": user_credits,
             "new_balance": str(new_credit),
             "doc_type": "model_usage",
+            "os": req.os or "web",
         },
     }
 
