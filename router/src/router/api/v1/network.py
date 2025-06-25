@@ -45,7 +45,9 @@ router = APIRouter()
 
 # Configure OpenAI client for LiteLLM
 openai_client = AsyncOpenAI(
-    api_key=LITELLM_API_KEY, base_url="https://litellm.alts.dev/v1"
+    api_key=LITELLM_API_KEY,
+    base_url="https://litellm.alts.dev/v1",
+    timeout=60.0,
 )
 
 
@@ -595,7 +597,6 @@ async def chatCompletionGenerate(
                         stream_options={
                             "include_usage": True,
                         },
-                        timeout=5,
                     )
 
                     async for chunk in stream:
@@ -665,7 +666,7 @@ async def chatCompletionGenerate(
         # Handle non-streaming response
         try:
             response = await openai_client.chat.completions.create(
-                **completion_params, timeout=1
+                **completion_params
             )
 
             result_text = (
