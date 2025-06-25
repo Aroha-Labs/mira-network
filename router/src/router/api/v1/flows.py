@@ -24,8 +24,35 @@ import json
 from src.router.utils.logger import logger
 from async_lru import alru_cache
 import traceback
+import httpx
+import asyncio
 
 router = APIRouter()
+
+
+async def send_exception_to_healer(exception: Exception, stack_trace: str, flow_id: Optional[str] = None):
+    """
+    Fire-and-forget function to send exception details to the self-healing system.
+    """
+    try:
+        payload = {
+            "service": "mira-network",
+            "exception": str(exception),
+            "stack_trace": stack_trace,
+            "repo_url": "https://github.com/Aroha-Labs/mira-network",
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        }
+        
+        
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            await client.post(
+                "https://heal.alts.dev/webhook/exception",
+                json=payload,
+                headers={"Content-Type": "application/json"}
+            )
+    except Exception as e:
+        # Log the error but don't let it affect the main flow
+        logger.warning(f"Failed to send exception to healer: {str(e)}")
 
 
 def extract_variables(system_prompt: str) -> List[str]:
@@ -746,6 +773,9 @@ async def generate_with_flow_id(
             f"Error: {str(e)}\n"
             f"Traceback:\n{error_trace}"
         )
+
+        # Send exception to healer (fire-and-forget)
+        asyncio.create_task(send_exception_to_healer(e, error_trace, flow_id))
 
         raise HTTPException(status_code=500, detail=str(e))
 
