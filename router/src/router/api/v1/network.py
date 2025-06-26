@@ -595,7 +595,7 @@ async def chatCompletionGenerate(
                         stream_options={
                             "include_usage": True,
                         },
-                        timeout=5,
+                        timeout=60,
                     )
 
                     async for chunk in stream:
@@ -665,7 +665,7 @@ async def chatCompletionGenerate(
         # Handle non-streaming response
         try:
             response = await openai_client.chat.completions.create(
-                **completion_params, timeout=1
+                **completion_params, timeout=60
             )
 
             result_text = (
