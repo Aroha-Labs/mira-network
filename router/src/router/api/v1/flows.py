@@ -26,6 +26,7 @@ from async_lru import alru_cache
 import traceback
 import httpx
 import asyncio
+from src.router.utils.debugging import diagnose_null_error, validate_required_objects, NullSafetyWrapper
 
 router = APIRouter()
 
@@ -33,26 +34,56 @@ router = APIRouter()
 async def send_exception_to_healer(exception: Exception, stack_trace: str, flow_id: Optional[str] = None):
     """
     Fire-and-forget function to send exception details to the self-healing system.
+    Enhanced with better context and error classification.
     """
     try:
+        # Classify the exception type for better handling
+        exception_type = type(exception).__name__
+        is_null_error = "NoneType" in str(exception) or isinstance(exception, AttributeError)
+        
         payload = {
-            "service": "mira-network",
+            "service": "mira-network-router",
             "exception": str(exception),
             "stack_trace": stack_trace,
             "repo_url": "https://github.com/Aroha-Labs/mira-network",
-            "timestamp": datetime.utcnow().isoformat() + "Z"
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "exception_type": exception_type,
+            "is_null_error": is_null_error,
+            "context": {
+                "flow_id": flow_id,
+                "component": "flow_chat_completion",
+                "severity": "high" if is_null_error else "medium"
+            }
         }
         
-        
         async with httpx.AsyncClient(timeout=5.0) as client:
-            await client.post(
+            response = await client.post(
                 "https://heal.alts.dev/webhook/exception",
                 json=payload,
                 headers={"Content-Type": "application/json"}
             )
+            
+            if response.status_code == 200:
+                logger.info(f"Successfully sent exception to healer: {exception_type}")
+            else:
+                logger.warning(f"Healer responded with status {response.status_code}: {response.text}")
+                
     except Exception as e:
         # Log the error but don't let it affect the main flow
         logger.warning(f"Failed to send exception to healer: {str(e)}")
+        # Try to track this failure for monitoring
+        try:
+            track(
+                "healer_notification_failed",
+                {
+                    "original_exception": str(exception),
+                    "healer_error": str(e),
+                    "flow_id": flow_id
+                }
+            )
+        except Exception:
+            # If even tracking fails, just log it
+            logger.error("Failed to track healer notification failure")
 
 
 def extract_variables(system_prompt: str) -> List[str]:
@@ -647,12 +678,82 @@ async def generate_with_flow_id(
     db: DBSession,
     user: User = Depends(verify_user),
 ):
-    # get user credits
-    user_credits = await redis_client.get(f"user_credit:{user.id}")
-    logger.info(f"User credits: {user_credits}")
-
-    if float(user_credits) <= 0:
-        raise HTTPException(status_code=402, detail="Insufficient credits")
+    # get user credits with comprehensive null safety
+    try:
+        if not redis_client:
+            track(
+                "flow_completion_error",
+                {
+                    "flow_id": flow_id,
+                    "error": "redis_client_unavailable",
+                    "user_id": str(user.id),
+                },
+            )
+            logger.error("Redis client is not available for credit check")
+            raise HTTPException(status_code=503, detail="Service temporarily unavailable - unable to verify credits")
+            
+        user_credits_raw = await redis_client.get(f"user_credit:{user.id}")
+        logger.info(f"User credits raw: {user_credits_raw}")
+        
+        # Handle case where user_credits is None
+        if user_credits_raw is None:
+            track(
+                "flow_completion_error",
+                {
+                    "flow_id": flow_id,
+                    "error": "user_credits_not_found",
+                    "user_id": str(user.id),
+                },
+            )
+            logger.error(f"User credits not found in Redis for user {user.id}")
+            raise HTTPException(status_code=402, detail="Unable to verify user credits")
+            
+        # Safely convert credits to float
+        try:
+            user_credits = float(user_credits_raw) if isinstance(user_credits_raw, (str, bytes)) else float(user_credits_raw)
+        except (ValueError, TypeError) as credit_conversion_error:
+            track(
+                "flow_completion_error",
+                {
+                    "flow_id": flow_id,
+                    "error": "invalid_credit_format",
+                    "user_id": str(user.id),
+                    "raw_credits": str(user_credits_raw),
+                    "conversion_error": str(credit_conversion_error),
+                },
+            )
+            logger.error(f"Invalid credit format for user {user.id}: {user_credits_raw}")
+            raise HTTPException(status_code=500, detail="Error processing user credits")
+            
+        logger.info(f"User credits: {user_credits}")
+        
+        if user_credits <= 0:
+            track(
+                "flow_completion_error",
+                {
+                    "flow_id": flow_id,
+                    "error": "insufficient_credits",
+                    "user_id": str(user.id),
+                    "credits": user_credits,
+                },
+            )
+            raise HTTPException(status_code=402, detail="Insufficient credits")
+            
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as credits_error:
+        track(
+            "flow_completion_error",
+            {
+                "flow_id": flow_id,
+                "error": "credit_check_failed",
+                "user_id": str(user.id),
+                "details": str(credits_error),
+            },
+        )
+        logger.error(f"Unexpected error checking credits for user {user.id}: {str(credits_error)}")
+        raise HTTPException(status_code=500, detail="Error verifying user credits")
 
     logger.info(f"Generating with flow ID: {flow_id}")
     if any(msg.role == "system" for msg in req.messages):
@@ -768,15 +869,57 @@ async def generate_with_flow_id(
     except Exception as e:
         # Get full traceback
         error_trace = traceback.format_exc()
-        logger.error(
-            f"Error generating with flow ID {flow_id}:\n"
-            f"Error: {str(e)}\n"
-            f"Traceback:\n{error_trace}"
-        )
+        
+        # Enhanced error logging with null safety diagnostics
+        if "NoneType" in str(e) or isinstance(e, AttributeError):
+            # Diagnose null reference errors
+            diagnostic_info = diagnose_null_error(
+                obj=None,  # We don't know which object was None
+                operation=f"flow_chat_completion_flow_id_{flow_id}",
+                context={
+                    "user_id": str(user.id) if user else "unknown",
+                    "flow_id": flow_id,
+                    "model": getattr(req, 'model', 'unknown') if req else "unknown",
+                    "error_type": type(e).__name__,
+                    "error_message": str(e)
+                }
+            )
+            
+            logger.error(
+                f"NoneType error in flow completion for flow ID {flow_id}:\n"
+                f"Error: {str(e)}\n"
+                f"Diagnostic info: {json.dumps(diagnostic_info, default=str)}\n"
+                f"Traceback:\n{error_trace}"
+            )
+        else:
+            logger.error(
+                f"Error generating with flow ID {flow_id}:\n"
+                f"Error: {str(e)}\n"
+                f"Traceback:\n{error_trace}"
+            )
 
-        # Send exception to healer (fire-and-forget)
-        asyncio.create_task(send_exception_to_healer(e, error_trace, flow_id))
+        # Send exception to healer (fire-and-forget) with additional context
+        try:
+            enhanced_trace = f"{error_trace}\n\nContext:\n" + json.dumps({
+                "operation": "flow_chat_completion",
+                "flow_id": flow_id,
+                "user_id": str(user.id) if user else None,
+                "model": getattr(req, 'model', None) if req else None,
+                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "is_null_error": "NoneType" in str(e) or isinstance(e, AttributeError)
+            }, default=str)
+            
+            asyncio.create_task(send_exception_to_healer(e, enhanced_trace, flow_id))
+        except Exception as healer_error:
+            logger.error(f"Failed to send exception to healer: {str(healer_error)}")
 
-        raise HTTPException(status_code=500, detail=str(e))
+        # Provide more specific error messages for common issues
+        if "NoneType" in str(e) or isinstance(e, AttributeError):
+            raise HTTPException(
+                status_code=500, 
+                detail="A system configuration error occurred. Please try again or contact support if the issue persists."
+            )
+        else:
+            raise HTTPException(status_code=500, detail=str(e))
 
     return response

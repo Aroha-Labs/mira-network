@@ -324,10 +324,29 @@ async def save_log(
         },
     )
 
+    # Safely retrieve supported models configuration
     sm = await get_setting_value(
         "SUPPORTED_MODELS",
         SETTINGS_MODELS["SUPPORTED_MODELS"],
     )
+    
+    # Add comprehensive null checking for settings model structure
+    if not sm or not hasattr(sm, 'root') or sm.root is None:
+        track(
+            "save_log_error",
+            {
+                "user_id": str(user.id),
+                "error": "invalid_settings_structure",
+                "model": original_req_model,
+                "sm_exists": sm is not None,
+                "has_root": hasattr(sm, 'root') if sm else False,
+                "root_is_none": sm.root is None if (sm and hasattr(sm, 'root')) else True,
+            },
+        )
+        logger.error(f"Invalid settings structure for supported models. sm={sm}, has_root={hasattr(sm, 'root') if sm else False}")
+        raise HTTPException(
+            status_code=500, detail="Configuration error - invalid model settings structure"
+        )
 
     model_p = sm.root.get(original_req_model)
 
@@ -357,13 +376,42 @@ async def save_log(
     cost = prompt_tokens_cost + completion_tokens_cost
 
     # NEW: Use redis to manage user's credits instead of updating the db
+    # Add null safety for Redis operations
+    if not redis_client:
+        track(
+            "save_log_error",
+            {
+                "user_id": str(user.id),
+                "error": "redis_client_unavailable",
+                "model": original_req_model,
+            },
+        )
+        logger.error("Redis client is not available for credit management")
+        raise HTTPException(
+            status_code=503, detail="Service temporarily unavailable - credit system error"
+        )
+    
     redis_key = f"user_credit:{user.id}"
+    
+    try:
+        # new_credit = user_credits - cost
+        await redis_client.incrbyfloat(redis_key, float(-cost))
 
-    # new_credit = user_credits - cost
-    await redis_client.incrbyfloat(redis_key, float(-cost))
-
-    new_credit_bytes = await redis_client.get(redis_key)
-    new_credit = float(new_credit_bytes.decode("utf-8")) if new_credit_bytes else 0.0
+        new_credit_bytes = await redis_client.get(redis_key)
+        new_credit = float(new_credit_bytes.decode("utf-8")) if new_credit_bytes else 0.0
+    except Exception as redis_error:
+        track(
+            "save_log_error",
+            {
+                "user_id": str(user.id),
+                "error": "redis_operation_failed",
+                "model": original_req_model,
+                "details": str(redis_error),
+            },
+        )
+        logger.error(f"Redis operation failed for user {user.id}: {str(redis_error)}")
+        # Fallback to calculating credit without updating Redis
+        new_credit = user_credits - cost
 
     # Prepare documents for OpenSearch
     llm_usage_doc = {
@@ -465,6 +513,21 @@ async def save_log(
             logger.error(f"Error sending log to data stream API: {str(e)}")
 
     try:
+        # Add null safety for OpenSearch operations
+        if not opensearch_client:
+            track(
+                "save_log_error",
+                {
+                    "user_id": str(user.id),
+                    "error": "opensearch_client_unavailable",
+                    "model": original_req_model,
+                },
+            )
+            logger.error("OpenSearch client is not available for logging")
+            # Continue without OpenSearch logging rather than failing completely
+            await send_to_data_stream()
+            return
+        
         # Send documents to OpenSearch and data stream API asynchronously
         await asyncio.gather(
             asyncio.get_event_loop().run_in_executor(
@@ -530,6 +593,18 @@ async def chatCompletionGenerate(
             raise HTTPException(status_code=402, detail="Insufficient credits")
 
         supported_models = await get_supported_models()
+        if not supported_models:
+            track(
+                "generate_error",
+                {
+                    "user_id": str(user.id),
+                    "error": "no_supported_models",
+                    "model": req.model,
+                },
+            )
+            logger.error("No supported models available")
+            raise HTTPException(status_code=503, detail="Service temporarily unavailable - no models configured")
+            
         if req.model not in supported_models:
             track(
                 "generate_error",
@@ -541,7 +616,18 @@ async def chatCompletionGenerate(
             )
             raise HTTPException(status_code=400, detail="Unsupported model")
 
-        model_config = supported_models[req.model]
+        model_config = supported_models.get(req.model)
+        if not model_config:
+            track(
+                "generate_error",
+                {
+                    "user_id": str(user.id),
+                    "error": "null_model_config",
+                    "model": req.model,
+                },
+            )
+            logger.error(f"Model configuration is None for model: {req.model}")
+            raise HTTPException(status_code=500, detail="Model configuration error")
         original_req_model = req.model
         logger.info(f"Using LiteLLM service with OpenAI client {req.model}")
         req.model = model_config.id
@@ -614,12 +700,27 @@ async def chatCompletionGenerate(
                         # Convert OpenAI chunk to SSE format
                         chunk_dict = chunk.model_dump()
 
-                        if chunk.choices and chunk.choices[0].delta.content:
-                            result_text += chunk.choices[0].delta.content
+                        # Safely extract chunk content with comprehensive null checking
+                        if chunk and hasattr(chunk, 'choices') and chunk.choices:
+                            choice = chunk.choices[0]
+                            if choice and hasattr(choice, 'delta') and choice.delta and choice.delta.content:
+                                result_text += choice.delta.content
 
                         # Check for usage information (usually in the last chunk)
                         if hasattr(chunk, "usage") and chunk.usage:
-                            usage = chunk.usage.model_dump()
+                            try:
+                                usage = chunk.usage.model_dump()
+                            except Exception as usage_error:
+                                logger.error(f"Error extracting usage from chunk: {str(usage_error)}")
+                                track(
+                                    "generate_warning",
+                                    {
+                                        "user_id": str(user.id),
+                                        "model": original_req_model,
+                                        "warning": "chunk_usage_extraction_failed",
+                                        "error": str(usage_error),
+                                    },
+                                )
 
                         yield f"data: {json.dumps(chunk_dict)}\n\n"
 
@@ -668,11 +769,43 @@ async def chatCompletionGenerate(
                 **completion_params, timeout=600
             )
 
-            result_text = (
-                response.choices[0].message.content if response.choices else ""
-            )
+            # Safely extract response content with comprehensive null checking
+            result_text = ""
+            if response and hasattr(response, 'choices') and response.choices:
+                choice = response.choices[0]
+                if choice and hasattr(choice, 'message') and choice.message:
+                    result_text = choice.message.content or ""
+            
+            if not result_text:
+                logger.warning(f"Empty or null response content for user {user.id}, model {original_req_model}")
+                track(
+                    "generate_warning",
+                    {
+                        "user_id": str(user.id),
+                        "model": original_req_model,
+                        "warning": "empty_response_content",
+                    },
+                )
+            
             ttfs = time.time() - timeStart
-            usage = response.usage.model_dump() if response.usage else {}
+            
+            # Safely extract usage information
+            usage = {}
+            if response and hasattr(response, 'usage') and response.usage:
+                try:
+                    usage = response.usage.model_dump()
+                except Exception as usage_error:
+                    logger.error(f"Error extracting usage data: {str(usage_error)}")
+                    track(
+                        "generate_warning",
+                        {
+                            "user_id": str(user.id),
+                            "model": original_req_model,
+                            "warning": "usage_extraction_failed",
+                            "error": str(usage_error),
+                        },
+                    )
+                    usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
 
             track(
                 "generate_completion",
@@ -702,13 +835,65 @@ async def chatCompletionGenerate(
                 flow_id=flow_id,
             )
 
-            # Convert response to match expected format
-            response_dict = response.model_dump()
-            return Response(
-                content=json.dumps(response_dict),
-                status_code=200,
-                media_type="application/json",
-            )
+            # Convert response to match expected format with null safety
+            try:
+                if response:
+                    response_dict = response.model_dump()
+                else:
+                    logger.error("Response is None - creating fallback response")
+                    response_dict = {
+                        "id": f"chatcmpl-{uuid.uuid4().hex[:12]}",
+                        "object": "chat.completion",
+                        "created": int(time.time()),
+                        "model": original_req_model,
+                        "choices": [{
+                            "index": 0,
+                            "message": {
+                                "role": "assistant",
+                                "content": result_text or "I apologize, but I'm unable to provide a response at this time."
+                            },
+                            "finish_reason": "stop"
+                        }],
+                        "usage": usage
+                    }
+                    
+                return Response(
+                    content=json.dumps(response_dict),
+                    status_code=200,
+                    media_type="application/json",
+                )
+            except Exception as serialization_error:
+                logger.error(f"Error serializing response: {str(serialization_error)}")
+                track(
+                    "generate_error",
+                    {
+                        "user_id": str(user.id),
+                        "model": original_req_model,
+                        "error": "response_serialization_failed",
+                        "details": str(serialization_error),
+                    },
+                )
+                # Create a minimal safe response
+                fallback_response = {
+                    "id": f"chatcmpl-{uuid.uuid4().hex[:12]}",
+                    "object": "chat.completion",
+                    "created": int(time.time()),
+                    "model": original_req_model,
+                    "choices": [{
+                        "index": 0,
+                        "message": {
+                            "role": "assistant",
+                            "content": "I apologize, but I encountered an error processing your request."
+                        },
+                        "finish_reason": "stop"
+                    }],
+                    "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+                }
+                return Response(
+                    content=json.dumps(fallback_response),
+                    status_code=200,
+                    media_type="application/json",
+                )
 
         except Exception as e:
             track("generate_error", {"user_id": str(user.id), "error": str(e)})
