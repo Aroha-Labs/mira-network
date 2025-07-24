@@ -20,3 +20,8 @@ OPENSEARCH_PASSWORD = os.getenv("OPENSEARCH_PASSWORD", "")
 # Data Stream API Configuration
 DATA_STREAM_API_URL = os.getenv("DATA_STREAM_API_URL", "")
 DATA_STREAM_SERVICE_KEY = os.getenv("DATA_STREAM_SERVICE_KEY", "")
+
+# Cache Configuration
+ENABLE_CACHE = os.getenv("ENABLE_CACHE", "false").lower() == "true"
+CACHE_API_URL = os.getenv("CACHE_API_URL", "http://localhost:3000")
+CACHE_API_KEY = os.getenv("CACHE_API_KEY", "your-secret-api-key")
