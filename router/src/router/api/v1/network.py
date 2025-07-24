@@ -1,13 +1,11 @@
 from datetime import datetime, timezone
-from typing import Optional, AsyncGenerator, List, Dict, Any
-from fastapi import APIRouter, Depends, Response, HTTPException, Request
+from typing import Optional, Dict, Any
+from fastapi import APIRouter, Depends, Response, HTTPException
 from fastapi.responses import StreamingResponse
 import httpx
 from pydantic import BaseModel
 from src.router.utils.user import get_user_credits
-from src.router.utils.machine import get_machine_id
 from src.router.core.config import (
-    NODE_SERVICE_URL,
     DATA_STREAM_API_URL,
     DATA_STREAM_SERVICE_KEY,
     LITELLM_API_KEY,
@@ -16,17 +14,16 @@ from src.router.core.settings_types import SETTINGS_MODELS
 from src.router.core.types import User
 from src.router.db.session import DBSession
 from src.router.core.security import verify_user
-from src.router.utils.network import get_random_machines
 from src.router.schemas.ai import AiRequest, VerifyRequest
 import time
 import json
-import uuid
 import uuid
 from src.router.utils.settings import get_setting_value
 from src.router.utils.settings import get_supported_models
 import asyncio
 from src.router.utils.redis import redis_client  # new import for redis
 from src.router.utils.logger import logger
+from src.router.utils.cache import cache_service
 from src.router.api.v1.docs.network import (
     chatCompletionGenerateDoc,
     list_models_doc,
@@ -581,6 +578,37 @@ async def chatCompletionGenerate(
             }
         }
 
+        # check cache for both streaming and non-streaming requests
+        cache_query = None
+        if len(req.messages) > 0:
+            # Use the last user message as the cache key
+            last_message = req.messages[-1].content
+            cache_query = last_message
+            
+            # Check cache
+            cache_data = await cache_service.check(cache_query)
+            if cache_data:
+                track(
+                    "cache_hit",
+                    {
+                        "user_id": str(user.id),
+                        "model": original_req_model,
+                        "cached": True,
+                    }
+                )
+                
+                # Return cached response based on request type
+                if req.stream:
+                    return cache_service.build_streaming_response(
+                        cache_data["response"], 
+                        original_req_model
+                    )
+                else:
+                    return cache_service.build_completion_response(
+                        cache_data["response"], 
+                        original_req_model
+                    )
+
         if req.stream:
 
             async def generate():
@@ -621,6 +649,8 @@ async def chatCompletionGenerate(
                         if hasattr(chunk, "usage") and chunk.usage:
                             usage = chunk.usage.model_dump()
 
+                        
+
                         yield f"data: {json.dumps(chunk_dict)}\n\n"
 
                 except Exception as e:
@@ -645,6 +675,10 @@ async def chatCompletionGenerate(
                             machine_id=machine_id,
                             flow_id=flow_id,
                         )
+                        
+                        # Fire and forget: Save to cache for streaming responses
+                        if cache_query and result_text:
+                            asyncio.create_task(cache_service.save(cache_query, result_text))
 
                     except Exception as log_error:
                         track(
@@ -688,6 +722,10 @@ async def chatCompletionGenerate(
 
             # For LiteLLM, set machine_id to 0 since we don't have machine info
             machine_id = 0
+            
+            # Fire and forget: Save to cache
+            if cache_query and result_text:
+                asyncio.create_task(cache_service.save(cache_query, result_text))
 
             await save_log(
                 user=user,
