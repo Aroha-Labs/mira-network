@@ -61,9 +61,25 @@ async def delete_cached_setting(name: str):
 
 
 async def get_online_machines() -> list[str]:
-    """Get list of online machine IDs with caching using async_lru"""
-    keys = await redis_client.keys(pattern="liveness:*")
-    machine_ids = [key.decode().split(":")[1] for key in keys]
+    """Get list of online machine IDs using SCAN instead of KEYS for production compatibility"""
+    machine_ids = []
+    cursor = 0
+    
+    while True:
+        # Use SCAN instead of KEYS for better performance and AWS Valkey compatibility
+        cursor, keys = await redis_client.scan(cursor, match="liveness:*", count=100)
+        
+        # Process the keys found in this iteration
+        for key in keys:
+            # key is already a string in async redis
+            key_str = key if isinstance(key, str) else key.decode()
+            machine_id = key_str.split(":")[1]
+            machine_ids.append(machine_id)
+        
+        # If cursor is 0, we've scanned all keys
+        if cursor == 0:
+            break
+    
     return machine_ids
 
 
