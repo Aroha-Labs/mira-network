@@ -21,6 +21,15 @@ import { Fragment } from "react";
 import CopyToClipboardIcon from "src/components/CopyToClipboardIcon";
 import ConfirmModal from "src/components/ConfirmModal";
 
+interface SystemSetting {
+  id: number;
+  name: string;
+  value: Record<string, unknown>;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 interface Machine {
   id: number;
   network_ip: string;
@@ -396,7 +405,7 @@ const RegisterMachineModal = ({
   });
   
   const availableModels = useMemo(() => {
-    const supportedModels = settings?.find((s: any) => s.name === "SUPPORTED_MODELS");
+    const supportedModels = settings?.find((s: SystemSetting) => s.name === "SUPPORTED_MODELS");
     if (supportedModels?.value) {
       return Object.keys(supportedModels.value);
     }
@@ -617,7 +626,7 @@ const EditMachineModal = ({
   });
   
   const availableModels = useMemo(() => {
-    const supportedModels = settings?.find((s: any) => s.name === "SUPPORTED_MODELS");
+    const supportedModels = settings?.find((s: SystemSetting) => s.name === "SUPPORTED_MODELS");
     if (supportedModels?.value) {
       return Object.keys(supportedModels.value);
     }
