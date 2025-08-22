@@ -205,15 +205,20 @@ async def update_machine(
                 )
 
         # Update LiteLLM if disabled status, traffic weight, or supported models changed
-        if machine.disabled != request.disabled or machine.traffic_weight != request.traffic_weight or machine.supported_models != request.supported_models:
+        # Use current values if not provided in request
+        new_disabled = request.disabled if request.disabled is not None else machine.disabled
+        new_traffic_weight = request.traffic_weight if request.traffic_weight is not None else machine.traffic_weight
+        new_supported_models = request.supported_models if request.supported_models is not None else machine.supported_models
+        
+        if machine.disabled != new_disabled or machine.traffic_weight != new_traffic_weight or machine.supported_models != new_supported_models:
             try:
                 await update_machine_in_litellm(
                     machine_id=machine.id,
                     machine_ip=request.network_ip,
-                    machine_name=request.name or f"machine-{machine.id}",
-                    enabled=not request.disabled,  # LiteLLM uses enabled, we store disabled
-                    traffic_weight=request.traffic_weight,
-                    supported_models_list=request.supported_models,
+                    machine_name=request.name or machine.name or f"machine-{machine.id}",
+                    enabled=not new_disabled,  # LiteLLM uses enabled, we store disabled
+                    traffic_weight=new_traffic_weight,
+                    supported_models_list=new_supported_models,
                 )
                 litellm_updated = True
                 logger.info(f"Machine {machine.id} updated in LiteLLM: {'disabled' if request.disabled else 'enabled'}, weight={request.traffic_weight}")
@@ -234,13 +239,19 @@ async def update_machine(
                 # Log but continue for non-critical LiteLLM errors
                 logger.warning(f"LiteLLM update error (non-critical): {str(e)}")
 
-        # Update database
+        # Update database - only update fields that are provided
         machine.network_ip = request.network_ip
-        machine.name = request.name
-        machine.description = request.description
-        machine.disabled = request.disabled
-        machine.traffic_weight = request.traffic_weight
-        machine.supported_models = request.supported_models
+        if request.name is not None:
+            machine.name = request.name
+        if request.description is not None:
+            machine.description = request.description
+        if request.disabled is not None:
+            machine.disabled = request.disabled
+        if request.traffic_weight is not None:
+            machine.traffic_weight = request.traffic_weight
+        # Only update supported_models if explicitly provided (not None)
+        if request.supported_models is not None:
+            machine.supported_models = request.supported_models
         machine.updated_at = datetime.utcnow()
 
         db.add(machine)

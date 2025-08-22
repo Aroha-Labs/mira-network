@@ -601,9 +601,28 @@ const EditMachineModal = ({
     network_ip: machine.network_ip,
     disabled: machine.disabled,
     traffic_weight: machine.traffic_weight || 0.5,
+    supported_models: machine.supported_models, // Include existing supported_models
   });
+  const [selectedModels, setSelectedModels] = useState<string[]>(machine.supported_models || []);
 
   const queryClient = useQueryClient();
+
+  // Fetch available models from settings
+  const { data: settings } = useQuery({
+    queryKey: ["settings"],
+    queryFn: async () => {
+      const response = await api.get("/admin/settings");
+      return response.data;
+    },
+  });
+  
+  const availableModels = useMemo(() => {
+    const supportedModels = settings?.find((s: any) => s.name === "SUPPORTED_MODELS");
+    if (supportedModels?.value) {
+      return Object.keys(supportedModels.value);
+    }
+    return [];
+  }, [settings]);
 
   const { mutate, isPending, error } = useMutation({
     mutationFn: (data: UpdateMachineRequest) => updateMachine(machine.network_ip, data),
@@ -615,7 +634,18 @@ const EditMachineModal = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    mutate(formData);
+    mutate({
+      ...formData,
+      supported_models: selectedModels.length > 0 ? selectedModels : undefined,
+    });
+  };
+  
+  const toggleModel = (model: string) => {
+    setSelectedModels(prev => 
+      prev.includes(model) 
+        ? prev.filter(m => m !== model)
+        : [...prev, model]
+    );
   };
 
   return (
@@ -743,6 +773,50 @@ const EditMachineModal = ({
                 </div>
                 <p className="text-xs text-gray-500 mt-1">
                   Adjust the percentage of traffic this machine handles. Lower values for testing, higher for production machines.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Supported Models
+                </label>
+                <div className="space-y-2 max-h-40 overflow-y-auto p-3 bg-gray-50 rounded-md">
+                  {availableModels.length > 0 ? (
+                    <>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs text-gray-600">
+                          {selectedModels.length === 0 
+                            ? "All models supported" 
+                            : `${selectedModels.length} model${selectedModels.length === 1 ? '' : 's'} selected`}
+                        </span>
+                        {selectedModels.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedModels([])}
+                            className="text-xs text-blue-600 hover:text-blue-700"
+                          >
+                            Clear all
+                          </button>
+                        )}
+                      </div>
+                      {availableModels.map((model) => (
+                        <label key={model} className="flex items-center space-x-2 cursor-pointer hover:bg-gray-100 px-2 py-1 rounded">
+                          <input
+                            type="checkbox"
+                            checked={selectedModels.includes(model)}
+                            onChange={() => toggleModel(model)}
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          <span className="text-sm text-gray-700">{model}</span>
+                        </label>
+                      ))}
+                    </>
+                  ) : (
+                    <p className="text-sm text-gray-500">Loading models...</p>
+                  )}
+                </div>
+                <p className="mt-1 text-xs text-gray-500">
+                  Select specific models this machine should support. Leave empty to support all models.
                 </p>
               </div>
             </div>
