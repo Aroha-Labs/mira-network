@@ -540,9 +540,10 @@ async def chatCompletionGenerate(
 
         model_config = supported_models[req.model]
         original_req_model = req.model
-        logger.info(f"Using LiteLLM service with OpenAI client {req.model}")
+        logger.info(f"Original model requested: {req.model}")
         req.model = model_config.id
-        logger.info(f"Using LiteLLM service with OpenAI client {req.model}")
+        logger.info(f"Model ID being sent to LiteLLM: {req.model}")
+        logger.info(f"Model config: {model_config}")
 
         # Prepare messages in OpenAI format
         messages = [
@@ -560,6 +561,10 @@ async def chatCompletionGenerate(
         # Add optional parameters if they exist
         if req.max_tokens:
             completion_params["max_tokens"] = req.max_tokens
+
+        logger.info(
+            f"Completion params being sent to LiteLLM: model={completion_params.get('model')}"
+        )
 
         # Get or create session ID for Langfuse tracking
         # session_id = await get_or_create_session_id(str(user.id))
@@ -623,6 +628,28 @@ async def chatCompletionGenerate(
                         },
                         timeout=600,
                     )
+
+                    # Extract machine ID from LiteLLM response headers
+                    if hasattr(stream, "response") and hasattr(
+                        stream.response, "headers"
+                    ):
+                        headers = dict(stream.response.headers)
+                        model_id = headers.get("x-litellm-model-id", "")
+                        logger.info(f"LiteLLM Model ID from headers: {model_id}")
+
+                        # Parse machine ID from deployment ID (e.g., "gpt-4o-machine-9" -> 9)
+                        if model_id and "-machine-" in model_id:
+                            try:
+                                machine_id = int(model_id.split("-machine-")[1])
+                                logger.info(f"Extracted machine ID: {machine_id}")
+                            except (ValueError, IndexError):
+                                logger.warning(
+                                    f"Could not parse machine ID from: {model_id}"
+                                )
+                        else:
+                            logger.warning(
+                                f"Model ID does not contain machine info: {model_id}"
+                            )
 
                     async for chunk in stream:
                         if ttfs is None:
@@ -700,6 +727,38 @@ async def chatCompletionGenerate(
                 **completion_params, timeout=600
             )
 
+            # Extract machine ID from LiteLLM response
+            machine_id = 0
+
+            # Check for headers in _hidden_params (for non-streaming responses)
+            if hasattr(response, "_hidden_params") and response._hidden_params:
+                hidden_params = response._hidden_params
+                logger.info(f"LiteLLM _hidden_params: {hidden_params}")
+
+                if isinstance(hidden_params, dict):
+                    # Look for model_id in hidden params
+                    model_id = hidden_params.get("model_id", "")
+                    if not model_id and "additional_headers" in hidden_params:
+                        # Check additional headers
+                        headers = hidden_params.get("additional_headers", {})
+                        model_id = headers.get("x-litellm-model-id", "")
+
+                    if model_id:
+                        logger.info(f"LiteLLM Model ID from hidden params: {model_id}")
+                        # Parse machine ID from deployment ID (e.g., "gpt-4o-machine-9" -> 9)
+                        if "-machine-" in model_id:
+                            try:
+                                machine_id = int(model_id.split("-machine-")[1])
+                                logger.info(f"Extracted machine ID: {machine_id}")
+                            except (ValueError, IndexError):
+                                logger.warning(
+                                    f"Could not parse machine ID from: {model_id}"
+                                )
+                        else:
+                            logger.warning(
+                                f"Model ID does not contain machine info: {model_id}"
+                            )
+
             result_text = (
                 response.choices[0].message.content if response.choices else ""
             )
@@ -717,9 +776,6 @@ async def chatCompletionGenerate(
                     "total_tokens": usage.get("total_tokens", 0),
                 },
             )
-
-            # For LiteLLM, set machine_id to 0 since we don't have machine info
-            machine_id = 0
 
             # Fire and forget: Save to cache
             if cache_query and result_text:

@@ -8,8 +8,8 @@
   },
   "scripts": {
     "test": "npm run build:ts && tsc -p test/tsconfig.json && c8 node --test -r ts-node/register \"test/**/*.ts\"",
-    "start": "npm run build:ts && fastify start --plugin-timeout 30000  -l error -p 80 -a 0.0.0.0 ./dist/app.js",
-    "start:prod": "fastify start --plugin-timeout 30000   -l error -a 0.0.0.0 -r newrelic ./dist/app.js -- -w auto",
+    "start": "npm run build:ts && fastify start --plugin-timeout 30000  -l debug -p 80 -a 0.0.0.0 ./dist/app.js",
+    "start:prod": "fastify start --plugin-timeout 30000   -l debug -a 0.0.0.0 -r newrelic ./dist/app.js -- -w auto",
     "build:ts": "tsc",
     "watch:ts": "tsc -w",
     "dev": "npm run build:ts && concurrently -k -p \"[{\"name\"}]\" -n \"TypeScript,App\" -c \"yellow.bold,cyan.bold\" \"npm:watch:ts\" \"npm:dev:start\"",

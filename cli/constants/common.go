@@ -5,5 +5,6 @@ var LITELLM_CONFIG_FILE = "litellm/config.yml"
 var LITELLM_DOTENV_FILE = "litellm/.env"
 var LLM_KEY_DOTENV_FILE = ".env.llmkeys"
 var MACHINE_ID_CONFIG_FILE = ".machine_id"
+var MACHINE_TOKEN_CONFIG_FILE = ".machine_token"
 
 var MIRA_CLIENT_BALANCER_BASE_URL = "https://mira-client-balancer.alts.dev"
