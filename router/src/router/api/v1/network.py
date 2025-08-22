@@ -42,7 +42,7 @@ router = APIRouter()
 
 # Configure OpenAI client for LiteLLM
 openai_client = AsyncOpenAI(
-    api_key=LITELLM_API_KEY, base_url="https://litellm.alts.dev/v1"
+    api_key=LITELLM_API_KEY, base_url="http://localhost:4000/v1"
 )
 
 
@@ -584,7 +584,7 @@ async def chatCompletionGenerate(
             # Use the last user message as the cache key
             last_message = req.messages[-1].content
             cache_query = last_message
-            
+
             # Check cache
             cache_data = await cache_service.check(cache_query)
             if cache_data:
@@ -594,19 +594,17 @@ async def chatCompletionGenerate(
                         "user_id": str(user.id),
                         "model": original_req_model,
                         "cached": True,
-                    }
+                    },
                 )
-                
+
                 # Return cached response based on request type
                 if req.stream:
                     return cache_service.build_streaming_response(
-                        cache_data["response"], 
-                        original_req_model
+                        cache_data["response"], original_req_model
                     )
                 else:
                     return cache_service.build_completion_response(
-                        cache_data["response"], 
-                        original_req_model
+                        cache_data["response"], original_req_model
                     )
 
         if req.stream:
@@ -649,8 +647,6 @@ async def chatCompletionGenerate(
                         if hasattr(chunk, "usage") and chunk.usage:
                             usage = chunk.usage.model_dump()
 
-                        
-
                         yield f"data: {json.dumps(chunk_dict)}\n\n"
 
                 except Exception as e:
@@ -675,10 +671,12 @@ async def chatCompletionGenerate(
                             machine_id=machine_id,
                             flow_id=flow_id,
                         )
-                        
+
                         # Fire and forget: Save to cache for streaming responses
                         if cache_query and result_text:
-                            asyncio.create_task(cache_service.save(cache_query, result_text))
+                            asyncio.create_task(
+                                cache_service.save(cache_query, result_text)
+                            )
 
                     except Exception as log_error:
                         track(
@@ -722,7 +720,7 @@ async def chatCompletionGenerate(
 
             # For LiteLLM, set machine_id to 0 since we don't have machine info
             machine_id = 0
-            
+
             # Fire and forget: Save to cache
             if cache_query and result_text:
                 asyncio.create_task(cache_service.save(cache_query, result_text))

@@ -10,6 +10,14 @@ from src.router.models.machine_tokens import MachineToken
 import secrets
 from datetime import datetime
 from src.router.utils.redis import redis_client
+from src.router.utils.litellm import (
+    add_machine_to_litellm,
+    remove_machine_from_litellm,
+    rollback_litellm_deployments,
+    update_machine_in_litellm,
+    LiteLLMError,
+)
+from src.router.utils.logger import logger
 
 router = APIRouter()
 
@@ -17,13 +25,14 @@ router = APIRouter()
 @router.post(
     "/machines/register",
     summary="Register a New Machine",
-    description="Admin endpoint to register a new machine in the system.",
+    description="Admin endpoint to register a new machine in the system and add it to LiteLLM.",
 )
 async def register_machine(
     request: RegisterMachineRequest,
     db: DBSession,
     user: User = Depends(verify_admin),
 ):
+    # Check if machine already exists
     existing_machine_res = await db.exec(
         select(Machine).where(Machine.network_ip == request.network_ip)
     )
@@ -41,27 +50,105 @@ async def register_machine(
             "message": "Machine already registered",
         }
 
+    # Create new machine object
     new_machine = Machine(
         network_ip=request.network_ip,
         name=request.name,
         description=request.description,
+        traffic_weight=request.traffic_weight,
+        supported_models=request.supported_models,
     )
-    db.add(new_machine)
-    await db.commit()
-    await db.refresh(new_machine)
-
-    await redis_client.set(f"network_ip:{new_machine.id}", new_machine.network_ip)
-
-    return {
-        "id": new_machine.id,
-        "network_ip": new_machine.network_ip,
-        "name": new_machine.name,
-        "description": new_machine.description,
-        "created_at": new_machine.created_at.isoformat(),
-        "disabled": new_machine.disabled,
-        "status": "registered",
-        "message": "Machine registered successfully",
-    }
+    
+    # Start transaction
+    litellm_added = False
+    redis_added = False
+    
+    try:
+        # Step 1: Add to database (but don't commit yet)
+        db.add(new_machine)
+        await db.flush()  # Get the ID without committing
+        
+        # Step 2: Add to LiteLLM (if configured)
+        try:
+            await add_machine_to_litellm(
+                machine_id=new_machine.id,
+                machine_ip=new_machine.network_ip,
+                machine_name=new_machine.name or f"machine-{new_machine.id}",
+                traffic_weight=new_machine.traffic_weight,
+                supported_models_list=new_machine.supported_models,
+            )
+            litellm_added = True
+            logger.info(f"Machine {new_machine.id} added to LiteLLM")
+        except LiteLLMError as e:
+            # If LiteLLM is required, fail the registration
+            logger.error(f"Failed to add machine to LiteLLM: {str(e)}")
+            await db.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to add machine to LiteLLM: {str(e)}"
+            )
+        except Exception as e:
+            # For other errors, log but continue (LiteLLM might not be configured)
+            logger.warning(f"LiteLLM integration error (non-critical): {str(e)}")
+        
+        # Step 3: Add to Redis
+        try:
+            await redis_client.set(f"network_ip:{new_machine.id}", new_machine.network_ip)
+            redis_added = True
+        except Exception as e:
+            logger.error(f"Failed to add machine to Redis: {str(e)}")
+            # Rollback LiteLLM if it was added
+            if litellm_added:
+                await rollback_litellm_deployments(new_machine.id)
+            await db.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to add machine to Redis: {str(e)}"
+            )
+        
+        # Step 4: Commit database transaction
+        await db.commit()
+        await db.refresh(new_machine)
+        
+        return {
+            "id": new_machine.id,
+            "network_ip": new_machine.network_ip,
+            "name": new_machine.name,
+            "description": new_machine.description,
+            "created_at": new_machine.created_at.isoformat(),
+            "disabled": new_machine.disabled,
+            "traffic_weight": new_machine.traffic_weight,
+            "supported_models": new_machine.supported_models,
+            "status": "registered",
+            "message": "Machine registered successfully",
+            "litellm_configured": litellm_added,
+        }
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        # Rollback everything on any other error
+        logger.error(f"Unexpected error during machine registration: {str(e)}")
+        
+        # Rollback database
+        await db.rollback()
+        
+        # Rollback Redis if it was added
+        if redis_added and new_machine.id:
+            try:
+                await redis_client.delete(f"network_ip:{new_machine.id}")
+            except Exception as redis_err:
+                logger.error(f"Failed to rollback Redis: {str(redis_err)}")
+        
+        # Rollback LiteLLM if it was added
+        if litellm_added and new_machine.id:
+            await rollback_litellm_deployments(new_machine.id)
+        
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to register machine: {str(e)}"
+        )
 
 
 @router.get(
@@ -82,6 +169,7 @@ async def get_machine(
 @router.put(
     "/machines/{network_ip}",
     summary="Update Machine Details",
+    description="Update machine details including enable/disable status. Syncs with LiteLLM when status changes.",
 )
 async def update_machine(
     network_ip: str,
@@ -95,21 +183,118 @@ async def update_machine(
     if not machine:
         raise HTTPException(status_code=404, detail="Machine not found")
 
-    # If network IP changed, update Redis cache
-    if machine.network_ip != request.network_ip:
-        await redis_client.set(f"network_ip:{machine.id}", request.network_ip)
+    # Track what changed for potential rollback
+    old_network_ip = machine.network_ip
+    old_disabled = machine.disabled
+    old_traffic_weight = machine.traffic_weight
+    old_supported_models = machine.supported_models
+    redis_updated = False
+    litellm_updated = False
 
-    machine.network_ip = request.network_ip
-    machine.name = request.name
-    machine.description = request.description
-    machine.disabled = request.disabled
-    machine.updated_at = datetime.utcnow()  # Add this line to update timestamp
+    try:
+        # Update Redis if network IP changed
+        if machine.network_ip != request.network_ip:
+            try:
+                await redis_client.set(f"network_ip:{machine.id}", request.network_ip)
+                redis_updated = True
+            except Exception as e:
+                logger.error(f"Failed to update Redis: {str(e)}")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to update Redis: {str(e)}"
+                )
 
-    db.add(machine)
-    await db.commit()
-    await db.refresh(machine)
+        # Update LiteLLM if disabled status, traffic weight, or supported models changed
+        if machine.disabled != request.disabled or machine.traffic_weight != request.traffic_weight or machine.supported_models != request.supported_models:
+            try:
+                await update_machine_in_litellm(
+                    machine_id=machine.id,
+                    machine_ip=request.network_ip,
+                    machine_name=request.name or f"machine-{machine.id}",
+                    enabled=not request.disabled,  # LiteLLM uses enabled, we store disabled
+                    traffic_weight=request.traffic_weight,
+                    supported_models_list=request.supported_models,
+                )
+                litellm_updated = True
+                logger.info(f"Machine {machine.id} updated in LiteLLM: {'disabled' if request.disabled else 'enabled'}, weight={request.traffic_weight}")
+            except LiteLLMError as e:
+                # Rollback Redis if it was updated
+                if redis_updated:
+                    try:
+                        await redis_client.set(f"network_ip:{machine.id}", old_network_ip)
+                    except Exception as redis_err:
+                        logger.error(f"Failed to rollback Redis: {str(redis_err)}")
+                
+                logger.error(f"Failed to update LiteLLM: {str(e)}")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to update LiteLLM: {str(e)}"
+                )
+            except Exception as e:
+                # Log but continue for non-critical LiteLLM errors
+                logger.warning(f"LiteLLM update error (non-critical): {str(e)}")
 
-    return machine
+        # Update database
+        machine.network_ip = request.network_ip
+        machine.name = request.name
+        machine.description = request.description
+        machine.disabled = request.disabled
+        machine.traffic_weight = request.traffic_weight
+        machine.supported_models = request.supported_models
+        machine.updated_at = datetime.utcnow()
+
+        db.add(machine)
+        await db.commit()
+        await db.refresh(machine)
+
+        return {
+            "id": machine.id,
+            "network_ip": machine.network_ip,
+            "name": machine.name,
+            "description": machine.description,
+            "created_at": machine.created_at.isoformat(),
+            "updated_at": machine.updated_at.isoformat(),
+            "disabled": machine.disabled,
+            "traffic_weight": machine.traffic_weight,
+            "supported_models": machine.supported_models,
+            "litellm_synced": litellm_updated,
+        }
+
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error updating machine: {str(e)}")
+        
+        # Rollback Redis if it was updated
+        if redis_updated:
+            try:
+                await redis_client.set(f"network_ip:{machine.id}", old_network_ip)
+            except Exception as redis_err:
+                logger.error(f"Failed to rollback Redis: {str(redis_err)}")
+        
+        # Rollback LiteLLM if it was updated
+        if litellm_updated:
+            try:
+                # Restore previous state
+                await update_machine_in_litellm(
+                    machine_id=machine.id,
+                    machine_ip=old_network_ip,
+                    machine_name=machine.name or f"machine-{machine.id}",
+                    enabled=not old_disabled,
+                    traffic_weight=old_traffic_weight,
+                    supported_models_list=old_supported_models,
+                )
+            except Exception as litellm_err:
+                logger.error(f"Failed to rollback LiteLLM: {str(litellm_err)}")
+        
+        # Rollback database
+        await db.rollback()
+        
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to update machine: {str(e)}"
+        )
 
 
 @router.post("/machines/{network_ip}/auth-tokens")
@@ -221,3 +406,76 @@ async def list_machine_tokens(
         }
         for token in tokens
     ]
+
+
+@router.delete(
+    "/machines/{network_ip}",
+    summary="Delete Machine",
+    description="Delete a machine from the system. Also removes it from LiteLLM and cleans up all associated data.",
+    status_code=204,
+)
+async def delete_machine(
+    network_ip: str,
+    db: DBSession,
+    user: User = Depends(verify_admin),
+):
+    # Find the machine
+    machine_res = await db.exec(select(Machine).where(Machine.network_ip == network_ip))
+    machine = machine_res.first()
+
+    if not machine:
+        raise HTTPException(status_code=404, detail="Machine not found")
+
+    machine_id = machine.id
+    
+    try:
+        # Step 1: Remove from LiteLLM (if configured)
+        try:
+            removed_deployments = await remove_machine_from_litellm(machine_id)
+            logger.info(f"Removed {len(removed_deployments)} deployments from LiteLLM for machine {machine_id}")
+        except LiteLLMError as e:
+            logger.error(f"Failed to remove machine from LiteLLM: {str(e)}")
+            # Continue with deletion even if LiteLLM fails (it might be down)
+        except Exception as e:
+            logger.warning(f"LiteLLM removal error (non-critical): {str(e)}")
+
+        # Step 2: Delete associated tokens (soft delete)
+        tokens_res = await db.exec(
+            select(MachineToken).where(
+                MachineToken.machine_id == machine_id,
+                MachineToken.deleted_at == None,  # noqa: E711
+            )
+        )
+        tokens = tokens_res.all()
+        
+        for token in tokens:
+            token.deleted_at = datetime.utcnow()
+            db.add(token)
+        
+        logger.info(f"Soft-deleted {len(tokens)} tokens for machine {machine_id}")
+
+        # Step 3: Remove from Redis
+        try:
+            await redis_client.delete(f"network_ip:{machine_id}")
+            await redis_client.delete(f"machine_id:{network_ip}")
+            await redis_client.delete(f"liveness:{machine_id}")
+            logger.info(f"Removed Redis entries for machine {machine_id}")
+        except Exception as e:
+            logger.error(f"Failed to remove Redis entries: {str(e)}")
+            # Continue even if Redis cleanup fails
+
+        # Step 4: Delete the machine from database
+        await db.delete(machine)
+        await db.commit()
+        
+        logger.info(f"Successfully deleted machine {machine_id} ({network_ip})")
+        
+        return None  # 204 No Content
+        
+    except Exception as e:
+        logger.error(f"Failed to delete machine: {str(e)}")
+        await db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to delete machine: {str(e)}"
+        )
