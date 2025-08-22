@@ -1,6 +1,7 @@
 package main
 
 import (
+	"Aroha-Labs/mira-client/internal/tui"
 	"Aroha-Labs/mira-client/cmds"
 	"Aroha-Labs/mira-client/constants"
 	"Aroha-Labs/mira-client/utils"
@@ -12,7 +13,6 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"runtime"
 	"strings"
 
 	"github.com/cqroot/prompt"
@@ -21,6 +21,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 // serviceCmd represents the parent service command
@@ -377,10 +378,36 @@ func checkCommandExists(cmd string) bool {
 }
 
 func main() {
-	// print os
-	fmt.Println("OS:", runtime.GOOS)
+	// Check if launched without arguments - show TUI
+	if len(os.Args) == 1 {
+		p := tea.NewProgram(
+			tui.NewMainMenu(),
+			tea.WithAltScreen(),
+		)
+		if _, err := p.Run(); err != nil {
+			fmt.Printf("Error running program: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
 
-	rootCmd := &cobra.Command{Use: "app"}
+	// Otherwise use traditional CLI
+	rootCmd := &cobra.Command{
+		Use:   "mira",
+		Short: "Mira Network - Decentralized GPU Inference",
+		Long:  tui.Logo + "\n\n" + tui.Tagline + "\n\nManage your GPU node in the Mira Network",
+		Run: func(cmd *cobra.Command, args []string) {
+			// If no subcommand, show TUI
+			p := tea.NewProgram(
+				tui.NewMainMenu(),
+				tea.WithAltScreen(),
+			)
+			if _, err := p.Run(); err != nil {
+				fmt.Printf("Error running program: %v\n", err)
+				os.Exit(1)
+			}
+		},
+	}
 
 	rootCmd.AddCommand(serviceCmd)
 	serviceCmd.AddCommand(startServiceCmd)
