@@ -13,7 +13,7 @@
     "build:ts": "tsc",
     "watch:ts": "tsc -w",
     "dev": "npm run build:ts && concurrently -k -p \"[{\"name\"}]\" -n \"TypeScript,App\" -c \"yellow.bold,cyan.bold\" \"npm:watch:ts\" \"npm:dev:start\"",
-    "dev:start": "fastify start --plugin-timeout 30000 --ignore-watch=.ts$ -l error -P -a 0.0.0.0 -r newrelic ./dist/app.js"
+    "dev:start": "fastify start --plugin-timeout 30000 --ignore-watch=.ts$ -l debug -P -a 0.0.0.0 -r newrelic ./dist/app.js"
   },
   "keywords": [],
   "author": "",
