@@ -42,7 +42,7 @@ from openai import AsyncOpenAI
 router = APIRouter()
 
 # Configure OpenAI client for LiteLLM
-openai_client = AsyncOpenAI(api_key=LITELLM_API_KEY, base_url=LITELLM_API_URL)
+openai_client = AsyncOpenAI(api_key=LITELLM_API_KEY, base_url=f"{LITELLM_API_URL}/v1")
 
 
 @router.post(
