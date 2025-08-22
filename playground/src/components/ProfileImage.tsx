@@ -10,7 +10,7 @@ const ProfileImage: React.FC<ComponentProps<"img">> = ({ src, ...props }) => {
     proxyUrl = `${API_BASE_URL}/proxy-image?url=${encodeURIComponent(src)}`;
   }
 
-  return <img src={typeof proxyUrl === "string" ? proxyUrl : undefined} {...props} />;
+  return <img src={typeof proxyUrl === "string" ? proxyUrl : undefined} alt="" {...props} />;
 };
 
 export default ProfileImage;
