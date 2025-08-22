@@ -164,7 +164,7 @@ must_conditions: list[OpenSearchQuery] = []
                         },
                         "invalid_page_size": {
                             "value": {"detail": "page_size must be between 1 and 100"}
-                        }
+                        },
                     }
                 }
             },
@@ -190,41 +190,55 @@ must_conditions: list[OpenSearchQuery] = []
 async def list_all_logs(
     user: User = Depends(verify_user),
     page: int = Query(default=1, ge=1, description="Page number"),
-    page_size: int = Query(default=10, ge=1, le=100, description="Number of items per page (max: 100)"),
-    start_date: Optional[datetime] = Query(default=None, description="Filter logs after this date (ISO 8601)"),
-    end_date: Optional[datetime] = Query(default=None, description="Filter logs before this date (ISO 8601)"),
+    page_size: int = Query(
+        default=10, ge=1, le=100, description="Number of items per page (max: 100)"
+    ),
+    start_date: Optional[datetime] = Query(
+        default=None, description="Filter logs after this date (ISO 8601)"
+    ),
+    end_date: Optional[datetime] = Query(
+        default=None, description="Filter logs before this date (ISO 8601)"
+    ),
     machine_id: Optional[str] = Query(default=None, description="Filter by machine ID"),
     model: Optional[str] = Query(default=None, description="Filter by model name"),
     api_key_id: Optional[int] = Query(default=None, description="Filter by API key ID"),
-    user_id: Optional[str] = Query(default=None, description="Filter by user ID (admin only)"),
+    user_id: Optional[str] = Query(
+        default=None, description="Filter by user ID (admin only)"
+    ),
     order_by: Literal["created_at", "model", "machine_id"] = Query(
-        default="created_at",
-        description="Field to sort by"
+        default="created_at", description="Field to sort by"
     ),
     order: Literal["asc", "desc"] = Query(default="desc", description="Sort direction"),
     flow_id: Optional[str] = Query(default=None, description="Filter by flow ID"),
 ):
     # Validate page_size
     if page_size > 100:
-        track("list_api_logs_error", {
-            "user_id": str(user.id),
-            "error": "invalid_page_size",
-            "requested_page_size": page_size
-        })
+        track(
+            "list_api_logs_error",
+            {
+                "user_id": str(user.id),
+                "error": "invalid_page_size",
+                "requested_page_size": page_size,
+            },
+        )
         raise HTTPException(
-            status_code=400,
-            detail="page_size must be between 1 and 100"
+            status_code=400, detail="page_size must be between 1 and 100"
         )
 
-    track("list_api_logs_request", {
-        "user_id": str(user.id),
-        "page": page,
-        "page_size": page_size,
-        "is_admin": "admin" in user.roles,
-        "has_filters": any([start_date, end_date, machine_id, model, api_key_id, user_id, flow_id]),
-        "requested_user_id": user_id
-    })
-    
+    track(
+        "list_api_logs_request",
+        {
+            "user_id": str(user.id),
+            "page": page,
+            "page_size": page_size,
+            "is_admin": "admin" in user.roles,
+            "has_filters": any(
+                [start_date, end_date, machine_id, model, api_key_id, user_id, flow_id]
+            ),
+            "requested_user_id": user_id,
+        },
+    )
+
     try:
         # Build OpenSearch query
         must_conditions = [{"term": {"doc_type": "model_usage"}}]
@@ -232,11 +246,14 @@ async def list_all_logs(
         # Access control
         if user_id:
             if "admin" not in user.roles:
-                track("list_api_logs_error", {
-                    "user_id": str(user.id),
-                    "error": "permission_denied",
-                    "requested_user_id": user_id
-                })
+                track(
+                    "list_api_logs_error",
+                    {
+                        "user_id": str(user.id),
+                        "error": "permission_denied",
+                        "requested_user_id": user_id,
+                    },
+                )
                 raise HTTPException(
                     status_code=403, detail="Only admins can query other users' logs"
                 )
@@ -319,13 +336,16 @@ async def list_all_logs(
 
         total_hits = response["hits"]["total"]["value"]
         total_pages = (total_hits + page_size - 1) // page_size
-        
-        track("list_api_logs_response", {
-            "user_id": str(user.id),
-            "total_hits": total_hits,
-            "logs_returned": len(logs),
-            "pages": total_pages
-        })
+
+        track(
+            "list_api_logs_response",
+            {
+                "user_id": str(user.id),
+                "total_hits": total_hits,
+                "logs_returned": len(logs),
+                "pages": total_pages,
+            },
+        )
 
         return {
             "logs": logs,
@@ -336,10 +356,7 @@ async def list_all_logs(
         }
 
     except Exception as e:
-        track("list_api_logs_error", {
-            "user_id": str(user.id),
-            "error": str(e)
-        })
+        track("list_api_logs_error", {"user_id": str(user.id), "error": str(e)})
         logger.error(f"Error in list_all_logs: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
@@ -351,18 +368,18 @@ async def list_all_logs(
 )
 async def total_inference_calls(user: User = Depends(verify_user)):
     track("total_inference_calls_request", {"user_id": str(user.id)})
-    
+
     query = {
         "query": {
             "bool": {
                 "must": [
                     {"match": {"user_id": user.id}},
-                    {"term": {"doc_type": "model_usage"}}
+                    {"term": {"doc_type": "model_usage"}},
                 ]
             }
         },
         "track_total_hits": True,
-        "size": 0
+        "size": 0,
     }
 
     try:
@@ -372,21 +389,17 @@ async def total_inference_calls(user: User = Depends(verify_user)):
         )
         total = response["hits"]["total"]["value"]
 
-        track("total_inference_calls_response", {
-            "user_id": str(user.id),
-            "total_calls": total
-        })
+        track(
+            "total_inference_calls_response",
+            {"user_id": str(user.id), "total_calls": total},
+        )
 
         return {"total": total}
     except Exception as e:
         logger.error(f"Error getting total inference calls: {e}")
-        track("total_inference_calls_error", {
-            "user_id": str(user.id),
-            "error": str(e)
-        })
+        track("total_inference_calls_error", {"user_id": str(user.id), "error": str(e)})
         raise HTTPException(
-            status_code=500,
-            detail=f"Error getting total inference calls: {str(e)}"
+            status_code=500, detail=f"Error getting total inference calls: {str(e)}"
         )
 
 
@@ -405,11 +418,14 @@ async def get_logs_metrics(
 
     # Access control
     if user_id and "admin" not in user.roles:
-        track("get_logs_metrics_error", {
-            "user_id": str(user.id),
-            "error": "permission_denied",
-            "requested_user_id": user_id
-        })
+        track(
+            "get_logs_metrics_error",
+            {
+                "user_id": str(user.id),
+                "error": "permission_denied",
+                "requested_user_id": user_id,
+            },
+        )
         raise HTTPException(
             status_code=403, detail="Only admins can query other users' logs"
         )
@@ -425,13 +441,9 @@ async def get_logs_metrics(
             must_conditions.append({"match": {"user_id": user.id}})
 
     if start_date:
-        must_conditions.append(
-            {"range": {"timestamp": {"gte": start_date}}}
-        )
+        must_conditions.append({"range": {"timestamp": {"gte": start_date}}})
     if end_date:
-        must_conditions.append(
-            {"range": {"timestamp": {"lte": end_date}}}
-        )
+        must_conditions.append({"range": {"timestamp": {"lte": end_date}}})
     if machine_id:
         must_conditions.append({"term": {"machine_id": str(machine_id)}})
     if model:
@@ -451,14 +463,9 @@ async def get_logs_metrics(
             "avg_response_time": {"avg": {"field": "total_response_time"}},
             "avg_ttft": {"avg": {"field": "ttft"}},
             "total_cost": {"sum": {"field": "cost"}},
-            "model_distribution": {
-                "terms": {
-                    "field": "model",
-                    "size": 100
-                }
-            }
+            "model_distribution": {"terms": {"field": "model.keyword", "size": 100}},
         },
-        "size": 0
+        "size": 0,
     }
 
     try:
@@ -473,62 +480,62 @@ async def get_logs_metrics(
             for bucket in aggs["model_distribution"]["buckets"]
         }
 
-        track("get_logs_metrics_response", {
-            "user_id": str(user.id),
-            "total_tokens": aggs["total_tokens"]["value"],
-            "models_count": len(model_distribution)
-        })
+        track(
+            "get_logs_metrics_response",
+            {
+                "user_id": str(user.id),
+                "total_tokens": aggs["total_tokens"]["value"],
+                "models_count": len(model_distribution),
+            },
+        )
 
         return {
             "total_tokens": int(aggs["total_tokens"]["value"]),
             "prompt_tokens": int(aggs["prompt_tokens"]["value"]),
             "completion_tokens": int(aggs["completion_tokens"]["value"]),
-            "avg_response_time": float(aggs["avg_response_time"]["value"]) if aggs["avg_response_time"]["value"] is not None else 0.0,
-            "avg_ttft": float(aggs["avg_ttft"]["value"]) if aggs["avg_ttft"]["value"] is not None else 0.0,
-            "total_cost": float(aggs["total_cost"]["value"]) if aggs["total_cost"]["value"] is not None else 0.0,
-            "model_distribution": list(model_distribution.items())
+            "avg_response_time": (
+                float(aggs["avg_response_time"]["value"])
+                if aggs["avg_response_time"]["value"] is not None
+                else 0.0
+            ),
+            "avg_ttft": (
+                float(aggs["avg_ttft"]["value"])
+                if aggs["avg_ttft"]["value"] is not None
+                else 0.0
+            ),
+            "total_cost": (
+                float(aggs["total_cost"]["value"])
+                if aggs["total_cost"]["value"] is not None
+                else 0.0
+            ),
+            "model_distribution": list(model_distribution.items()),
         }
 
     except Exception as e:
         logger.error(f"Error getting logs metrics from OpenSearch: {e}")
-        track("get_logs_metrics_error", {
-            "user_id": str(user.id),
-            "error": str(e)
-        })
+        track("get_logs_metrics_error", {"user_id": str(user.id), "error": str(e)})
         raise HTTPException(
-            status_code=500,
-            detail=f"Error getting logs metrics: {str(e)}"
+            status_code=500, detail=f"Error getting logs metrics: {str(e)}"
         )
 
 
 @router.get(
-    "/usage-stats",
-    summary="Get Usage Statistics",
-    response_description="Returns usage statistics for the specified time period",
+    "/machine-stats",
+    summary="Get Machine Statistics",
+    response_description="Returns comprehensive machine usage statistics",
 )
-async def get_usage_stats(
+async def get_machine_stats(
     user: User = Depends(verify_user),
     start_date: Optional[datetime] = Query(default=None),
     end_date: Optional[datetime] = Query(default=None),
     machine_id: Optional[str] = Query(default=None),
-    model: Optional[str] = Query(default=None),
-    api_key_id: Optional[int] = Query(default=None),
     user_id: Optional[str] = Query(default=None),
-    flow_id: Optional[str] = Query(default=None),
-    interval: str = Query(default="1h", description="Time bucket interval (e.g. 1h, 1d)"),
+    interval: str = Query(default="1h", description="Time bucket interval"),
 ):
-    track("get_usage_stats_request", {
-        "user_id": str(user.id),
-        "interval": interval
-    })
+    track("get_machine_stats_request", {"user_id": str(user.id), "interval": interval})
 
     # Access control
     if user_id and "admin" not in user.roles:
-        track("get_usage_stats_error", {
-            "user_id": str(user.id),
-            "error": "permission_denied",
-            "requested_user_id": user_id
-        })
         raise HTTPException(
             status_code=403, detail="Only admins can query other users' logs"
         )
@@ -548,11 +555,218 @@ async def get_usage_stats(
             {"range": {"timestamp": {"gte": start_date.isoformat()}}}
         )
     if end_date:
-        must_conditions.append(
-            {"range": {"timestamp": {"lte": end_date.isoformat()}}}
-        )
+        must_conditions.append({"range": {"timestamp": {"lte": end_date.isoformat()}}})
     if machine_id:
-        must_conditions.append({"term": {"machine_id": str(machine_id)}})
+        must_conditions.append({"term": {"machine_id.keyword": str(machine_id)}})
+
+    # Build aggregations for machine-specific metrics
+    query = {
+        "query": {"bool": {"must": must_conditions}},
+        "aggs": {
+            "machines": {
+                "terms": {"field": "machine_id.keyword", "size": 100},
+                "aggs": {
+                    "total_tokens": {"sum": {"field": "total_tokens"}},
+                    "prompt_tokens": {"sum": {"field": "prompt_tokens"}},
+                    "completion_tokens": {"sum": {"field": "completion_tokens"}},
+                    "total_cost": {"sum": {"field": "cost"}},
+                    "avg_response_time": {"avg": {"field": "total_response_time"}},
+                    "avg_ttft": {"avg": {"field": "ttft"}},
+                    "request_count": {"value_count": {"field": "_id"}},
+                    "models": {
+                        "terms": {"field": "model.keyword", "size": 50},
+                        "aggs": {
+                            "tokens": {"sum": {"field": "total_tokens"}},
+                            "cost": {"sum": {"field": "cost"}},
+                        },
+                    },
+                    "usage_over_time": {
+                        "date_histogram": {
+                            "field": "timestamp",
+                            "fixed_interval": interval,
+                            "format": "yyyy-MM-dd'T'HH:mm:ss",
+                        },
+                        "aggs": {
+                            "tokens": {"sum": {"field": "total_tokens"}},
+                            "cost": {"sum": {"field": "cost"}},
+                            "requests": {"value_count": {"field": "_id"}},
+                        },
+                    },
+                },
+            },
+            "total_metrics": {"sum_bucket": {"buckets_path": "machines>total_tokens"}},
+            "model_distribution": {
+                "terms": {"field": "model.keyword", "size": 100},
+                "aggs": {
+                    "tokens": {"sum": {"field": "total_tokens"}},
+                    "cost": {"sum": {"field": "cost"}},
+                    "machines": {"cardinality": {"field": "machine_id.keyword"}},
+                },
+            },
+        },
+        "size": 0,
+    }
+
+    try:
+        response = opensearch_client.search(
+            index=OPENSEARCH_LLM_USAGE_LOG_INDEX,
+            body=query,
+        )
+
+        # Process results
+        machines_data = []
+        for bucket in response["aggregations"]["machines"]["buckets"]:
+            machine_id = bucket["key"]
+
+            # Process time series data
+            time_series = []
+            for time_bucket in bucket["usage_over_time"]["buckets"]:
+                time_series.append(
+                    {
+                        "timestamp": time_bucket["key_as_string"],
+                        "tokens": int(time_bucket["tokens"]["value"]),
+                        "cost": float(time_bucket["cost"]["value"]),
+                        "requests": int(time_bucket["requests"]["value"]),
+                    }
+                )
+
+            # Process model distribution for this machine
+            models = []
+            for model_bucket in bucket["models"]["buckets"]:
+                models.append(
+                    {
+                        "model": model_bucket["key"],
+                        "tokens": int(model_bucket["tokens"]["value"]),
+                        "cost": float(model_bucket["cost"]["value"]),
+                        "count": model_bucket["doc_count"],
+                    }
+                )
+
+            machines_data.append(
+                {
+                    "machine_id": machine_id,
+                    "total_tokens": int(bucket["total_tokens"]["value"]),
+                    "prompt_tokens": int(bucket["prompt_tokens"]["value"]),
+                    "completion_tokens": int(bucket["completion_tokens"]["value"]),
+                    "total_cost": float(bucket["total_cost"]["value"]),
+                    "avg_response_time": (
+                        float(bucket["avg_response_time"]["value"])
+                        if bucket["avg_response_time"]["value"]
+                        else 0
+                    ),
+                    "avg_ttft": (
+                        float(bucket["avg_ttft"]["value"])
+                        if bucket["avg_ttft"]["value"]
+                        else 0
+                    ),
+                    "request_count": int(bucket["request_count"]["value"]),
+                    "models": models,
+                    "time_series": time_series,
+                }
+            )
+
+        # Sort machines by total tokens
+        machines_data.sort(key=lambda x: x["total_tokens"], reverse=True)
+
+        # Process model distribution across all machines
+        model_distribution = []
+        for model_bucket in response["aggregations"]["model_distribution"]["buckets"]:
+            model_distribution.append(
+                {
+                    "model": model_bucket["key"],
+                    "tokens": int(model_bucket["tokens"]["value"]),
+                    "cost": float(model_bucket["cost"]["value"]),
+                    "machine_count": int(model_bucket["machines"]["value"]),
+                    "request_count": model_bucket["doc_count"],
+                }
+            )
+
+        # Calculate totals
+        total_tokens = sum(m["total_tokens"] for m in machines_data)
+        total_cost = sum(m["total_cost"] for m in machines_data)
+        total_requests = sum(m["request_count"] for m in machines_data)
+
+        track(
+            "get_machine_stats_response",
+            {
+                "user_id": str(user.id),
+                "machines_count": len(machines_data),
+                "total_tokens": total_tokens,
+                "total_cost": total_cost,
+            },
+        )
+
+        return {
+            "machines": machines_data,
+            "model_distribution": model_distribution,
+            "totals": {
+                "tokens": total_tokens,
+                "cost": total_cost,
+                "requests": total_requests,
+                "machine_count": len(machines_data),
+            },
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting machine stats: {e}")
+        track("get_machine_stats_error", {"user_id": str(user.id), "error": str(e)})
+        raise HTTPException(
+            status_code=500, detail=f"Error getting machine statistics: {str(e)}"
+        )
+
+
+@router.get(
+    "/usage-stats",
+    summary="Get Usage Statistics",
+    response_description="Returns usage statistics for the specified time period",
+)
+async def get_usage_stats(
+    user: User = Depends(verify_user),
+    start_date: Optional[datetime] = Query(default=None),
+    end_date: Optional[datetime] = Query(default=None),
+    machine_id: Optional[str] = Query(default=None),
+    model: Optional[str] = Query(default=None),
+    api_key_id: Optional[int] = Query(default=None),
+    user_id: Optional[str] = Query(default=None),
+    flow_id: Optional[str] = Query(default=None),
+    interval: str = Query(
+        default="1h", description="Time bucket interval (e.g. 1h, 1d)"
+    ),
+):
+    track("get_usage_stats_request", {"user_id": str(user.id), "interval": interval})
+
+    # Access control
+    if user_id and "admin" not in user.roles:
+        track(
+            "get_usage_stats_error",
+            {
+                "user_id": str(user.id),
+                "error": "permission_denied",
+                "requested_user_id": user_id,
+            },
+        )
+        raise HTTPException(
+            status_code=403, detail="Only admins can query other users' logs"
+        )
+
+    # Build OpenSearch query
+    must_conditions = [{"term": {"doc_type": "model_usage"}}]
+
+    # Add filters
+    if user_id:
+        must_conditions.append({"match": {"user_id": user_id}})
+    else:
+        if "admin" not in user.roles:
+            must_conditions.append({"match": {"user_id": user.id}})
+
+    if start_date:
+        must_conditions.append(
+            {"range": {"timestamp": {"gte": start_date.isoformat()}}}
+        )
+    if end_date:
+        must_conditions.append({"range": {"timestamp": {"lte": end_date.isoformat()}}})
+    if machine_id:
+        must_conditions.append({"term": {"machine_id.keyword": str(machine_id)}})
     if model:
         must_conditions.append({"match": {"model": model}})
     if api_key_id:
@@ -568,30 +782,35 @@ async def get_usage_stats(
                 "date_histogram": {
                     "field": "timestamp",
                     "fixed_interval": interval,
-                    "format": "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
+                    "format": "yyyy-MM-dd'T'HH:mm:ss.SSSZ",
                 },
                 "aggs": {
-                    "by_model": {
-                        "terms": {"field": "model"},
+                    "by_machine": {
+                        "terms": {"field": "machine_id.keyword", "size": 100},
                         "aggs": {
-                            "prompt_tokens": {"sum": {"field": "prompt_tokens"}},
-                            "completion_tokens": {"sum": {"field": "completion_tokens"}},
-                            "total_tokens": {"sum": {"field": "total_tokens"}},
-                            "avg_response_time": {"avg": {"field": "total_response_time"}},
-                            "avg_ttft": {"avg": {"field": "ttft"}},
-                            "total_cost": {
-                                "sum": {
-                                    "script": {
-                                        "source": "doc['cost'].value"
-                                    }
-                                }
+                            "by_model": {
+                                "terms": {"field": "model.keyword"},
+                                "aggs": {
+                                    "prompt_tokens": {
+                                        "sum": {"field": "prompt_tokens"}
+                                    },
+                                    "completion_tokens": {
+                                        "sum": {"field": "completion_tokens"}
+                                    },
+                                    "total_tokens": {"sum": {"field": "total_tokens"}},
+                                    "avg_response_time": {
+                                        "avg": {"field": "total_response_time"}
+                                    },
+                                    "avg_ttft": {"avg": {"field": "ttft"}},
+                                    "total_cost": {"sum": {"field": "cost"}},
+                                },
                             }
-                        }
+                        },
                     }
-                }
+                },
             }
         },
-        "size": 0
+        "size": 0,
     }
 
     try:
@@ -604,38 +823,56 @@ async def get_usage_stats(
         results = []
         for bucket in response["aggregations"]["usage_over_time"]["buckets"]:
             timestamp = bucket["key_as_string"]
-            
-            models_data = []
-            for model_bucket in bucket["by_model"]["buckets"]:
-                models_data.append({
-                    "model": model_bucket["key"],
-                    "prompt_tokens": int(model_bucket["prompt_tokens"]["value"]),
-                    "completion_tokens": int(model_bucket["completion_tokens"]["value"]),
-                    "total_tokens": int(model_bucket["total_tokens"]["value"]),
-                    "avg_response_time": float(model_bucket["avg_response_time"]["value"]) if model_bucket["avg_response_time"]["value"] is not None else 0.0,
-                    "avg_ttft": float(model_bucket["avg_ttft"]["value"]) if model_bucket["avg_ttft"]["value"] is not None else 0.0,
-                    "total_cost": float(model_bucket["total_cost"]["value"]) if model_bucket["total_cost"]["value"] is not None else 0.0
-                })
 
-            results.append({
-                "timestamp": timestamp,
-                "models": models_data
-            })
+            machines_data = []
+            for machine_bucket in bucket["by_machine"]["buckets"]:
+                machine_id = machine_bucket["key"]
 
-        track("get_usage_stats_response", {
-            "user_id": str(user.id),
-            "total_buckets": len(results)
-        })
+                models_data = []
+                for model_bucket in machine_bucket["by_model"]["buckets"]:
+                    models_data.append(
+                        {
+                            "model": model_bucket["key"],
+                            "prompt_tokens": int(
+                                model_bucket["prompt_tokens"]["value"]
+                            ),
+                            "completion_tokens": int(
+                                model_bucket["completion_tokens"]["value"]
+                            ),
+                            "total_tokens": int(model_bucket["total_tokens"]["value"]),
+                            "avg_response_time": (
+                                float(model_bucket["avg_response_time"]["value"])
+                                if model_bucket["avg_response_time"]["value"]
+                                is not None
+                                else 0.0
+                            ),
+                            "avg_ttft": (
+                                float(model_bucket["avg_ttft"]["value"])
+                                if model_bucket["avg_ttft"]["value"] is not None
+                                else 0.0
+                            ),
+                            "total_cost": (
+                                float(model_bucket["total_cost"]["value"])
+                                if model_bucket["total_cost"]["value"] is not None
+                                else 0.0
+                            ),
+                        }
+                    )
+
+                machines_data.append({"machine_id": machine_id, "models": models_data})
+
+            results.append({"timestamp": timestamp, "machines": machines_data})
+
+        track(
+            "get_usage_stats_response",
+            {"user_id": str(user.id), "total_buckets": len(results)},
+        )
 
         return {"results": results}
 
     except Exception as e:
         logger.error(f"Error getting usage stats from OpenSearch: {e}")
-        track("get_usage_stats_error", {
-            "user_id": str(user.id),
-            "error": str(e)
-        })
+        track("get_usage_stats_error", {"user_id": str(user.id), "error": str(e)})
         raise HTTPException(
-            status_code=500,
-            detail=f"Error getting usage statistics: {str(e)}"
+            status_code=500, detail=f"Error getting usage statistics: {str(e)}"
         )

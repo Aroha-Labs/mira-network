@@ -21,6 +21,7 @@ const (
 	WizStateWelcome WizardState = iota
 	WizStateShowInfo
 	WizStateGetAuthToken
+	WizStateGetRouterURL
 	WizStateGetOpenRouterKey
 	WizStateGetOptionalKeys
 	WizStateStartingContainer
@@ -32,6 +33,7 @@ type SetupWizardModel struct {
 	state           WizardState
 	machineID       string
 	ipAddress       string
+	routerURL       string
 	openRouterKey   string
 	authToken       string
 	anthropicKey    string
@@ -129,6 +131,29 @@ func (m SetupWizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.authToken = token
 				m.error = nil
 				_ = utils.SaveToken(m.authToken)
+				m.state = WizStateGetRouterURL
+				m.currentInput.SetValue("http://localhost:8000")
+				m.currentInput.Placeholder = "http://localhost:8000"
+				return m, textinput.Blink
+			
+			case WizStateGetRouterURL:
+				url := m.currentInput.Value()
+				if url == "" {
+					m.error = fmt.Errorf("Router URL is required")
+					return m, nil
+				}
+				// Basic URL validation
+				if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
+					m.error = fmt.Errorf("Router URL must start with http:// or https://")
+					return m, nil
+				}
+				// Warning for HTTPS with local development
+				if strings.HasPrefix(url, "https://") && (strings.Contains(url, "localhost") || strings.Contains(url, "127.0.0.1")) {
+					// Just log a warning but allow it - user might have SSL configured
+					// The error will show up in logs if it's wrong
+				}
+				m.routerURL = url
+				m.error = nil
 				m.state = WizStateGetOpenRouterKey
 				m.currentInput.SetValue("")
 				m.currentInput.Placeholder = "sk-or-v1-..."
@@ -182,7 +207,7 @@ func (m SetupWizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		default:
-			if m.state == WizStateGetOpenRouterKey || m.state == WizStateGetAuthToken {
+			if m.state == WizStateGetOpenRouterKey || m.state == WizStateGetAuthToken || m.state == WizStateGetRouterURL || m.state == WizStateGetOptionalKeys {
 				var cmd tea.Cmd
 				m.currentInput, cmd = m.currentInput.Update(msg)
 				return m, cmd
@@ -240,6 +265,7 @@ func (m SetupWizardModel) startContainer() tea.Cmd {
 			"run", "-d",
 			"--name", "mira-node",
 			"-p", "34523:8000",
+			"-e", "PORT=8000",  // Set Fastify to run on port 8000 inside container
 			"-e", fmt.Sprintf("MC_MACHINE_ID=%s", m.machineID),
 			"-e", fmt.Sprintf("MACHINE_IP=%s", m.ipAddress),
 			"-e", fmt.Sprintf("MACHINE_API_TOKEN=%s", m.authToken),
@@ -258,8 +284,20 @@ func (m SetupWizardModel) startContainer() tea.Cmd {
 		}
 
 		// Add router base URL and other required env vars from node-service
-		args = append(args, "-e", "ROUTER_BASE_URL=http://router.mira.network:8000")
+		// Replace localhost with host.docker.internal for Docker on Mac/Windows
+		routerURL := m.routerURL
+		if strings.Contains(routerURL, "localhost") || strings.Contains(routerURL, "127.0.0.1") {
+			routerURL = strings.ReplaceAll(routerURL, "localhost", "host.docker.internal")
+			routerURL = strings.ReplaceAll(routerURL, "127.0.0.1", "host.docker.internal")
+		}
+		args = append(args, "-e", fmt.Sprintf("ROUTER_BASE_URL=%s", routerURL))
 		args = append(args, "-e", fmt.Sprintf("MACHINE_NAME=mira-%s", m.machineID[:8]))
+		
+		// Add New Relic configuration
+		args = append(args, "-e", fmt.Sprintf("NEW_RELIC_APP_NAME=mira-network-node-%s", m.machineID[:8]))
+		args = append(args, "-e", "NEW_RELIC_LOG=stdout")  // Avoid permission issues with log file
+		args = append(args, "-e", "NEW_RELIC_LOG_LEVEL=error")
+		args = append(args, "-e", "NEW_RELIC_LICENSE_KEY=dummy-license-key")  // Dummy key to prevent startup errors
 		
 		args = append(args, "ghcr.io/aroha-labs/mira-network-node-service:main")
 
@@ -319,6 +357,8 @@ func (m SetupWizardModel) View() string {
 		title = "📋 Admin Registration Required"
 	case WizStateGetAuthToken:
 		title = "🔐 Authentication Token (Required)"
+	case WizStateGetRouterURL:
+		title = "🌐 Router URL Configuration"
 	case WizStateGetOpenRouterKey:
 		title = "🔑 OpenRouter API Key (Required)"
 	case WizStateGetOptionalKeys:
@@ -353,14 +393,22 @@ func (m SetupWizardModel) View() string {
 		s.WriteString("  Send this information to your router admin:\n")
 		s.WriteString("  ───────────────────────────────────────────────\n\n")
 		
-		// Create a box with copyable information - show full machine ID
+		// Format the info content first
+		infoContent := fmt.Sprintf("Machine ID: %s\nIP Address: %s\nPort:       34523", m.machineID, m.ipAddress)
+		
+		// Create a box with copyable information - using proper width
 		infoBox := lipgloss.NewStyle().
 			BorderStyle(lipgloss.RoundedBorder()).
 			BorderForeground(BrandAccent).
 			Padding(1, 2).
-			Render(fmt.Sprintf("Machine ID: %s\nIP Address: %s\nPort:       34523", m.machineID, m.ipAddress))
+			Width(60).
+			Render(infoContent)
 		
-		s.WriteString("  " + infoBox + "\n\n")
+		// Add each line of the box with proper indentation
+		for _, line := range strings.Split(infoBox, "\n") {
+			s.WriteString("  " + line + "\n")
+		}
+		s.WriteString("\n")
 		
 		s.WriteString("  📋 Copy the above information for your admin\n\n")
 		s.WriteString("  The admin will:\n")
@@ -408,6 +456,16 @@ func (m SetupWizardModel) View() string {
 		s.WriteString("  " + HelpStyle.Render("💡 Token format: mk-mira-XXXXXXXXXXXX") + "\n")
 		s.WriteString("  " + HelpStyle.Render("This token is provided by your router admin") + "\n")
 		s.WriteString("  " + HelpStyle.Render("Without it, your node cannot join the network"))
+	
+	case WizStateGetRouterURL:
+		s.WriteString("  " + InputPromptStyle.Render("Enter the Router URL:") + "\n\n")
+		s.WriteString("  " + m.currentInput.View() + "\n\n")
+		if m.error != nil {
+			s.WriteString("  " + ErrorStyle.Render("❌ " + m.error.Error()) + "\n\n")
+		}
+		s.WriteString("  " + HelpStyle.Render("💡 Default: https://router.mira.network:8000") + "\n")
+		s.WriteString("  " + HelpStyle.Render("This is the URL of your Mira Network router") + "\n")
+		s.WriteString("  " + HelpStyle.Render("Your admin should provide this if different"))
 
 	case WizStateStartingContainer:
 		s.WriteString("  " + lipgloss.NewStyle().Foreground(BrandPrimary).Render("Starting Mira Node Service...") + "\n\n")
@@ -454,13 +512,19 @@ func (m SetupWizardModel) View() string {
 		s.WriteString(fmt.Sprintf("  Health:      %s\n\n", health))
 		
 		// Show API endpoint
+		endpointContent := fmt.Sprintf("API Endpoint: http://%s:34523", m.ipAddress)
 		endpointBox := lipgloss.NewStyle().
 			BorderStyle(lipgloss.RoundedBorder()).
 			BorderForeground(SuccessColor).
 			Padding(0, 2).
-			Render(fmt.Sprintf("API Endpoint: http://%s:34523", m.ipAddress))
+			Width(50).
+			Render(endpointContent)
 		
-		s.WriteString("  " + endpointBox + "\n\n")
+		// Add each line of the box with proper indentation
+		for _, line := range strings.Split(endpointBox, "\n") {
+			s.WriteString("  " + line + "\n")
+		}
+		s.WriteString("\n")
 		s.WriteString("  " + lipgloss.NewStyle().Foreground(TextSecondary).Render("Your node is now part of the Mira Network!") + "\n\n")
 		s.WriteString("  " + HelpStyle.Render("Press Enter to return to menu"))
 
