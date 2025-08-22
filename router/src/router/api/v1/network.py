@@ -9,6 +9,7 @@ from src.router.core.config import (
     DATA_STREAM_API_URL,
     DATA_STREAM_SERVICE_KEY,
     LITELLM_API_KEY,
+    LITELLM_API_URL,
 )
 from src.router.core.settings_types import SETTINGS_MODELS
 from src.router.core.types import User
@@ -41,9 +42,7 @@ from openai import AsyncOpenAI
 router = APIRouter()
 
 # Configure OpenAI client for LiteLLM
-openai_client = AsyncOpenAI(
-    api_key=LITELLM_API_KEY, base_url="http://localhost:4000/v1"
-)
+openai_client = AsyncOpenAI(api_key=LITELLM_API_KEY, base_url=LITELLM_API_URL)
 
 
 @router.post(
