@@ -1,7 +1,7 @@
 import { FastifyPluginAsync } from "fastify";
 import axios from "axios";
 import { Env } from "../config";
-import { registerMachine, getLocalIp } from "../utils/machineRegistry";
+import { getLocalIp } from "../utils/network";
 import OpenAI from "openai";
 
 enum PROVIDER_NAME {
@@ -84,21 +84,23 @@ const getModelProvider = (
     return [modelProvider, model];
   }
 
-  const [providerName, ...rest] = model.split("/") as [
-    PROVIDER_NAME,
-    ...string[]
-  ];
-  const modelName = rest.join("/");
-
-  if (!modelName || modelName === "") {
-    throw new Error("Invalid model name");
+  // LiteLLM sends "openai/..." prefix, strip it and use OpenRouter
+  if (model.startsWith("openai/")) {
+    model = model.substring(7); // Remove "openai/" prefix
   }
 
-  if (!modelProviders[providerName]) {
-    throw new Error("Invalid model provider");
+  // If model still has "openrouter/" prefix, remove it
+  if (model.startsWith("openrouter/")) {
+    model = model.substring(11); // Remove "openrouter/" prefix
   }
 
-  return [modelProviders[providerName], modelName];
+  // Always use OpenRouter
+  if (!modelProviders[PROVIDER_NAME.OPENROUTER].apiKey) {
+    throw new Error("OpenRouter API key not configured");
+  }
+
+  // model is now in format OpenRouter expects: "openai/gpt-4o:throughput"
+  return [modelProviders[PROVIDER_NAME.OPENROUTER], model];
 };
 
 type GetLlmCompletionRequest = OpenAI.ChatCompletionCreateParams & {
@@ -205,29 +207,26 @@ const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
     const machineIp = Env.MACHINE_IP || getLocalIp(fastify.log);
     fastify.log.info(`Using machine IP: ${machineIp}`);
 
-    fastify.log.info("Starting machine registration process...");
-
+    // Check if required environment variables are set
     if (!ROUTER_BASE_URL) {
       fastify.log.error("ROUTER_BASE_URL is not set");
       fastify.log.error("Shutting down...");
       process.exit(1);
     }
 
-    const machineToken = await registerMachine(ROUTER_BASE_URL, fastify.log);
-
-    if (machineToken) {
-      fastify.log.info("Machine registered successfully and token acquired");
-      process.env.MACHINE_API_TOKEN = machineToken;
-      Env.MACHINE_API_TOKEN = machineToken;
-      fastify.log.info(`Using machine name: ${Env.MACHINE_NAME}`);
-
-      updateLiveness(machineIp, fastify.log);
-    } else {
-      fastify.log.error("Failed to register machine or acquire token after multiple attempts");
-      fastify.log.error("Machine registration is required to run the service");
+    // Check if machine token is provided (required for operation)
+    if (!Env.MACHINE_API_TOKEN) {
+      fastify.log.error("MACHINE_API_TOKEN is not set");
+      fastify.log.error("Machine token must be provided by administrator");
       fastify.log.error("Shutting down...");
       process.exit(1);
     }
+
+    fastify.log.info("Machine token found, starting service");
+    fastify.log.info(`Machine name: ${Env.MACHINE_NAME || 'Not set'}`);
+    
+    // Start liveness updates with the provided token
+    updateLiveness(machineIp, fastify.log);
   });
 
   fastify.addHook("preHandler", async (request, reply) => {
@@ -278,7 +277,7 @@ const root: FastifyPluginAsync = async (fastify, opts): Promise<void> => {
         });
 
         if (!stream) {
-          return { data: response };
+          return response;  // Return OpenAI response directly (no wrapper)
         }
 
         reply.raw.setHeader("x-machine-ip", Env.MACHINE_IP || getLocalIp(fastify.log));

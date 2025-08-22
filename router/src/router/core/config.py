@@ -11,6 +11,8 @@ NODE_SERVICE_URL = os.getenv("NODE_SERVICE_URL")
 
 # LiteLLM Configuration
 LITELLM_API_KEY = os.getenv("LITELLM_API_KEY")
+LITELLM_API_URL = os.getenv("LITELLM_API_URL", "http://localhost:4000")
+LITELLM_MASTER_KEY = os.getenv("LITELLM_MASTER_KEY", "")
 
 # OpenSearch Configuration
 OPENSEARCH_BASE_URL = os.getenv("OPENSEARCH_BASE_URL", "")

@@ -13,5 +13,8 @@ android/
 ios/
 
 k6-tests/*.json
+!k6-tests/package.json
 
 .env.local
+scripts/
+.aider*
