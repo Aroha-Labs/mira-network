@@ -6,7 +6,6 @@ import api from "src/lib/axios";
 import { 
   ArrowPathIcon, 
   ChartBarIcon, 
-  ComputerDesktopIcon,
   ClockIcon,
   CurrencyDollarIcon,
   ServerIcon,
@@ -392,7 +391,6 @@ const MachineStatsPage = () => {
     );
   }
 
-  const onlineMachines = machines?.filter(m => m.status === "online" && !m.disabled) || [];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
@@ -675,7 +673,7 @@ const MachineStatsPage = () => {
               </h3>
               <select
                 value={selectedMetric}
-                onChange={(e) => setSelectedMetric(e.target.value as any)}
+                onChange={(e) => setSelectedMetric(e.target.value as "tokens" | "cost" | "requests")}
                 className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="tokens">Tokens</option>
