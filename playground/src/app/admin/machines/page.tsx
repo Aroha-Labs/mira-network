@@ -29,6 +29,8 @@ interface Machine {
   description?: string;
   created_at: string;
   disabled: boolean;
+  traffic_weight?: number;
+  supported_models?: string[];
   auth_tokens?: MachineToken[];
 }
 
@@ -36,6 +38,8 @@ interface RegisterMachineRequest {
   network_ip: string;
   name?: string;
   description?: string;
+  traffic_weight?: number;
+  supported_models?: string[];
 }
 
 interface UpdateMachineRequest {
@@ -43,6 +47,8 @@ interface UpdateMachineRequest {
   description?: string;
   network_ip: string;
   disabled?: boolean;
+  traffic_weight?: number;
+  supported_models?: string[];
 }
 
 interface SortConfig {
@@ -108,6 +114,7 @@ const MachineCard = ({ machine }: { machine: Machine }) => {
         name: machine.name,
         description: machine.description,
         disabled: !machine.disabled, // Toggle the disabled state
+        traffic_weight: machine.traffic_weight,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["machines"] });
@@ -271,6 +278,33 @@ const MachineCard = ({ machine }: { machine: Machine }) => {
                 </dd>
               </div>
               <div>
+                <dt className="text-sm font-medium text-gray-500">Traffic Weight</dt>
+                <dd className="mt-1 text-sm text-gray-900">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    {Math.round((machine.traffic_weight || 0.5) * 100)}%
+                  </span>
+                </dd>
+              </div>
+              {machine.supported_models && machine.supported_models.length > 0 && (
+                <div>
+                  <dt className="text-sm font-medium text-gray-500">Supported Models</dt>
+                  <dd className="mt-1 text-sm text-gray-900">
+                    <div className="flex flex-wrap gap-1">
+                      {machine.supported_models.slice(0, 3).map((model) => (
+                        <span key={model} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
+                          {model}
+                        </span>
+                      ))}
+                      {machine.supported_models.length > 3 && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
+                          +{machine.supported_models.length - 3} more
+                        </span>
+                      )}
+                    </div>
+                  </dd>
+                </div>
+              )}
+              <div>
                 <dt className="text-sm font-medium text-gray-500">Status</dt>
                 <dd className="mt-1 text-sm">
                   {machine.disabled ? (
@@ -346,21 +380,53 @@ const RegisterMachineModal = ({
     network_ip: "",
     name: "",
     description: "",
+    traffic_weight: 0.5,
+    supported_models: undefined,
   });
+  const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const queryClient = useQueryClient();
+  
+  // Fetch available models from settings
+  const { data: settings } = useQuery({
+    queryKey: ["settings"],
+    queryFn: async () => {
+      const response = await api.get("/admin/settings");
+      return response.data;
+    },
+  });
+  
+  const availableModels = useMemo(() => {
+    const supportedModels = settings?.find((s: any) => s.name === "SUPPORTED_MODELS");
+    if (supportedModels?.value) {
+      return Object.keys(supportedModels.value);
+    }
+    return [];
+  }, [settings]);
 
   const { mutate, isPending, error } = useMutation({
     mutationFn: registerMachine,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["machines"] });
       onClose();
-      setFormData({ network_ip: "", name: "", description: "" });
+      setFormData({ network_ip: "", name: "", description: "", traffic_weight: 0.5, supported_models: undefined });
+      setSelectedModels([]);
     },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    mutate(formData);
+    mutate({
+      ...formData,
+      supported_models: selectedModels.length > 0 ? selectedModels : undefined,
+    });
+  };
+  
+  const toggleModel = (model: string) => {
+    setSelectedModels(prev => 
+      prev.includes(model) 
+        ? prev.filter(m => m !== model)
+        : [...prev, model]
+    );
   };
 
   return (
@@ -432,6 +498,63 @@ const RegisterMachineModal = ({
                   placeholder="Machine description"
                 />
               </div>
+
+              <div>
+                <label
+                  htmlFor="traffic_weight"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Traffic Weight: {Math.round((formData.traffic_weight || 0.5) * 100)}%
+                </label>
+                <div className="flex items-center space-x-3">
+                  <span className="text-xs text-gray-500">0%</span>
+                  <input
+                    type="range"
+                    id="traffic_weight"
+                    min="0"
+                    max="1"
+                    step="0.1"
+                    value={formData.traffic_weight || 0.5}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ 
+                        ...prev, 
+                        traffic_weight: parseFloat(e.target.value) 
+                      }))
+                    }
+                    className="flex-1"
+                  />
+                  <span className="text-xs text-gray-500">100%</span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Percentage of traffic this machine will handle
+                </p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Supported Models
+                </label>
+                <p className="text-xs text-gray-500 mb-2">
+                  Select specific models this machine will handle. Leave empty to support all models.
+                </p>
+                {availableModels.length > 0 ? (
+                  <div className="space-y-2 max-h-40 overflow-y-auto border border-gray-200 rounded-md p-2">
+                    {availableModels.map((model) => (
+                      <label key={model} className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
+                        <input
+                          type="checkbox"
+                          checked={selectedModels.includes(model)}
+                          onChange={() => toggleModel(model)}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-700">{model}</span>
+                      </label>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500 italic">Loading available models...</p>
+                )}
+              </div>
             </div>
 
             {error && (
@@ -477,6 +600,7 @@ const EditMachineModal = ({
     description: machine.description || "",
     network_ip: machine.network_ip,
     disabled: machine.disabled,
+    traffic_weight: machine.traffic_weight || 0.5,
   });
 
   const queryClient = useQueryClient();
@@ -588,6 +712,37 @@ const EditMachineModal = ({
                 />
                 <p className="mt-1 text-sm text-gray-500">
                   Optional: Add details about this machine&apos;s purpose or location
+                </p>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="edit-traffic-weight"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Traffic Weight: {Math.round((formData.traffic_weight || 0.5) * 100)}%
+                </label>
+                <div className="flex items-center space-x-3">
+                  <span className="text-xs text-gray-500">0%</span>
+                  <input
+                    type="range"
+                    id="edit-traffic-weight"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={formData.traffic_weight || 0.5}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ 
+                        ...prev, 
+                        traffic_weight: parseFloat(e.target.value) 
+                      }))
+                    }
+                    className="flex-1"
+                  />
+                  <span className="text-xs text-gray-500">100%</span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Adjust the percentage of traffic this machine handles. Lower values for testing, higher for production machines.
                 </p>
               </div>
             </div>
