@@ -3,11 +3,11 @@
 # Go parameters
 GOCMD=go
 
-NAME=mira-client
-VERSION=v0.0.0
+NAME=mira
+VERSION=v1.0.0
 
 # Phony
-.PHONY: run dev test test-coverage
+.PHONY: run dev test test-coverage build-local
 
 # Build the project for mac-m1, mac-intel, linux and windows
 build:
@@ -15,6 +15,10 @@ build:
 	GOOS=darwin GOARCH=amd64 $(GOCMD) build -o bin/$(NAME)-mac-intel-$(VERSION)
 	GOOS=linux GOARCH=amd64 $(GOCMD) build -o bin/$(NAME)-linux-$(VERSION)
 	GOOS=windows GOARCH=amd64 $(GOCMD) build -o bin/$(NAME)-windows-$(VERSION).exe
+
+# Build for local development
+build-local:
+	$(GOCMD) build -o $(NAME) .
 
 # Run the project
 run:
