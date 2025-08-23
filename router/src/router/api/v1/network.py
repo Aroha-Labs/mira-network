@@ -435,31 +435,6 @@ async def save_log(
         },
     }
 
-    async def send_to_data_stream():
-        if not DATA_STREAM_API_URL or not DATA_STREAM_SERVICE_KEY:
-            logger.warning(
-                "DATA_STREAM_API_URL or DATA_STREAM_SERVICE_KEY not configured, skipping data stream logging"
-            )
-            return
-
-        try:
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    f"{DATA_STREAM_API_URL}/api/v1/track",
-                    json=data_stream_payload,
-                    headers={
-                        "Write-Key": DATA_STREAM_SERVICE_KEY,
-                        "Content-Type": "application/json",
-                    },
-                    timeout=5.0,  # 5 second timeout
-                )
-                if response.status_code != 200:
-                    logger.error(
-                        f"Failed to send log to data stream API: {response.status_code} {response.text}"
-                    )
-        except Exception as e:
-            logger.error(f"Error sending log to data stream API: {str(e)}")
-
     try:
         # Send documents to OpenSearch and data stream API asynchronously
         await asyncio.gather(
