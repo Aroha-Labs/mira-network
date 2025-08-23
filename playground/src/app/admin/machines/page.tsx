@@ -149,10 +149,10 @@ const MachineCard = ({ machine }: { machine: Machine }) => {
 
   return (
     <>
-      <div className="bg-white rounded-lg shadow-xs border border-gray-200">
+      <div className="bg-white rounded-lg border border-gray-200 shadow-xs">
         <div className="p-6">
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex items-start gap-4">
+          <div className="flex justify-between items-start mb-4">
+            <div className="flex gap-4 items-start">
               <div
                 className={`p-3 rounded-lg ${getStatusColor(
                   machine.status,
@@ -162,7 +162,7 @@ const MachineCard = ({ machine }: { machine: Machine }) => {
                 <ComputerDesktopIcon className="w-6 h-6" />
               </div>
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex gap-2 items-center">
                   <h3 className="text-base font-medium text-gray-900">
                     {machine.name || "Unnamed Machine"}
                   </h3>
@@ -176,7 +176,7 @@ const MachineCard = ({ machine }: { machine: Machine }) => {
                   </div>
                 </div>
                 {machine.description && (
-                  <p className="text-sm text-gray-600 mt-2">{machine.description}</p>
+                  <p className="mt-2 text-sm text-gray-600">{machine.description}</p>
                 )}
               </div>
             </div>
@@ -273,10 +273,10 @@ const MachineCard = ({ machine }: { machine: Machine }) => {
           </div>
 
           <div className="pt-4 border-t border-gray-100">
-            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+            <dl className="grid grid-cols-1 gap-y-3 gap-x-6 sm:grid-cols-2">
               <div>
                 <dt className="text-sm font-medium text-gray-500">Network IP</dt>
-                <dd className="mt-1 text-sm text-gray-900 font-mono">
+                <dd className="mt-1 font-mono text-sm text-gray-900">
                   {machine.network_ip}
                 </dd>
               </div>
@@ -290,7 +290,7 @@ const MachineCard = ({ machine }: { machine: Machine }) => {
                 <dt className="text-sm font-medium text-gray-500">Traffic Weight</dt>
                 <dd className="mt-1 text-sm text-gray-900">
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                    {Math.round((machine.traffic_weight || 0.5) * 100)}%
+                    {Math.round(machine.traffic_weight * 100)}%
                   </span>
                 </dd>
               </div>
@@ -300,7 +300,10 @@ const MachineCard = ({ machine }: { machine: Machine }) => {
                   <dd className="mt-1 text-sm text-gray-900">
                     <div className="flex flex-wrap gap-1">
                       {machine.supported_models.slice(0, 3).map((model) => (
-                        <span key={model} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
+                        <span
+                          key={model}
+                          className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800"
+                        >
                           {model}
                         </span>
                       ))}
@@ -360,11 +363,11 @@ const MachineCard = ({ machine }: { machine: Machine }) => {
             Are you sure you want to {machine.disabled ? "enable" : "disable"} this
             machine?
           </p>
-          <div className="mt-2 p-3 bg-gray-50 rounded-md">
+          <div className="p-3 mt-2 bg-gray-50 rounded-md">
             <p className="text-sm font-medium text-gray-900">
               {machine.name || "Unnamed Machine"}
             </p>
-            <p className="text-sm text-gray-500 font-mono mt-1">{machine.network_ip}</p>
+            <p className="mt-1 font-mono text-sm text-gray-500">{machine.network_ip}</p>
           </div>
           {!machine.disabled && (
             <p className="mt-3 text-sm text-red-500">
@@ -394,7 +397,7 @@ const RegisterMachineModal = ({
   });
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const queryClient = useQueryClient();
-  
+
   // Fetch available models from settings
   const { data: settings } = useQuery({
     queryKey: ["settings"],
@@ -403,9 +406,11 @@ const RegisterMachineModal = ({
       return response.data;
     },
   });
-  
+
   const availableModels = useMemo(() => {
-    const supportedModels = settings?.find((s: SystemSetting) => s.name === "SUPPORTED_MODELS");
+    const supportedModels = settings?.find(
+      (s: SystemSetting) => s.name === "SUPPORTED_MODELS"
+    );
     if (supportedModels?.value) {
       return Object.keys(supportedModels.value);
     }
@@ -417,7 +422,13 @@ const RegisterMachineModal = ({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["machines"] });
       onClose();
-      setFormData({ network_ip: "", name: "", description: "", traffic_weight: 0.5, supported_models: undefined });
+      setFormData({
+        network_ip: "",
+        name: "",
+        description: "",
+        traffic_weight: 0.5,
+        supported_models: undefined,
+      });
       setSelectedModels([]);
     },
   });
@@ -429,21 +440,19 @@ const RegisterMachineModal = ({
       supported_models: selectedModels.length > 0 ? selectedModels : undefined,
     });
   };
-  
+
   const toggleModel = (model: string) => {
-    setSelectedModels(prev => 
-      prev.includes(model) 
-        ? prev.filter(m => m !== model)
-        : [...prev, model]
+    setSelectedModels((prev) =>
+      prev.includes(model) ? prev.filter((m) => m !== model) : [...prev, model]
     );
   };
 
   return (
     <Dialog open={isOpen} onClose={onClose} className="relative z-50">
       <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
-      <div className="fixed inset-0 flex items-center justify-center p-4">
-        <Dialog.Panel className="mx-auto max-w-sm rounded-lg bg-white p-6 shadow-xl w-full">
-          <Dialog.Title className="text-lg font-medium text-gray-900 mb-4">
+      <div className="flex fixed inset-0 justify-center items-center p-4">
+        <Dialog.Panel className="p-6 mx-auto w-full max-w-sm bg-white rounded-lg shadow-xl">
+          <Dialog.Title className="mb-4 text-lg font-medium text-gray-900">
             Register New Machine
           </Dialog.Title>
 
@@ -452,7 +461,7 @@ const RegisterMachineModal = ({
               <div>
                 <label
                   htmlFor="name"
-                  className="block text-sm font-medium text-gray-700 mb-1"
+                  className="block mb-1 text-sm font-medium text-gray-700"
                 >
                   Name
                 </label>
@@ -471,10 +480,10 @@ const RegisterMachineModal = ({
               <div>
                 <label
                   htmlFor="network_ip"
-                  className="block text-sm font-medium text-gray-700 mb-1"
+                  className="block mb-1 text-sm font-medium text-gray-700"
                 >
                   Network IP
-                  <span className="text-red-500 ml-1">*</span>
+                  <span className="ml-1 text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -492,7 +501,7 @@ const RegisterMachineModal = ({
               <div>
                 <label
                   htmlFor="description"
-                  className="block text-sm font-medium text-gray-700 mb-1"
+                  className="block mb-1 text-sm font-medium text-gray-700"
                 >
                   Description
                 </label>
@@ -511,7 +520,7 @@ const RegisterMachineModal = ({
               <div>
                 <label
                   htmlFor="traffic_weight"
-                  className="block text-sm font-medium text-gray-700 mb-1"
+                  className="block mb-1 text-sm font-medium text-gray-700"
                 >
                   Traffic Weight: {Math.round((formData.traffic_weight || 0.5) * 100)}%
                 </label>
@@ -525,43 +534,49 @@ const RegisterMachineModal = ({
                     step="0.1"
                     value={formData.traffic_weight || 0.5}
                     onChange={(e) =>
-                      setFormData((prev) => ({ 
-                        ...prev, 
-                        traffic_weight: parseFloat(e.target.value) 
+                      setFormData((prev) => ({
+                        ...prev,
+                        traffic_weight: parseFloat(e.target.value),
                       }))
                     }
                     className="flex-1"
                   />
                   <span className="text-xs text-gray-500">100%</span>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="mt-1 text-xs text-gray-500">
                   Percentage of traffic this machine will handle
                 </p>
               </div>
-              
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block mb-2 text-sm font-medium text-gray-700">
                   Supported Models
                 </label>
-                <p className="text-xs text-gray-500 mb-2">
-                  Select specific models this machine will handle. Leave empty to support all models.
+                <p className="mb-2 text-xs text-gray-500">
+                  Select specific models this machine will handle. Leave empty to support
+                  all models.
                 </p>
                 {availableModels.length > 0 ? (
-                  <div className="space-y-2 max-h-40 overflow-y-auto border border-gray-200 rounded-md p-2">
+                  <div className="overflow-y-auto p-2 space-y-2 max-h-40 rounded-md border border-gray-200">
                     {availableModels.map((model) => (
-                      <label key={model} className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
+                      <label
+                        key={model}
+                        className="flex items-center p-1 space-x-2 rounded cursor-pointer hover:bg-gray-50"
+                      >
                         <input
                           type="checkbox"
                           checked={selectedModels.includes(model)}
                           onChange={() => toggleModel(model)}
-                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          className="text-blue-600 rounded border-gray-300 focus:ring-blue-500"
                         />
                         <span className="text-sm text-gray-700">{model}</span>
                       </label>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-gray-500 italic">Loading available models...</p>
+                  <p className="text-sm italic text-gray-500">
+                    Loading available models...
+                  </p>
                 )}
               </div>
             </div>
@@ -572,11 +587,11 @@ const RegisterMachineModal = ({
               </div>
             )}
 
-            <div className="mt-6 flex justify-end gap-3">
+            <div className="flex gap-3 justify-end mt-6">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white rounded-md border border-gray-300 hover:bg-gray-50"
               >
                 Cancel
               </button>
@@ -612,7 +627,9 @@ const EditMachineModal = ({
     traffic_weight: machine.traffic_weight || 0.5,
     supported_models: machine.supported_models, // Include existing supported_models
   });
-  const [selectedModels, setSelectedModels] = useState<string[]>(machine.supported_models || []);
+  const [selectedModels, setSelectedModels] = useState<string[]>(
+    machine.supported_models || []
+  );
 
   const queryClient = useQueryClient();
 
@@ -624,9 +641,11 @@ const EditMachineModal = ({
       return response.data;
     },
   });
-  
+
   const availableModels = useMemo(() => {
-    const supportedModels = settings?.find((s: SystemSetting) => s.name === "SUPPORTED_MODELS");
+    const supportedModels = settings?.find(
+      (s: SystemSetting) => s.name === "SUPPORTED_MODELS"
+    );
     if (supportedModels?.value) {
       return Object.keys(supportedModels.value);
     }
@@ -648,31 +667,29 @@ const EditMachineModal = ({
       supported_models: selectedModels.length > 0 ? selectedModels : undefined,
     });
   };
-  
+
   const toggleModel = (model: string) => {
-    setSelectedModels(prev => 
-      prev.includes(model) 
-        ? prev.filter(m => m !== model)
-        : [...prev, model]
+    setSelectedModels((prev) =>
+      prev.includes(model) ? prev.filter((m) => m !== model) : [...prev, model]
     );
   };
 
   return (
     <Dialog open={isOpen} onClose={onClose} className="relative z-50">
       <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
-      <div className="fixed inset-0 flex items-center justify-center p-4">
-        <Dialog.Panel className="mx-auto max-w-sm rounded-lg bg-white p-6 shadow-xl w-full">
-          <div className="flex items-center justify-between mb-6">
+      <div className="flex fixed inset-0 justify-center items-center p-4">
+        <Dialog.Panel className="p-6 mx-auto w-full max-w-sm bg-white rounded-lg shadow-xl">
+          <div className="flex justify-between items-center mb-6">
             <Dialog.Title className="text-lg font-medium text-gray-900">
               Edit Machine
             </Dialog.Title>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-500 p-1 rounded-full hover:bg-gray-50"
+              className="p-1 text-gray-400 rounded-full hover:text-gray-500 hover:bg-gray-50"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5"
+                className="w-5 h-5"
                 viewBox="0 0 20 20"
                 fill="currentColor"
               >
@@ -690,7 +707,7 @@ const EditMachineModal = ({
               <div>
                 <label
                   htmlFor="edit-name"
-                  className="block text-sm font-medium text-gray-700 mb-1"
+                  className="block mb-1 text-sm font-medium text-gray-700"
                 >
                   Name
                 </label>
@@ -701,7 +718,7 @@ const EditMachineModal = ({
                   onChange={(e) =>
                     setFormData((prev) => ({ ...prev, name: e.target.value }))
                   }
-                  className="w-full rounded-md border-gray-300 shadow-xs focus:border-blue-500 focus:ring-blue-500 transition-colors"
+                  className="w-full rounded-md border-gray-300 transition-colors shadow-xs focus:border-blue-500 focus:ring-blue-500"
                   placeholder="Enter machine name"
                 />
               </div>
@@ -709,10 +726,10 @@ const EditMachineModal = ({
               <div>
                 <label
                   htmlFor="edit-network-ip"
-                  className="block text-sm font-medium text-gray-700 mb-1"
+                  className="block mb-1 text-sm font-medium text-gray-700"
                 >
                   Network IP
-                  <span className="text-red-500 ml-1">*</span>
+                  <span className="ml-1 text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -721,7 +738,7 @@ const EditMachineModal = ({
                   onChange={(e) =>
                     setFormData((prev) => ({ ...prev, network_ip: e.target.value }))
                   }
-                  className="w-full rounded-md border-gray-300 shadow-xs focus:border-blue-500 focus:ring-blue-500 transition-colors font-mono"
+                  className="w-full font-mono rounded-md border-gray-300 transition-colors shadow-xs focus:border-blue-500 focus:ring-blue-500"
                   placeholder="192.168.1.100"
                   required
                   pattern="^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$"
@@ -735,7 +752,7 @@ const EditMachineModal = ({
               <div>
                 <label
                   htmlFor="edit-description"
-                  className="block text-sm font-medium text-gray-700 mb-1"
+                  className="block mb-1 text-sm font-medium text-gray-700"
                 >
                   Description
                 </label>
@@ -746,7 +763,7 @@ const EditMachineModal = ({
                     setFormData((prev) => ({ ...prev, description: e.target.value }))
                   }
                   rows={3}
-                  className="w-full rounded-md border-gray-300 shadow-xs focus:border-blue-500 focus:ring-blue-500 transition-colors resize-none"
+                  className="w-full rounded-md border-gray-300 transition-colors resize-none shadow-xs focus:border-blue-500 focus:ring-blue-500"
                   placeholder="Add a description for this machine..."
                 />
                 <p className="mt-1 text-sm text-gray-500">
@@ -757,7 +774,7 @@ const EditMachineModal = ({
               <div>
                 <label
                   htmlFor="edit-traffic-weight"
-                  className="block text-sm font-medium text-gray-700 mb-1"
+                  className="block mb-1 text-sm font-medium text-gray-700"
                 >
                   Traffic Weight: {Math.round((formData.traffic_weight || 0.5) * 100)}%
                 </label>
@@ -771,32 +788,33 @@ const EditMachineModal = ({
                     step="0.05"
                     value={formData.traffic_weight || 0.5}
                     onChange={(e) =>
-                      setFormData((prev) => ({ 
-                        ...prev, 
-                        traffic_weight: parseFloat(e.target.value) 
+                      setFormData((prev) => ({
+                        ...prev,
+                        traffic_weight: parseFloat(e.target.value),
                       }))
                     }
                     className="flex-1"
                   />
                   <span className="text-xs text-gray-500">100%</span>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  Adjust the percentage of traffic this machine handles. Lower values for testing, higher for production machines.
+                <p className="mt-1 text-xs text-gray-500">
+                  Adjust the percentage of traffic this machine handles. Lower values for
+                  testing, higher for production machines.
                 </p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block mb-2 text-sm font-medium text-gray-700">
                   Supported Models
                 </label>
-                <div className="space-y-2 max-h-40 overflow-y-auto p-3 bg-gray-50 rounded-md">
+                <div className="overflow-y-auto p-3 space-y-2 max-h-40 bg-gray-50 rounded-md">
                   {availableModels.length > 0 ? (
                     <>
-                      <div className="flex items-center justify-between mb-2">
+                      <div className="flex justify-between items-center mb-2">
                         <span className="text-xs text-gray-600">
-                          {selectedModels.length === 0 
-                            ? "All models supported" 
-                            : `${selectedModels.length} model${selectedModels.length === 1 ? '' : 's'} selected`}
+                          {selectedModels.length === 0
+                            ? "All models supported"
+                            : `${selectedModels.length} model${selectedModels.length === 1 ? "" : "s"} selected`}
                         </span>
                         {selectedModels.length > 0 && (
                           <button
@@ -809,12 +827,15 @@ const EditMachineModal = ({
                         )}
                       </div>
                       {availableModels.map((model) => (
-                        <label key={model} className="flex items-center space-x-2 cursor-pointer hover:bg-gray-100 px-2 py-1 rounded">
+                        <label
+                          key={model}
+                          className="flex items-center px-2 py-1 space-x-2 rounded cursor-pointer hover:bg-gray-100"
+                        >
                           <input
                             type="checkbox"
                             checked={selectedModels.includes(model)}
                             onChange={() => toggleModel(model)}
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            className="text-blue-600 rounded border-gray-300 focus:ring-blue-500"
                           />
                           <span className="text-sm text-gray-700">{model}</span>
                         </label>
@@ -825,17 +846,18 @@ const EditMachineModal = ({
                   )}
                 </div>
                 <p className="mt-1 text-xs text-gray-500">
-                  Select specific models this machine should support. Leave empty to support all models.
+                  Select specific models this machine should support. Leave empty to
+                  support all models.
                 </p>
               </div>
             </div>
 
             {error && (
-              <div className="mt-6 p-3 bg-red-50 rounded-md">
-                <div className="flex items-center gap-2 text-sm text-red-700">
+              <div className="p-3 mt-6 bg-red-50 rounded-md">
+                <div className="flex gap-2 items-center text-sm text-red-700">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5"
+                    className="w-5 h-5"
                     viewBox="0 0 20 20"
                     fill="currentColor"
                   >
@@ -850,23 +872,23 @@ const EditMachineModal = ({
               </div>
             )}
 
-            <div className="mt-6 flex justify-end gap-3">
+            <div className="flex gap-3 justify-end mt-6">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white rounded-md border border-gray-300 transition-colors hover:bg-gray-50"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isPending}
-                className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md transition-colors hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isPending ? (
                   <>
                     <svg
-                      className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                      className="mr-2 -ml-1 w-4 h-4 text-white animate-spin"
                       xmlns="http://www.w3.org/2000/svg"
                       fill="none"
                       viewBox="0 0 24 24"
@@ -962,16 +984,16 @@ const AuthTokenModal = ({
     <>
       <Dialog open={isOpen} onClose={onClose} className="relative z-50">
         <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
-        <div className="fixed inset-0 flex items-center justify-center p-4">
-          <Dialog.Panel className="mx-auto max-w-md rounded-lg bg-white p-6 shadow-xl w-full">
-            <div className="flex items-center justify-between mb-6">
+        <div className="flex fixed inset-0 justify-center items-center p-4">
+          <Dialog.Panel className="p-6 mx-auto w-full max-w-md bg-white rounded-lg shadow-xl">
+            <div className="flex justify-between items-center mb-6">
               <Dialog.Title className="text-lg font-medium text-gray-900">
                 Manage Auth Tokens
               </Dialog.Title>
               <button onClick={onClose} className="text-gray-400 hover:text-gray-500">
                 <span className="sr-only">Close</span>
                 <svg
-                  className="h-6 w-6"
+                  className="w-6 h-6"
                   fill="none"
                   viewBox="0 0 24 24"
                   strokeWidth="1.5"
@@ -1000,7 +1022,7 @@ const AuthTokenModal = ({
                   <button
                     onClick={() => createToken()}
                     disabled={isCreating}
-                    className="mt-2 w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                    className="inline-flex justify-center items-center px-4 py-2 mt-2 w-full text-sm font-medium text-white bg-blue-600 rounded-md border border-transparent hover:bg-blue-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
                   >
                     {isCreating ? "Creating..." : "Create Token"}
                   </button>
@@ -1008,12 +1030,12 @@ const AuthTokenModal = ({
               </div>
 
               <div>
-                <h3 className="text-sm font-medium text-gray-900 mb-3">
+                <h3 className="mb-3 text-sm font-medium text-gray-900">
                   Existing Tokens
                 </h3>
                 <div className="space-y-2">
                   {isLoading ? (
-                    <div className="text-center py-4">
+                    <div className="py-4 text-center">
                       <Loading />
                     </div>
                   ) : !tokens?.length ? (
@@ -1022,14 +1044,14 @@ const AuthTokenModal = ({
                     tokens.map((token) => (
                       <div
                         key={token.id}
-                        className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
+                        className="flex justify-between items-center p-3 bg-gray-50 rounded-md"
                       >
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-gray-900">
                             {token.description || "Unnamed Token"}
                           </p>
                           <div className="flex items-center gap-1.5 mt-0.5">
-                            <p className="text-xs text-gray-500 font-mono truncate">
+                            <p className="font-mono text-xs text-gray-500 truncate">
                               {truncateString(token.api_token)}
                             </p>
                             <CopyToClipboardIcon
@@ -1046,7 +1068,7 @@ const AuthTokenModal = ({
                         >
                           <span className="sr-only">Delete token</span>
                           <svg
-                            className="h-5 w-5"
+                            className="w-5 h-5"
                             fill="none"
                             viewBox="0 0 24 24"
                             strokeWidth="1.5"
@@ -1083,8 +1105,8 @@ const AuthTokenModal = ({
           <p className="text-sm text-gray-500">
             Are you sure you want to delete this auth token? This action cannot be undone.
           </p>
-          <div className="mt-2 p-3 bg-gray-50 rounded-md">
-            <p className="text-xs text-gray-500 font-mono mt-1">
+          <div className="p-3 mt-2 bg-gray-50 rounded-md">
+            <p className="mt-1 font-mono text-xs text-gray-500">
               {truncateString(tokenToDelete)}
             </p>
           </div>
@@ -1178,7 +1200,7 @@ const AdminMachines = () => {
       <button
         onClick={() => handleSort(field)}
         className={`inline-flex items-center gap-1 text-sm ${
-          isActive ? "text-blue-600 font-medium" : "text-gray-600"
+          isActive ? "font-medium text-blue-600" : "text-gray-600"
         } hover:text-blue-600`}
       >
         {label}
@@ -1205,10 +1227,10 @@ const AdminMachines = () => {
   const renderControls = () => (
     <div className="mb-6 space-y-4">
       {/* Top row: Search and Actions */}
-      <div className="flex flex-wrap items-center gap-4">
+      <div className="flex flex-wrap gap-4 items-center">
         <div className="flex-1 min-w-[260px]">
           <div className="relative">
-            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <MagnifyingGlassIcon className="absolute left-3 top-1/2 w-5 h-5 text-gray-400 -translate-y-1/2" />
             <input
               type="text"
               placeholder="Search by name, IP, or description..."
@@ -1216,14 +1238,14 @@ const AdminMachines = () => {
               onChange={(e) =>
                 setFilters((prev) => ({ ...prev, search: e.target.value }))
               }
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+              className="py-2 pr-4 pl-10 w-full rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex gap-2 items-center">
           <Menu as="div" className="relative">
-            <Menu.Button className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-white border rounded-lg hover:bg-gray-50">
+            <Menu.Button className="inline-flex gap-2 items-center px-4 py-2 text-sm bg-white rounded-lg border hover:bg-gray-50">
               <FunnelIcon className="w-4 h-4" />
               Status: {filters.status === "all" ? "All" : filters.status}
             </Menu.Button>
@@ -1236,7 +1258,7 @@ const AdminMachines = () => {
               leaveFrom="transform opacity-100 scale-100"
               leaveTo="transform opacity-0 scale-95"
             >
-              <Menu.Items className="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-hidden">
+              <Menu.Items className="absolute right-0 z-10 mt-2 w-48 bg-white rounded-md ring-1 ring-black ring-opacity-5 shadow-lg origin-top-right focus:outline-hidden">
                 <div className="py-1">
                   {["all", "online", "offline"].map((status) => (
                     <Menu.Item key={status}>
@@ -1288,7 +1310,7 @@ const AdminMachines = () => {
                   includeDisabled: false,
                 }))
               }
-              className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-50"
+              className="px-3 py-2 text-sm text-gray-600 rounded-lg border border-gray-300 hover:text-gray-900 hover:bg-gray-50"
             >
               Clear filters
             </button>
@@ -1297,8 +1319,8 @@ const AdminMachines = () => {
       </div>
 
       {/* Bottom row: Sort controls and Results count */}
-      <div className="flex items-center justify-between gap-4 border-t border-gray-200 pt-4">
-        <div className="flex items-center gap-4">
+      <div className="flex gap-4 justify-between items-center pt-4 border-t border-gray-200">
+        <div className="flex gap-4 items-center">
           <span className="text-sm text-gray-500">Sort by:</span>
           {renderSortButton("name", "Name")}
           {renderSortButton("status", "Status")}
@@ -1324,35 +1346,35 @@ const AdminMachines = () => {
 
   if (!userSession?.access_token) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex justify-center items-center h-64">
         Please log in to view machines.
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
-      <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 sm:gap-0">
+    <div className="px-4 py-4 mx-auto max-w-7xl sm:px-6 lg:px-8 sm:py-8">
+      <div className="flex flex-col gap-4 mb-6 sm:mb-8 sm:flex-row sm:items-start sm:justify-between sm:gap-0">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+          <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">
             Machine Management
           </h1>
-          <p className="mt-1 sm:mt-2 text-sm text-gray-600">
+          <p className="mt-1 text-sm text-gray-600 sm:mt-2">
             Monitor and manage connected machines
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex gap-2 items-center">
           <button
             onClick={() => refetch()}
             disabled={isLoading || isFetching}
-            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="p-2 text-gray-500 rounded-lg transition-colors hover:text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             title="Refresh machines list"
           >
             <ArrowPathIcon className={`w-5 h-5 ${isFetching ? "animate-spin" : ""}`} />
           </button>
           <button
             onClick={() => setIsRegisterModalOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+            className="inline-flex gap-2 items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
           >
             <PlusIcon className="w-5 h-5" />
             Add Machine
@@ -1374,7 +1396,7 @@ const AdminMachines = () => {
               <Loading />
             </div>
           ) : !filteredAndSortedMachines.length ? (
-            <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
+            <div className="py-12 text-center bg-white rounded-xl border border-gray-200">
               <div className="text-gray-500">
                 {data?.length
                   ? "No machines match the current filters"
@@ -1393,18 +1415,18 @@ const AdminMachines = () => {
 
       {/* Stats Summary - only show when no filters are active */}
       {data && data.length > 0 && !filters.search && filters.status === "all" && (
-        <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div className="bg-white rounded-lg shadow-xs border border-gray-200 p-6">
+        <div className="grid grid-cols-1 gap-4 mt-8 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="p-6 bg-white rounded-lg border border-gray-200 shadow-xs">
             <h3 className="text-sm font-medium text-gray-500">Total Machines</h3>
             <p className="mt-2 text-3xl font-semibold text-gray-900">{data.length}</p>
           </div>
-          <div className="bg-white rounded-lg shadow-xs border border-gray-200 p-6">
+          <div className="p-6 bg-white rounded-lg border border-gray-200 shadow-xs">
             <h3 className="text-sm font-medium text-gray-500">Online Machines</h3>
             <p className="mt-2 text-3xl font-semibold text-green-600">
               {data.filter((m) => m.status === "online").length}
             </p>
           </div>
-          <div className="bg-white rounded-lg shadow-xs border border-gray-200 p-6">
+          <div className="p-6 bg-white rounded-lg border border-gray-200 shadow-xs">
             <h3 className="text-sm font-medium text-gray-500">Offline Machines</h3>
             <p className="mt-2 text-3xl font-semibold text-gray-600">
               {data.filter((m) => m.status === "offline").length}
