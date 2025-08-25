@@ -7,6 +7,7 @@ from src.router.utils.opensearch import (
     opensearch_client,
     OPENSEARCH_LLM_USAGE_LOG_INDEX,
 )
+from src.router.utils.redis import redis_client, get_online_machines
 from src.router.utils.nr import track
 from src.router.utils.logger import logger
 
@@ -522,197 +523,79 @@ async def get_logs_metrics(
 @router.get(
     "/machine-stats",
     summary="Get Machine Statistics",
-    response_description="Returns comprehensive machine usage statistics",
+    response_description="Returns machine usage statistics from Valkey",
 )
-async def get_machine_stats(
-    user: User = Depends(verify_user),
-    start_date: Optional[datetime] = Query(default=None),
-    end_date: Optional[datetime] = Query(default=None),
-    machine_id: Optional[str] = Query(default=None),
-    user_id: Optional[str] = Query(default=None),
-    interval: str = Query(default="1h", description="Time bucket interval"),
-):
-    track("get_machine_stats_request", {"user_id": str(user.id), "interval": interval})
+async def get_machine_stats(user: User = Depends(verify_user)):
+    """Get machine statistics from Valkey"""
+    track("get_machine_stats_request", {"user_id": str(user.id)})
 
-    # Access control
-    if user_id and "admin" not in user.roles:
-        raise HTTPException(
-            status_code=403, detail="Only admins can query other users' logs"
-        )
+    # Get online machines
+    online_machines = await get_online_machines()
 
-    # Build OpenSearch query
-    must_conditions = [{"term": {"doc_type": "model_usage"}}]
-
-    # Add filters
-    if user_id:
-        must_conditions.append({"match": {"user_id": user_id}})
-    else:
-        if "admin" not in user.roles:
-            must_conditions.append({"match": {"user_id": user.id}})
-
-    if start_date:
-        must_conditions.append(
-            {"range": {"timestamp": {"gte": start_date.isoformat()}}}
-        )
-    if end_date:
-        must_conditions.append({"range": {"timestamp": {"lte": end_date.isoformat()}}})
-    if machine_id:
-        must_conditions.append({"term": {"machine_id.keyword": str(machine_id)}})
-
-    # Build aggregations for machine-specific metrics
-    query = {
-        "query": {"bool": {"must": must_conditions}},
-        "aggs": {
-            "machines": {
-                "terms": {"field": "machine_id.keyword", "size": 100},
-                "aggs": {
-                    "total_tokens": {"sum": {"field": "total_tokens"}},
-                    "prompt_tokens": {"sum": {"field": "prompt_tokens"}},
-                    "completion_tokens": {"sum": {"field": "completion_tokens"}},
-                    "total_cost": {"sum": {"field": "cost"}},
-                    "avg_response_time": {"avg": {"field": "total_response_time"}},
-                    "avg_ttft": {"avg": {"field": "ttft"}},
-                    "request_count": {"value_count": {"field": "_id"}},
-                    "models": {
-                        "terms": {"field": "model.keyword", "size": 50},
-                        "aggs": {
-                            "tokens": {"sum": {"field": "total_tokens"}},
-                            "cost": {"sum": {"field": "cost"}},
-                        },
-                    },
-                    "usage_over_time": {
-                        "date_histogram": {
-                            "field": "timestamp",
-                            "fixed_interval": interval,
-                            "format": "yyyy-MM-dd'T'HH:mm:ss",
-                        },
-                        "aggs": {
-                            "tokens": {"sum": {"field": "total_tokens"}},
-                            "cost": {"sum": {"field": "cost"}},
-                            "requests": {"value_count": {"field": "_id"}},
-                        },
-                    },
-                },
-            },
-            "total_metrics": {"sum_bucket": {"buckets_path": "machines>total_tokens"}},
-            "model_distribution": {
-                "terms": {"field": "model.keyword", "size": 100},
-                "aggs": {
-                    "tokens": {"sum": {"field": "total_tokens"}},
-                    "cost": {"sum": {"field": "cost"}},
-                    "machines": {"cardinality": {"field": "machine_id.keyword"}},
-                },
-            },
-        },
-        "size": 0,
-    }
-
-    try:
-        response = opensearch_client.search(
-            index=OPENSEARCH_LLM_USAGE_LOG_INDEX,
-            body=query,
-        )
-
-        # Process results
-        machines_data = []
-        for bucket in response["aggregations"]["machines"]["buckets"]:
-            machine_id = bucket["key"]
-
-            # Process time series data
-            time_series = []
-            for time_bucket in bucket["usage_over_time"]["buckets"]:
-                time_series.append(
-                    {
-                        "timestamp": time_bucket["key_as_string"],
-                        "tokens": int(time_bucket["tokens"]["value"]),
-                        "cost": float(time_bucket["cost"]["value"]),
-                        "requests": int(time_bucket["requests"]["value"]),
-                    }
-                )
-
-            # Process model distribution for this machine
-            models = []
-            for model_bucket in bucket["models"]["buckets"]:
-                models.append(
-                    {
-                        "model": model_bucket["key"],
-                        "tokens": int(model_bucket["tokens"]["value"]),
-                        "cost": float(model_bucket["cost"]["value"]),
-                        "count": model_bucket["doc_count"],
-                    }
-                )
-
+    # Get stats for each machine
+    machines_data = []
+    for machine_id in online_machines[:50]:  # Limit to 50
+        stats = await redis_client.hgetall(f"stats:machine:{machine_id}")
+        if stats:
             machines_data.append(
                 {
                     "machine_id": machine_id,
-                    "total_tokens": int(bucket["total_tokens"]["value"]),
-                    "prompt_tokens": int(bucket["prompt_tokens"]["value"]),
-                    "completion_tokens": int(bucket["completion_tokens"]["value"]),
-                    "total_cost": float(bucket["total_cost"]["value"]),
-                    "avg_response_time": (
-                        float(bucket["avg_response_time"]["value"])
-                        if bucket["avg_response_time"]["value"]
-                        else 0
-                    ),
-                    "avg_ttft": (
-                        float(bucket["avg_ttft"]["value"])
-                        if bucket["avg_ttft"]["value"]
-                        else 0
-                    ),
-                    "request_count": int(bucket["request_count"]["value"]),
-                    "models": models,
-                    "time_series": time_series,
+                    "total_tokens": int(stats.get(b"tokens", 0)),
+                    "total_cost": float(stats.get(b"cost", 0)),
+                    "request_count": int(stats.get(b"requests", 0)),
                 }
             )
 
-        # Sort machines by total tokens
-        machines_data.sort(key=lambda x: x["total_tokens"], reverse=True)
+    # Sort by tokens
+    machines_data.sort(key=lambda x: x["total_tokens"], reverse=True)
 
-        # Process model distribution across all machines
-        model_distribution = []
-        for model_bucket in response["aggregations"]["model_distribution"]["buckets"]:
-            model_distribution.append(
-                {
-                    "model": model_bucket["key"],
-                    "tokens": int(model_bucket["tokens"]["value"]),
-                    "cost": float(model_bucket["cost"]["value"]),
-                    "machine_count": int(model_bucket["machines"]["value"]),
-                    "request_count": model_bucket["doc_count"],
-                }
-            )
+    # Get model distribution
+    model_distribution = []
+    cursor = 0
+    while True:
+        cursor, keys = await redis_client.scan(cursor, match="stats:model:*", count=100)
+        for key in keys:
+            model_name = (key.decode() if isinstance(key, bytes) else key).split(":")[
+                -1
+            ]
+            key_str = key if isinstance(key, str) else key.decode()
+            stats = await redis_client.hgetall(key_str)
+            if stats:
+                model_distribution.append(
+                    {
+                        "model": model_name,
+                        "tokens": int(stats.get(b"tokens", 0)),
+                        "request_count": int(stats.get(b"requests", 0)),
+                    }
+                )
+        if cursor == 0:
+            break
 
-        # Calculate totals
-        total_tokens = sum(m["total_tokens"] for m in machines_data)
-        total_cost = sum(m["total_cost"] for m in machines_data)
-        total_requests = sum(m["request_count"] for m in machines_data)
+    # Calculate totals
+    total_tokens = sum(m["total_tokens"] for m in machines_data)
+    total_cost = sum(m["total_cost"] for m in machines_data)
+    total_requests = sum(m["request_count"] for m in machines_data)
 
-        track(
-            "get_machine_stats_response",
-            {
-                "user_id": str(user.id),
-                "machines_count": len(machines_data),
-                "total_tokens": total_tokens,
-                "total_cost": total_cost,
-            },
-        )
+    track(
+        "get_machine_stats_response",
+        {
+            "user_id": str(user.id),
+            "machines_count": len(machines_data),
+            "total_tokens": total_tokens,
+            "total_cost": total_cost,
+        },
+    )
 
-        return {
-            "machines": machines_data,
-            "model_distribution": model_distribution,
-            "totals": {
-                "tokens": total_tokens,
-                "cost": total_cost,
-                "requests": total_requests,
-                "machine_count": len(machines_data),
-            },
-        }
-
-    except Exception as e:
-        logger.error(f"Error getting machine stats: {e}")
-        track("get_machine_stats_error", {"user_id": str(user.id), "error": str(e)})
-        raise HTTPException(
-            status_code=500, detail=f"Error getting machine statistics: {str(e)}"
-        )
+    return {
+        "machines": machines_data,
+        "model_distribution": model_distribution,
+        "totals": {
+            "tokens": total_tokens,
+            "cost": total_cost,
+            "requests": total_requests,
+            "machine_count": len(machines_data),
+        },
+    }
 
 
 @router.get(

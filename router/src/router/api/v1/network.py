@@ -2,12 +2,9 @@ from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 from fastapi import APIRouter, Depends, Response, HTTPException
 from fastapi.responses import StreamingResponse
-import httpx
 from pydantic import BaseModel
 from src.router.utils.user import get_user_credits
 from src.router.core.config import (
-    DATA_STREAM_API_URL,
-    DATA_STREAM_SERVICE_KEY,
     LITELLM_API_KEY,
     LITELLM_API_URL,
 )
@@ -361,6 +358,17 @@ async def save_log(
     new_credit_bytes = await redis_client.get(redis_key)
     new_credit = float(new_credit_bytes.decode("utf-8")) if new_credit_bytes else 0.0
 
+    # Update machine stats in Valkey (simple counters)
+    await redis_client.hincrby(f"stats:machine:{machine_id}", "tokens", total_tokens)
+    await redis_client.hincrby(f"stats:machine:{machine_id}", "requests", 1)
+    await redis_client.hincrbyfloat(f"stats:machine:{machine_id}", "cost", cost)
+
+    # Update model stats
+    await redis_client.hincrby(
+        f"stats:model:{original_req_model}", "tokens", total_tokens
+    )
+    await redis_client.hincrby(f"stats:model:{original_req_model}", "requests", 1)
+
     # Prepare documents for OpenSearch
     llm_usage_doc = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -452,7 +460,7 @@ async def save_log(
                     body=credit_history_doc,
                 ),
             ),
-            send_to_data_stream(),
+            # send_to_data_stream(),  # Commented out - function not defined
         )
     except Exception as e:
         track("save_log_error", {"user_id": str(user.id), "error": str(e)})
