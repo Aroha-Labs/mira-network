@@ -36,7 +36,7 @@ import {
   Filler,
   RadialLinearScale,
 } from "chart.js";
-import { Line, Bar, Doughnut, Radar } from "react-chartjs-2";
+import { Bar, Doughnut, Radar } from "react-chartjs-2";
 
 ChartJS.register(
   CategoryScale,
@@ -52,31 +52,12 @@ ChartJS.register(
   Filler
 );
 
-interface MachineModel {
-  model: string;
-  tokens: number;
-  cost: number;
-  count: number;
-}
-
-interface MachineTimeSeries {
-  timestamp: string;
-  tokens: number;
-  cost: number;
-  requests: number;
-}
 
 interface MachineData {
   machine_id: string;
   total_tokens: number;
-  prompt_tokens: number;
-  completion_tokens: number;
   total_cost: number;
-  avg_response_time: number;
-  avg_ttft: number;
   request_count: number;
-  models: MachineModel[];
-  time_series: MachineTimeSeries[];
 }
 
 interface ModelDistribution {
@@ -260,12 +241,10 @@ const MachineStatsPage = () => {
     // Normalize values for better visualization
     const maxTokens = Math.max(...topMachines.map((m) => m.total_tokens));
     const maxRequests = Math.max(...topMachines.map((m) => m.request_count));
-    const maxResponseTime = Math.max(...topMachines.map((m) => m.avg_response_time));
     const maxCost = Math.max(...topMachines.map((m) => m.total_cost));
-    const maxTTFT = Math.max(...topMachines.map((m) => m.avg_ttft));
 
     return {
-      labels: ["Tokens", "Requests", "Speed", "Cost Efficiency", "TTFT"],
+      labels: ["Tokens", "Requests", "Cost"],
       datasets: topMachines.map((machine, index) => {
         const machineInfo = machineMap.get(machine.machine_id);
         const colors = [
@@ -282,13 +261,9 @@ const MachineStatsPage = () => {
             machineInfo?.network_ip ||
             `Machine ${machine.machine_id}`,
           data: [
-            (machine.total_tokens / maxTokens) * 100,
-            (machine.request_count / maxRequests) * 100,
-            maxResponseTime > 0
-              ? ((maxResponseTime - machine.avg_response_time) / maxResponseTime) * 100
-              : 0,
-            maxCost > 0 ? ((maxCost - machine.total_cost) / maxCost) * 100 : 0,
-            maxTTFT > 0 ? ((maxTTFT - machine.avg_ttft) / maxTTFT) * 100 : 0,
+            maxTokens > 0 ? (machine.total_tokens / maxTokens) * 100 : 0,
+            maxRequests > 0 ? (machine.request_count / maxRequests) * 100 : 0,
+            maxCost > 0 ? (machine.total_cost / maxCost) * 100 : 0,
           ],
           backgroundColor: `${colors[index]}, 0.2)`,
           borderColor: `${colors[index]}, 1)`,
@@ -299,61 +274,62 @@ const MachineStatsPage = () => {
     };
   }, [statsData, machines]);
 
-  // Prepare time series chart
-  const timeSeriesChart = useMemo(() => {
+  // Prepare bar chart for top machines
+  const topMachinesChart = useMemo(() => {
     if (!statsData?.machines || statsData.machines.length === 0) return null;
 
     // Filter out machine_id="0" which represents unknown machines
     const validMachines = statsData.machines.filter((m) => m.machine_id !== "0");
     if (validMachines.length === 0) return null;
 
-    const topMachines = validMachines.slice(0, 5);
+    // Sort by selected metric and take top 10
+    const sortedMachines = [...validMachines].sort((a, b) => {
+      if (selectedMetric === "tokens") return b.total_tokens - a.total_tokens;
+      if (selectedMetric === "cost") return b.total_cost - a.total_cost;
+      return b.request_count - a.request_count;
+    });
+    
+    const topMachines = sortedMachines.slice(0, 10);
     const machineMap = new Map(machines?.map((m) => [m.id.toString(), m]) || []);
 
-    // Get all unique timestamps
-    const allTimestamps = new Set<string>();
-    topMachines.forEach((m) => {
-      m.time_series.forEach((ts) => allTimestamps.add(ts.timestamp));
-    });
-    const timestamps = Array.from(allTimestamps).sort();
-
-    const colors = [
-      "rgba(59, 130, 246",
-      "rgba(16, 185, 129",
-      "rgba(245, 158, 11",
-      "rgba(239, 68, 68",
-      "rgba(139, 92, 246",
-    ];
-
     return {
-      labels: timestamps.map((ts) =>
-        new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-      ),
-      datasets: topMachines.map((machine, index) => {
+      labels: topMachines.map((machine) => {
         const machineInfo = machineMap.get(machine.machine_id);
-        const dataMap = new Map(
-          machine.time_series.map((ts) => [
-            ts.timestamp,
-            selectedMetric === "tokens"
-              ? ts.tokens
-              : selectedMetric === "cost"
-                ? ts.cost
-                : ts.requests,
-          ])
+        return (
+          machineInfo?.name ||
+          machineInfo?.network_ip ||
+          `Machine ${machine.machine_id}`
         );
-
-        return {
-          label:
-            machineInfo?.name ||
-            machineInfo?.network_ip ||
-            `Machine ${machine.machine_id}`,
-          data: timestamps.map((ts) => dataMap.get(ts) || 0),
-          borderColor: `${colors[index]}, 1)`,
-          backgroundColor: `${colors[index]}, 0.1)`,
-          tension: 0.4,
-          fill: true,
-        };
       }),
+      datasets: [
+        {
+          label:
+            selectedMetric === "tokens"
+              ? "Total Tokens"
+              : selectedMetric === "cost"
+              ? "Total Cost ($)"
+              : "Total Requests",
+          data: topMachines.map((machine) => {
+            if (selectedMetric === "tokens") return machine.total_tokens;
+            if (selectedMetric === "cost") return machine.total_cost;
+            return machine.request_count;
+          }),
+          backgroundColor: [
+            "rgba(59, 130, 246, 0.8)",
+            "rgba(16, 185, 129, 0.8)",
+            "rgba(245, 158, 11, 0.8)",
+            "rgba(239, 68, 68, 0.8)",
+            "rgba(139, 92, 246, 0.8)",
+            "rgba(236, 72, 153, 0.8)",
+            "rgba(14, 165, 233, 0.8)",
+            "rgba(168, 85, 247, 0.8)",
+            "rgba(251, 146, 60, 0.8)",
+            "rgba(34, 197, 94, 0.8)",
+          ],
+          borderColor: "rgba(0, 0, 0, 0.1)",
+          borderWidth: 1,
+        },
+      ],
     };
   }, [statsData, machines, selectedMetric]);
 
@@ -379,8 +355,6 @@ const MachineStatsPage = () => {
         "Total Tokens",
         "Total Cost",
         "Requests",
-        "Avg Response Time",
-        "Avg TTFT",
       ];
       const machineMap = new Map(machines?.map((m) => [m.id.toString(), m]) || []);
 
@@ -392,8 +366,6 @@ const MachineStatsPage = () => {
           m.total_tokens,
           m.total_cost,
           m.request_count,
-          m.avg_response_time,
-          m.avg_ttft,
         ];
       });
 
@@ -723,10 +695,10 @@ const MachineStatsPage = () => {
                 <option value="requests">Requests</option>
               </select>
             </div>
-            {timeSeriesChart ? (
+            {topMachinesChart ? (
               <div style={{ height: "300px", position: "relative" }}>
-                <Line
-                  data={timeSeriesChart}
+                <Bar
+                  data={topMachinesChart}
                   options={{
                     responsive: true,
                     maintainAspectRatio: false,
