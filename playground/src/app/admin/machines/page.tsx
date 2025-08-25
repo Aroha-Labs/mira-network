@@ -290,7 +290,7 @@ const MachineCard = ({ machine }: { machine: Machine }) => {
                 <dt className="text-sm font-medium text-gray-500">Traffic Weight</dt>
                 <dd className="mt-1 text-sm text-gray-900">
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                    {Math.round(machine.traffic_weight * 100)}%
+                    {Math.round((machine.traffic_weight ?? 0.5) * 100)}%
                   </span>
                 </dd>
               </div>
