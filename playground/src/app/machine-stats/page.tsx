@@ -6,10 +6,8 @@ import api from "src/lib/axios";
 import {
   ArrowPathIcon,
   ChartBarIcon,
-  ClockIcon,
   CurrencyDollarIcon,
   ServerIcon,
-  SparklesIcon,
   ArrowTrendingUpIcon,
   ArrowDownTrayIcon,
   CpuChipIcon,
@@ -21,7 +19,7 @@ import {
 } from "@heroicons/react/24/outline";
 import Loading from "src/components/PageLoading";
 import { useState, useMemo } from "react";
-import { USDollar } from "src/utils/currency";
+import { USDollarPrecise } from "src/utils/currency";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -140,7 +138,6 @@ const fetchMachineStats = async (timeRange: string) => {
 };
 
 const MachineStatsPage = () => {
-  const [timeRange, setTimeRange] = useState("24h");
   const [selectedMetric, setSelectedMetric] = useState<"tokens" | "cost" | "requests">(
     "tokens"
   );
@@ -158,8 +155,8 @@ const MachineStatsPage = () => {
     refetch,
     isFetching,
   } = useQuery({
-    queryKey: ["machine-stats", timeRange],
-    queryFn: () => fetchMachineStats(timeRange),
+    queryKey: ["machine-stats"],
+    queryFn: () => fetchMachineStats("24h"),
     enabled: !!userSession?.access_token,
     refetchInterval: 60000,
   });
@@ -238,10 +235,11 @@ const MachineStatsPage = () => {
     const topMachines = validMachines.slice(0, 5);
     const machineMap = new Map(machines?.map((m) => [m.id.toString(), m]) || []);
 
-    // Normalize values for better visualization
-    const maxTokens = Math.max(...topMachines.map((m) => m.total_tokens));
-    const maxRequests = Math.max(...topMachines.map((m) => m.request_count));
-    const maxCost = Math.max(...topMachines.map((m) => m.total_cost));
+    // Calculate max values across all machines for normalization
+    const allMachines = statsData.machines.filter((m) => m.machine_id !== "0");
+    const maxTokens = Math.max(...allMachines.map((m) => m.total_tokens), 1);
+    const maxRequests = Math.max(...allMachines.map((m) => m.request_count), 1);
+    const maxCost = Math.max(...allMachines.map((m) => m.total_cost), 0.01);
 
     return {
       labels: ["Tokens", "Requests", "Cost"],
@@ -255,16 +253,16 @@ const MachineStatsPage = () => {
           "rgba(139, 92, 246",
         ];
 
+        const tokenPercent = (machine.total_tokens / maxTokens) * 100;
+        const requestPercent = (machine.request_count / maxRequests) * 100;
+        const costPercent = (machine.total_cost / maxCost) * 100;
+
         return {
           label:
             machineInfo?.name ||
             machineInfo?.network_ip ||
             `Machine ${machine.machine_id}`,
-          data: [
-            maxTokens > 0 ? (machine.total_tokens / maxTokens) * 100 : 0,
-            maxRequests > 0 ? (machine.request_count / maxRequests) * 100 : 0,
-            maxCost > 0 ? (machine.total_cost / maxCost) * 100 : 0,
-          ],
+          data: [tokenPercent, requestPercent, costPercent],
           backgroundColor: `${colors[index]}, 0.2)`,
           borderColor: `${colors[index]}, 1)`,
           borderWidth: 2,
@@ -445,30 +443,6 @@ const MachineStatsPage = () => {
           </div>
         </div>
 
-        {/* Time Range Selector */}
-        <div className="p-4 mb-6 bg-white rounded-xl border border-gray-200 shadow-sm">
-          <div className="flex justify-between items-center">
-            <div className="flex gap-3 items-center">
-              <ClockIcon className="w-5 h-5 text-gray-500" />
-              <span className="text-sm font-medium text-gray-700">Time Range</span>
-            </div>
-            <div className="flex gap-1 p-1 bg-gray-100 rounded-lg">
-              {["1h", "6h", "24h", "7d", "30d"].map((range) => (
-                <button
-                  key={range}
-                  onClick={() => setTimeRange(range)}
-                  className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
-                    timeRange === range
-                      ? "bg-white text-blue-600 shadow-sm"
-                      : "text-gray-600 hover:text-gray-900"
-                  }`}
-                >
-                  {range}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
 
         {/* Key Metrics Dashboard */}
         <div className="grid grid-cols-1 gap-4 mb-8 md:grid-cols-2 lg:grid-cols-4">
@@ -481,7 +455,14 @@ const MachineStatsPage = () => {
             </div>
             <h3 className="mb-1 text-sm text-gray-600">Total Tokens</h3>
             <p className="text-3xl font-bold text-gray-900">
-              {((statsData?.totals.tokens || 0) / 1000000).toFixed(2)}M
+              {(() => {
+                const tokens = statsData?.totals.tokens || 0;
+                if (tokens === 0) return '0';
+                if (tokens < 100) return tokens.toFixed(1);
+                if (tokens < 1000) return Math.round(tokens).toString();
+                if (tokens < 1000000) return `${(tokens / 1000).toFixed(1)}k`;
+                return `${(tokens / 1000000).toFixed(2)}M`;
+              })()}
             </p>
           </div>
 
@@ -490,11 +471,11 @@ const MachineStatsPage = () => {
               <div className="p-3 bg-green-100 rounded-lg">
                 <CurrencyDollarIcon className="w-6 h-6 text-green-600" />
               </div>
-              <SparklesIcon className="w-5 h-5 text-yellow-500" />
+              <ArrowTrendingUpIcon className="w-5 h-5 text-green-500" />
             </div>
             <h3 className="mb-1 text-sm text-gray-600">Total Cost</h3>
             <p className="text-3xl font-bold text-gray-900">
-              {USDollar.format(statsData?.totals.cost || 0)}
+              {USDollarPrecise.format(statsData?.totals.cost || 0)}
             </p>
           </div>
 
@@ -530,6 +511,124 @@ const MachineStatsPage = () => {
           </div>
         </div>
 
+        {/* Machine Details Table */}
+        <div className="mb-8">
+          <h3 className="flex gap-2 items-center mb-6 text-xl font-semibold text-gray-900">
+            <ServerIcon className="w-6 h-6 text-blue-600" />
+            Machine Performance Details
+          </h3>
+          <div className="overflow-hidden bg-white rounded-xl border border-gray-200 shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
+                      Machine
+                    </th>
+                    <th className="px-6 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">
+                      Tokens
+                    </th>
+                    <th className="px-6 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">
+                      Cost
+                    </th>
+                    <th className="px-6 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">
+                      Requests
+                    </th>
+                    <th className="px-6 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">
+                      Avg Tokens/Req
+                    </th>
+                    <th className="px-6 py-3 text-xs font-medium tracking-wider text-center text-gray-500 uppercase">
+                      Utilization
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {statsData?.machines
+                    .filter((m) => m.machine_id !== "0")
+                    .sort((a, b) => b.total_tokens - a.total_tokens)
+                    .map((machineData) => {
+                      const machine = machines?.find((m) => m.id.toString() === machineData.machine_id);
+                      const percentage = statsData.totals.tokens > 0
+                        ? (machineData.total_tokens / statsData.totals.tokens) * 100
+                        : 0;
+                      const avgTokensPerRequest = machineData.request_count > 0
+                        ? Math.round(machineData.total_tokens / machineData.request_count)
+                        : 0;
+
+                      return (
+                        <tr key={machineData.machine_id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <div className="flex-shrink-0 w-10 h-10">
+                                <div className="flex justify-center items-center w-10 h-10 bg-blue-100 rounded-full">
+                                  <ServerIcon className="w-5 h-5 text-blue-600" />
+                                </div>
+                              </div>
+                              <div className="ml-4">
+                                <div className="text-sm font-medium text-gray-900">
+                                  {machine?.name || `Machine ${machineData.machine_id}`}
+                                </div>
+                                <div className="text-sm text-gray-500">
+                                  {machine?.network_ip || 'Unknown IP'}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-right whitespace-nowrap">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              machine?.status === 'online' 
+                                ? 'bg-green-100 text-green-800' 
+                                : 'bg-gray-100 text-gray-800'
+                            }`}>
+                              {machine?.status === 'online' ? '🟢 Online' : '⚫ Offline'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-right text-gray-900 whitespace-nowrap">
+                            {(() => {
+                              const tokens = machineData.total_tokens;
+                              if (tokens === 0) return '0';
+                              if (tokens < 1) return tokens.toFixed(3);
+                              if (tokens < 10) return tokens.toFixed(2);
+                              if (tokens < 100) return tokens.toFixed(1);
+                              if (tokens < 1000) return Math.round(tokens).toString();
+                              if (tokens < 1000000) return `${(tokens / 1000).toFixed(1)}k`;
+                              return `${(tokens / 1000000).toFixed(2)}M`;
+                            })()}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-right text-gray-900 whitespace-nowrap">
+                            {USDollarPrecise.format(machineData.total_cost)}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-right text-gray-900 whitespace-nowrap">
+                            {machineData.request_count.toLocaleString()}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-right text-gray-900 whitespace-nowrap">
+                            {avgTokensPerRequest.toLocaleString()}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex gap-2 items-center">
+                              <div className="flex-1 h-2 bg-gray-200 rounded-full">
+                                <div
+                                  className="h-2 bg-gradient-to-r from-blue-400 to-blue-600 rounded-full"
+                                  style={{ width: `${Math.min(percentage, 100)}%` }}
+                                />
+                              </div>
+                              <span className="w-14 text-xs text-right text-gray-500">
+                                {percentage.toFixed(1)}%
+                              </span>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
         {/* Main Charts Section */}
         <div className="grid grid-cols-1 gap-6 mb-8 lg:grid-cols-2">
           {/* Machine Token Usage */}
@@ -552,7 +651,13 @@ const MachineStatsPage = () => {
                         callbacks: {
                           label: (context) => {
                             const tokens = context.parsed.x;
-                            return `Tokens: ${(tokens / 1000).toFixed(1)}k`;
+                            if (tokens === 0) return 'Tokens: 0';
+                            if (tokens < 1) return `Tokens: ${tokens.toFixed(3)}`;
+                            if (tokens < 10) return `Tokens: ${tokens.toFixed(2)}`;
+                            if (tokens < 100) return `Tokens: ${tokens.toFixed(1)}`;
+                            if (tokens < 1000) return `Tokens: ${Math.round(tokens)}`;
+                            if (tokens < 1000000) return `Tokens: ${(tokens / 1000).toFixed(1)}k`;
+                            return `Tokens: ${(tokens / 1000000).toFixed(2)}M`;
                           },
                         },
                       },
@@ -560,7 +665,15 @@ const MachineStatsPage = () => {
                     scales: {
                       x: {
                         ticks: {
-                          callback: (value) => `${(Number(value) / 1000).toFixed(0)}k`,
+                          callback: (value) => {
+                            const num = Number(value);
+                            if (num === 0) return '0';
+                            if (num < 1) return num.toFixed(2);
+                            if (num < 10) return num.toFixed(1);
+                            if (num < 1000) return Math.round(num).toString();
+                            if (num < 1000000) return `${(num / 1000).toFixed(1)}k`;
+                            return `${(num / 1000000).toFixed(2)}M`;
+                          },
                         },
                         grid: {
                           display: true,
@@ -612,7 +725,7 @@ const MachineStatsPage = () => {
                               0
                             );
                             const percentage = ((cost / total) * 100).toFixed(1);
-                            return `${context.label}: ${USDollar.format(cost)} (${percentage}%)`;
+                            return `${context.label}: ${USDollarPrecise.format(cost)} (${percentage}%)`;
                           },
                         },
                       },
@@ -719,9 +832,15 @@ const MachineStatsPage = () => {
                             const value = context.parsed.y;
                             const label = context.dataset.label;
                             if (selectedMetric === "tokens") {
-                              return `${label}: ${(value / 1000).toFixed(1)}k tokens`;
+                              if (value === 0) return `${label}: 0 tokens`;
+                              if (value < 1) return `${label}: ${value.toFixed(3)} tokens`;
+                              if (value < 10) return `${label}: ${value.toFixed(2)} tokens`;
+                              if (value < 100) return `${label}: ${value.toFixed(1)} tokens`;
+                              if (value < 1000) return `${label}: ${Math.round(value)} tokens`;
+                              if (value < 1000000) return `${label}: ${(value / 1000).toFixed(1)}k tokens`;
+                              return `${label}: ${(value / 1000000).toFixed(2)}M tokens`;
                             } else if (selectedMetric === "cost") {
-                              return `${label}: ${USDollar.format(value)}`;
+                              return `${label}: ${USDollarPrecise.format(value)}`;
                             } else {
                               return `${label}: ${value} requests`;
                             }
@@ -734,10 +853,21 @@ const MachineStatsPage = () => {
                         beginAtZero: true,
                         ticks: {
                           callback: (value) => {
+                            const num = Number(value);
                             if (selectedMetric === "tokens") {
-                              return `${(Number(value) / 1000).toFixed(0)}k`;
+                              if (num === 0) return '0';
+                              if (num < 1) return num.toFixed(2);
+                              if (num < 10) return num.toFixed(1);
+                              if (num < 1000) return Math.round(num).toString();
+                              if (num < 1000000) return `${(num / 1000).toFixed(1)}k`;
+                              return `${(num / 1000000).toFixed(2)}M`;
                             } else if (selectedMetric === "cost") {
-                              return `$${Number(value).toFixed(0)}`;
+                              if (num === 0) return '$0.0000';
+                              if (num < 0.01) return `$${num.toFixed(4)}`;
+                              if (num < 1) return `$${num.toFixed(4)}`;
+                              if (num < 10) return `$${num.toFixed(4)}`;
+                              if (num < 100) return `$${num.toFixed(2)}`;
+                              return `$${num.toFixed(0)}`;
                             } else {
                               return value;
                             }
@@ -771,88 +901,6 @@ const MachineStatsPage = () => {
           </div>
         </div>
 
-        {/* Model Distribution */}
-        <div className="overflow-hidden bg-white rounded-xl border border-gray-200 shadow-sm">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="flex gap-2 items-center text-lg font-semibold text-gray-900">
-              <SparklesIcon className="w-5 h-5 text-yellow-500" />
-              Model Distribution Across Machines
-            </h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
-                    Model
-                  </th>
-                  <th className="px-6 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">
-                    Tokens
-                  </th>
-                  <th className="px-6 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">
-                    Cost
-                  </th>
-                  <th className="px-6 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">
-                    Requests
-                  </th>
-                  <th className="px-6 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">
-                    Machines
-                  </th>
-                  <th className="px-6 py-3 text-xs font-medium tracking-wider text-center text-gray-500 uppercase">
-                    Usage
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {statsData?.model_distribution.map((model) => {
-                  const percentage =
-                    statsData.totals.tokens > 0
-                      ? (model.tokens / statsData.totals.tokens) * 100
-                      : 0;
-
-                  return (
-                    <tr key={model.model} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {model.model}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-right text-gray-900 whitespace-nowrap">
-                        {model.tokens > 1000000
-                          ? `${(model.tokens / 1000000).toFixed(2)}M`
-                          : model.tokens > 1000
-                            ? `${(model.tokens / 1000).toFixed(1)}k`
-                            : model.tokens}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-right text-gray-900 whitespace-nowrap">
-                        {USDollar.format(model.cost)}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-right text-gray-900 whitespace-nowrap">
-                        {model.request_count.toLocaleString()}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-right text-gray-900 whitespace-nowrap">
-                        {model.machine_count}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex gap-2 items-center">
-                          <div className="flex-1 h-2 bg-gray-200 rounded-full">
-                            <div
-                              className="h-2 bg-blue-500 rounded-full"
-                              style={{ width: `${percentage}%` }}
-                            />
-                          </div>
-                          <span className="w-12 text-xs text-right text-gray-500">
-                            {percentage.toFixed(1)}%
-                          </span>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
       </div>
     </div>
   );
