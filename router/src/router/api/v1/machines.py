@@ -232,7 +232,7 @@ async def list_all_machines(
             "disabled": machine.disabled,
             "status": ("online" if str(machine.id) in online_machines else "offline"),
             "traffic_weight": machine.traffic_weight,
-            "models": machine.supported_models,
+            "supported_models": machine.supported_models,
         }
         for machine in machines
     ]
