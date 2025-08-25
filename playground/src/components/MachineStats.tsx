@@ -24,21 +24,31 @@ const fetchMachines = async () => {
 };
 
 export default function MachineStats() {
-  const { data: machines, isLoading, refetch, isFetching } = useQuery({
+  const {
+    data: machines,
+    isLoading,
+    refetch,
+    isFetching,
+  } = useQuery({
     queryKey: ["machines-stats"],
     queryFn: fetchMachines,
     refetchInterval: 30000, // Refresh every 30 seconds
   });
 
-  const onlineMachines = machines?.filter(m => m.status === "online" && !m.disabled) || [];
-  const offlineMachines = machines?.filter(m => m.status === "offline" && !m.disabled) || [];
-  const totalWeight = onlineMachines.reduce((sum, m) => sum + (m.traffic_weight || 0.5), 0);
+  const onlineMachines =
+    machines?.filter((m) => m.status === "online" && !m.disabled) || [];
+  const offlineMachines =
+    machines?.filter((m) => m.status === "offline" && !m.disabled) || [];
+  const totalWeight = onlineMachines.reduce(
+    (sum, m) => sum + (m.traffic_weight || 0.5),
+    0
+  );
 
   if (isLoading) {
     return (
-      <div className="w-full max-w-md p-4 bg-white rounded-sm shadow-sm">
+      <div className="p-4 w-full max-w-md bg-white rounded-sm shadow-sm">
         <div className="animate-pulse">
-          <div className="h-4 bg-gray-200 rounded w-1/3 mb-3"></div>
+          <div className="mb-3 w-1/3 h-4 bg-gray-200 rounded"></div>
           <div className="space-y-2">
             <div className="h-3 bg-gray-200 rounded"></div>
             <div className="h-3 bg-gray-200 rounded"></div>
@@ -50,17 +60,17 @@ export default function MachineStats() {
 
   return (
     <div className="w-full max-w-md">
-      <div className="bg-white rounded-sm shadow-sm border border-gray-200">
+      <div className="bg-white rounded-sm border border-gray-200 shadow-sm">
         {/* Header */}
-        <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        <div className="flex justify-between items-center px-4 py-3 border-b border-gray-100">
+          <div className="flex gap-2 items-center">
             <ComputerDesktopIcon className="w-5 h-5 text-gray-600" />
             <h3 className="text-sm font-medium text-gray-900">Machine Network Status</h3>
           </div>
           <button
             onClick={() => refetch()}
             disabled={isFetching}
-            className="p-1 text-gray-400 hover:text-gray-600 rounded hover:bg-gray-50 transition-colors"
+            className="p-1 text-gray-400 rounded transition-colors hover:text-gray-600 hover:bg-gray-50"
             title="Refresh"
           >
             <ArrowPathIcon className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} />
@@ -92,30 +102,28 @@ export default function MachineStats() {
 
           {/* Machine List */}
           {machines && machines.length > 0 ? (
-            <div className="space-y-2 max-h-48 overflow-y-auto">
+            <div className="overflow-y-auto space-y-2 max-h-48">
               {machines.map((machine) => (
                 <div
                   key={machine.id}
-                  className="flex items-center justify-between p-2 bg-gray-50 rounded-md hover:bg-gray-100 transition-colors"
+                  className="flex justify-between items-center p-2 bg-gray-50 rounded-md transition-colors hover:bg-gray-100"
                 >
-                  <div className="flex items-center gap-2 min-w-0">
+                  <div className="flex gap-2 items-center min-w-0">
                     <div
                       className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                        machine.status === "online"
-                          ? "bg-green-500"
-                          : "bg-red-500"
+                        machine.status === "online" ? "bg-green-500" : "bg-red-500"
                       }`}
                     />
                     <div className="min-w-0">
                       <div className="text-sm font-medium text-gray-900 truncate">
                         {machine.name || "Unnamed Machine"}
                       </div>
-                      <div className="text-xs text-gray-500 font-mono">
+                      <div className="font-mono text-xs text-gray-500">
                         {machine.network_ip}
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
+                  <div className="flex flex-shrink-0 gap-2 items-center">
                     <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
                       {Math.round((machine.traffic_weight || 0.5) * 100)}%
                     </span>
@@ -129,32 +137,35 @@ export default function MachineStats() {
               ))}
             </div>
           ) : (
-            <div className="text-center py-4">
+            <div className="py-4 text-center">
               <p className="text-sm text-gray-500">No machines registered</p>
             </div>
           )}
 
           {/* Load Distribution */}
           {onlineMachines.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-gray-100">
-              <div className="text-xs font-medium text-gray-700 mb-2">Load Distribution</div>
+            <div className="pt-4 mt-4 border-t border-gray-100">
+              <div className="mb-2 text-xs font-medium text-gray-700">
+                Load Distribution
+              </div>
               <div className="space-y-1">
                 {onlineMachines.map((machine) => {
-                  const percentage = totalWeight > 0 
-                    ? ((machine.traffic_weight || 0.5) / totalWeight) * 100 
-                    : 0;
+                  const percentage =
+                    totalWeight > 0
+                      ? ((machine.traffic_weight || 0.5) / totalWeight) * 100
+                      : 0;
                   return (
-                    <div key={machine.id} className="flex items-center gap-2">
-                      <div className="text-xs text-gray-600 w-24 truncate">
+                    <div key={machine.id} className="flex gap-2 items-center">
+                      <div className="w-24 text-xs text-gray-600 truncate">
                         {machine.name || machine.network_ip}
                       </div>
-                      <div className="flex-1 bg-gray-200 rounded-full h-2">
+                      <div className="flex-1 h-2 bg-gray-200 rounded-full">
                         <div
-                          className="bg-blue-500 h-2 rounded-full transition-all"
+                          className="h-2 bg-blue-500 rounded-full transition-all"
                           style={{ width: `${percentage}%` }}
                         />
                       </div>
-                      <div className="text-xs text-gray-500 w-10 text-right">
+                      <div className="w-10 text-xs text-right text-gray-500">
                         {percentage.toFixed(0)}%
                       </div>
                     </div>
