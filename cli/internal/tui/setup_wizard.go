@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"Aroha-Labs/mira-client/constants"
 	"Aroha-Labs/mira-client/utils"
 	"fmt"
 	"net/http"
@@ -132,8 +133,8 @@ func (m SetupWizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.error = nil
 				_ = utils.SaveToken(m.authToken)
 				m.state = WizStateGetRouterURL
-				m.currentInput.SetValue("http://localhost:8000")
-				m.currentInput.Placeholder = "http://localhost:8000"
+				m.currentInput.SetValue(constants.DEFAULT_ROUTER_URL)
+				m.currentInput.Placeholder = constants.DEFAULT_ROUTER_URL
 				return m, textinput.Blink
 			
 			case WizStateGetRouterURL:
@@ -154,6 +155,8 @@ func (m SetupWizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				m.routerURL = url
 				m.error = nil
+				// Save the router URL
+				_ = utils.SaveRouterURL(m.routerURL)
 				m.state = WizStateGetOpenRouterKey
 				m.currentInput.SetValue("")
 				m.currentInput.Placeholder = "sk-or-v1-..."
@@ -463,9 +466,9 @@ func (m SetupWizardModel) View() string {
 		if m.error != nil {
 			s.WriteString("  " + ErrorStyle.Render("❌ " + m.error.Error()) + "\n\n")
 		}
-		s.WriteString("  " + HelpStyle.Render("💡 Default: https://router.mira.network:8000") + "\n")
+		s.WriteString("  " + HelpStyle.Render("💡 Default: https://api.mira.network") + "\n")
 		s.WriteString("  " + HelpStyle.Render("This is the URL of your Mira Network router") + "\n")
-		s.WriteString("  " + HelpStyle.Render("Your admin should provide this if different"))
+		s.WriteString("  " + HelpStyle.Render("Press Enter to use default or enter custom URL"))
 
 	case WizStateStartingContainer:
 		s.WriteString("  " + lipgloss.NewStyle().Foreground(BrandPrimary).Render("Starting Mira Node Service...") + "\n\n")
