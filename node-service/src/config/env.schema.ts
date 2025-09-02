@@ -28,14 +28,12 @@ export const envSchema = {
     
     // Router Config
     ROUTER_BASE_URL: { 
-      type: 'string',
-      format: 'uri'
+      type: 'string'
     },
     
     // VLLM Provider
     VLLM_BASE_URL: { 
-      type: 'string',
-      format: 'uri'
+      type: 'string'
     },
     VLLM_API_KEY: { type: 'string' },
     
@@ -48,15 +46,13 @@ export const envSchema = {
     // LiteLLM Provider
     LITELLM_API_KEY: { type: 'string' },
     LITELLM_PROXY_BASE_URL: { 
-      type: 'string',
-      format: 'uri'
+      type: 'string'
     },
     
     // Groq Provider
     GROQ_API_KEY: { type: 'string' },
     GROQ_BASE_URL: { 
-      type: 'string',
-      format: 'uri'
+      type: 'string'
     },
     
     // Anthropic Provider

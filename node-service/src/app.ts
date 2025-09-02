@@ -1,21 +1,10 @@
-import { join } from "node:path";
-import AutoLoad, { AutoloadPluginOptions } from "@fastify/autoload";
-import { FastifyPluginAsync, FastifyServerOptions } from "fastify";
+import { FastifyPluginAsync } from "fastify";
 import fastifyEnv from "@fastify/env";
+import fastifySensible from "@fastify/sensible";
 import { envSchema } from "./config/env.schema";
+import rootRoute from "./routes/root";
 
-export interface AppOptions
-  extends FastifyServerOptions,
-    Partial<AutoloadPluginOptions> {}
-// Pass --options via CLI arguments in command to enable these options.
-const options: AppOptions = {
-  logger: false,
-};
-
-const app: FastifyPluginAsync<AppOptions> = async (
-  fastify,
-  opts
-): Promise<void> => {
+const app: FastifyPluginAsync = async (fastify): Promise<void> => {
   // Register environment configuration with validation
   await fastify.register(fastifyEnv, {
     schema: envSchema,
@@ -23,23 +12,11 @@ const app: FastifyPluginAsync<AppOptions> = async (
     data: process.env, // Also use existing env vars
   });
 
-  // Do not touch the following lines
+  // Register sensible plugin for better error handling
+  await fastify.register(fastifySensible);
 
-  // This loads all plugins defined in plugins
-  // those should be support plugins that are reused
-  // through your application
-  void fastify.register(AutoLoad, {
-    dir: join(__dirname, "plugins"),
-    options: opts,
-  });
-
-  // This loads all plugins defined in routes
-  // define your routes in one of these
-  void fastify.register(AutoLoad, {
-    dir: join(__dirname, "routes"),
-    options: opts,
-  });
+  // Register routes
+  await fastify.register(rootRoute);
 };
 
 export default app;
-export { app, options };
