@@ -5,16 +5,12 @@ import { FastifyBaseLogger } from "fastify";
 export class OpenRouterProvider extends Provider {
   readonly name = "openrouter";
 
-  constructor(logger?: FastifyBaseLogger) {
+  constructor(apiKey: string, logger?: FastifyBaseLogger) {
     const config: ProviderConfig = {
       baseUrl: "https://openrouter.ai/api/v1",
-      apiKey: process.env.OPENROUTER_API_KEY || "",
+      apiKey,
     };
     super(config, logger);
-
-    if (!config.apiKey) {
-      throw new Error("OpenRouter API key is not configured");
-    }
   }
 
   static canHandle(model: string): boolean {

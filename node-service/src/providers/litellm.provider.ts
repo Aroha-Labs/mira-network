@@ -5,16 +5,12 @@ import { FastifyBaseLogger } from "fastify";
 export class LiteLLMProvider extends Provider {
   readonly name = "litellm";
 
-  constructor(logger?: FastifyBaseLogger) {
+  constructor(baseUrl: string, apiKey: string, logger?: FastifyBaseLogger) {
     const config: ProviderConfig = {
-      baseUrl: process.env.LITELLM_PROXY_BASE_URL || "http://localhost:4000/v1",
-      apiKey: process.env.LITELLM_API_KEY || "",
+      baseUrl,
+      apiKey,
     };
     super(config, logger);
-
-    if (!config.apiKey) {
-      throw new Error("LiteLLM API key is not configured");
-    }
   }
 
   static canHandle(model: string): boolean {

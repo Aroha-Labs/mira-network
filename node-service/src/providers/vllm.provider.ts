@@ -5,10 +5,10 @@ import { FastifyBaseLogger } from "fastify";
 export class VLLMProvider extends Provider {
   readonly name = "vllm";
 
-  constructor(logger?: FastifyBaseLogger) {
+  constructor(baseUrl: string, apiKey: string, logger?: FastifyBaseLogger) {
     const config: ProviderConfig = {
-      baseUrl: process.env.VLLM_BASE_URL || "http://localhost:8000/v1",
-      apiKey: process.env.VLLM_API_KEY || "sk-vllm",
+      baseUrl,
+      apiKey,
     };
     super(config, logger);
   }

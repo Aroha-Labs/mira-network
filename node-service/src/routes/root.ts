@@ -1,7 +1,6 @@
 import { FastifyPluginAsync } from "fastify";
 import { ProviderFactory, ChatCompletionRequest, CompletionOptions } from "../providers";
 import { LivenessService } from "../services/liveness.service";
-import { Env } from "../config";
 import { getLocalIp } from "../utils/network";
 import OpenAI from "openai";
 
@@ -11,7 +10,7 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
   // Startup handler
   fastify.addHook("onReady", async () => {
     try {
-      livenessService = new LivenessService(fastify.log);
+      livenessService = new LivenessService(fastify.log, fastify.config);
       await livenessService.start();
     } catch (error) {
       fastify.log.error("Failed to start liveness service, shutting down...");
@@ -21,8 +20,8 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
 
   // Add machine info headers
   fastify.addHook("preHandler", async (request, reply) => {
-    reply.header("x-machine-ip", Env.MACHINE_IP || getLocalIp(fastify.log));
-    reply.header("x-machine-name", Env.MACHINE_NAME || "");
+    reply.header("x-machine-ip", fastify.config.MACHINE_IP || getLocalIp(fastify.log));
+    reply.header("x-machine-name", fastify.config.MACHINE_NAME || "");
   });
 
   // Cleanup on shutdown
@@ -33,7 +32,7 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
   // Health check
   fastify.get("/health", async () => ({
     status: "ok",
-    version: process.env.VERSION || "0.0.0",
+    version: fastify.config.VERSION || "0.0.0",
     providers: ProviderFactory.listAvailableProviders(),
   }));
 
@@ -54,6 +53,7 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
         // Get provider and model name
         const { provider, modelName } = ProviderFactory.getProvider(
           model,
+          fastify.config,
           fastify.log
         );
 

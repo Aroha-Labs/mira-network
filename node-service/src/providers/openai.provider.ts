@@ -5,20 +5,16 @@ import { FastifyBaseLogger } from "fastify";
 export class OpenAIProvider extends Provider {
   readonly name = "openai";
 
-  constructor(logger?: FastifyBaseLogger) {
+  constructor(apiKey: string, logger?: FastifyBaseLogger) {
     const config: ProviderConfig = {
       baseUrl: "https://api.openai.com/v1",
-      apiKey: process.env.OPENAI_API_KEY || "",
+      apiKey,
     };
     super(config, logger);
-
-    if (!config.apiKey) {
-      throw new Error("OpenAI API key is not configured");
-    }
   }
 
   static canHandle(model: string): boolean {
-    return model.startsWith("openai/");
+    return model.startsWith("openai/") || model.startsWith("gpt-");
   }
 
   static extractModel(model: string): string {

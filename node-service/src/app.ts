@@ -1,6 +1,8 @@
 import { join } from "node:path";
 import AutoLoad, { AutoloadPluginOptions } from "@fastify/autoload";
 import { FastifyPluginAsync, FastifyServerOptions } from "fastify";
+import fastifyEnv from "@fastify/env";
+import { envSchema } from "./config/env.schema";
 
 export interface AppOptions
   extends FastifyServerOptions,
@@ -14,7 +16,12 @@ const app: FastifyPluginAsync<AppOptions> = async (
   fastify,
   opts
 ): Promise<void> => {
-  // Place here your custom code!
+  // Register environment configuration with validation
+  await fastify.register(fastifyEnv, {
+    schema: envSchema,
+    dotenv: true, // Load from .env file if present
+    data: process.env, // Also use existing env vars
+  });
 
   // Do not touch the following lines
 

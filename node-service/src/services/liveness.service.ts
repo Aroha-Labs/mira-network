@@ -1,32 +1,25 @@
 import axios from "axios";
 import { FastifyBaseLogger } from "fastify";
-import { Env } from "../config";
+import { EnvConfig } from "../config";
 import { getLocalIp } from "../utils/network";
 
 export class LivenessService {
   private interval?: NodeJS.Timeout;
   private machineIp: string;
   private routerUrl: string;
+  private machineApiToken: string;
+  private machineName: string;
 
-  constructor(private logger: FastifyBaseLogger) {
-    this.machineIp = Env.MACHINE_IP || getLocalIp(logger);
-    this.routerUrl = process.env.ROUTER_BASE_URL || "";
+  constructor(private logger: FastifyBaseLogger, config: EnvConfig) {
+    this.machineIp = config.MACHINE_IP || getLocalIp(logger);
+    this.routerUrl = config.ROUTER_BASE_URL;
+    this.machineApiToken = config.MACHINE_API_TOKEN;
+    this.machineName = config.MACHINE_NAME || "Not set";
   }
 
   async start(): Promise<void> {
-    // Validate requirements
-    if (!this.routerUrl) {
-      this.logger.error("ROUTER_BASE_URL is not set");
-      throw new Error("Router base URL is required");
-    }
-
-    if (!Env.MACHINE_API_TOKEN) {
-      this.logger.error("MACHINE_API_TOKEN is not set");
-      throw new Error("Machine API token is required");
-    }
-
     this.logger.info(`Starting liveness service for machine: ${this.machineIp}`);
-    this.logger.info(`Machine name: ${Env.MACHINE_NAME || "Not set"}`);
+    this.logger.info(`Machine name: ${this.machineName}`);
 
     // Start periodic updates
     this.interval = setInterval(() => this.updateLiveness(), 3000);
@@ -44,7 +37,7 @@ export class LivenessService {
         {},
         {
           headers: {
-            Authorization: `Bearer ${Env.MACHINE_API_TOKEN}`,
+            Authorization: `Bearer ${this.machineApiToken}`,
           },
         }
       );
