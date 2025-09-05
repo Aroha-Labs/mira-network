@@ -58,6 +58,12 @@ export const envSchema = {
     // Anthropic Provider
     ANTHROPIC_API_KEY: { type: 'string' },
     
+    // Security
+    SERVICE_ACCESS_TOKEN: { 
+      type: 'string',
+      description: 'Optional access token to protect chat endpoint if service is exposed'
+    },
+    
     // Other
     VERSION: { type: 'string' },
   },

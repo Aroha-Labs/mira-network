@@ -32,6 +32,9 @@ export interface EnvConfig {
   // Anthropic Provider
   ANTHROPIC_API_KEY?: string;
   
+  // Security
+  SERVICE_ACCESS_TOKEN?: string; // Optional - protects chat endpoint if exposed
+  
   // Other
   VERSION?: string;
 }

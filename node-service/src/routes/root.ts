@@ -2,6 +2,7 @@ import { FastifyPluginAsync } from "fastify";
 import { ProviderFactory, ChatCompletionRequest, CompletionOptions } from "../providers";
 import { LivenessService } from "../services/liveness.service";
 import { getLocalIp } from "../utils/network";
+import { createAuthMiddleware } from "../middleware/auth";
 import OpenAI from "openai";
 
 const root: FastifyPluginAsync = async (fastify): Promise<void> => {
@@ -36,9 +37,15 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
     providers: ProviderFactory.listAvailableProviders(),
   }));
 
-  // Chat completions endpoint
+  // Create auth middleware based on config
+  const authMiddleware = createAuthMiddleware(fastify.config);
+
+  // Chat completions endpoint with optional authentication
   fastify.post<{ Body: ChatCompletionRequest }>(
     "/v1/chat/completions",
+    {
+      preHandler: authMiddleware
+    },
     async (request, reply) => {
       const { model, messages, stream = false, ...options } = request.body;
 
@@ -56,6 +63,7 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
           fastify.config,
           fastify.log
         );
+        fastify.log.info(`Using provider: ${provider.name} for model: ${modelName}`);
 
         // Create completion options
         const completionOptions: CompletionOptions = {
