@@ -2,6 +2,8 @@ package tui
 
 import (
 	"Aroha-Labs/mira-client/constants"
+	"Aroha-Labs/mira-client/internal/docker"
+	"Aroha-Labs/mira-client/internal/vllm"
 	"Aroha-Labs/mira-client/utils"
 	"fmt"
 	"os"
@@ -27,17 +29,18 @@ const (
 )
 
 type StartServiceModel struct {
-	state       StartState
-	spinner     spinner.Model
-	textInput   textinput.Model
-	machineID   string
-	ipAddress   string
-	token       string
-	error       error
-	width       int
-	height      int
-	steps       []Step
-	currentStep int
+	state        StartState
+	spinner      spinner.Model
+	textInput    textinput.Model
+	machineID    string
+	ipAddress    string
+	token        string
+	serviceToken string
+	error        error
+	width        int
+	height       int
+	steps        []Step
+	currentStep  int
 }
 
 type Step struct {
@@ -130,57 +133,118 @@ func (m StartServiceModel) startDocker() tea.Msg {
 	machineID := m.machineID
 	token := m.token
 
-	// Check if container is already running
-	checkCmd := exec.Command("docker", "ps", "--filter", "label=service-name=mira-client-service", "--format", "{{.ID}}")
-	output, _ := checkCmd.Output()
+	// Check if service access token exists, generate if not
+	serviceToken, err := utils.GetServiceAccessToken()
+	if err != nil || serviceToken == "" {
+		// Generate new service token
+		serviceToken, err = utils.GenerateAccessToken()
+		if err != nil {
+			return errMsg{error: fmt.Errorf("failed to generate service token: %w", err)}
+		}
+		// Save for future use
+		if err := utils.SaveServiceAccessToken(serviceToken); err != nil {
+			return errMsg{error: fmt.Errorf("failed to save service token: %w", err)}
+		}
+	}
+
+	service := docker.NewServiceManager("mira-node-service", false)
 	
-	if containerID := strings.TrimSpace(string(output)); containerID != "" {
-		// Container already running, stop it first
-		stopCmd := exec.Command("docker", "stop", containerID)
-		if err := stopCmd.Run(); err != nil {
-			return errMsg{error: fmt.Errorf("failed to stop existing container: %w", err)}
-		}
-		
-		removeCmd := exec.Command("docker", "rm", containerID)
-		if err := removeCmd.Run(); err != nil {
-			return errMsg{error: fmt.Errorf("failed to remove existing container: %w", err)}
-		}
+	// Prepare run options
+	opts := docker.RunOptions{
+		Name:   "mira-node-service",
+		Detach: true,
+		Ports: map[string]string{
+			"34523": "8000",
+		},
+		Env: map[string]string{
+			"MC_MACHINE_ID": machineID,
+			"MACHINE_IP": m.ipAddress,  // Add machine IP
+			"PORT": "8000",          // Internal port for Fastify
+			"LOG_LEVEL": "info",     // Required by env schema
+			"SERVICE_ACCESS_TOKEN": serviceToken, // Add service access token
+		},
+		Labels: map[string]string{
+			"service-name": "mira-node-service",
+		},
 	}
-
-	// Start new container (simplified for now)
-	args := []string{
-		"run", "-d",
-		"--label", "service-name=mira-client-service",
-		"-p", "34523:8000",
-		"-e", "MC_MACHINE_ID=" + machineID,
-	}
-
+	
 	// Add token if provided
 	if token != "" {
-		args = append(args, "-e", "MACHINE_API_TOKEN="+token)
+		opts.Env["MACHINE_API_TOKEN"] = token
 	}
 	
-	// Check if llm keys file exists and add it
+	// Get and add router URL
+	routerURL, err := utils.GetStoredRouterURL()
+	if err != nil {
+		routerURL = constants.DEFAULT_ROUTER_URL
+	}
+	// Replace localhost with host.docker.internal for Docker on Mac/Windows
+	if strings.Contains(routerURL, "localhost") || strings.Contains(routerURL, "127.0.0.1") {
+		routerURL = strings.ReplaceAll(routerURL, "localhost", "host.docker.internal")
+		routerURL = strings.ReplaceAll(routerURL, "127.0.0.1", "host.docker.internal")
+	}
+	opts.Env["ROUTER_BASE_URL"] = routerURL
+	
+	// Check if VLLM is configured and add VLLM env vars if user wants to use it
+	if vllm.IsConfigured() {
+		vllmConfig, err := vllm.LoadConfig()
+		if err == nil {
+			// Use host.docker.internal so container can reach VLLM on host
+			vllmURL := fmt.Sprintf("http://host.docker.internal:%d/v1", vllmConfig.Port)
+			opts.Env["VLLM_BASE_URL"] = vllmURL
+			opts.Env["VLLM_API_KEY"] = vllmConfig.APIKey
+		}
+	}
+	
+	// Check if llm keys file exists and add environment variables from it
 	llmKeyDotEnvFile := utils.GetConfigFilePath(constants.LLM_KEY_DOTENV_FILE)
-	if _, err := os.Stat(llmKeyDotEnvFile); err == nil {
-		args = append(args, "--env-file", llmKeyDotEnvFile)
+	if content, err := os.ReadFile(llmKeyDotEnvFile); err == nil {
+		// Parse the env file and add to opts.Env
+		lines := strings.Split(string(content), "\n")
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			// Skip empty lines and comments
+			if line == "" || strings.HasPrefix(line, "#") {
+				continue
+			}
+			// Parse KEY=VALUE format
+			if parts := strings.SplitN(line, "=", 2); len(parts) == 2 {
+				key := strings.TrimSpace(parts[0])
+				value := strings.TrimSpace(parts[1])
+				// Remove quotes if present
+				value = strings.Trim(value, `"'`)
+				
+				// Add known LLM provider keys
+				switch key {
+				case "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GROQ_API_KEY", 
+				     "OPENROUTER_API_KEY", "LITELLM_API_KEY", "LITELLM_PROXY_BASE_URL",
+				     "GROQ_BASE_URL":
+					opts.Env[key] = value
+				}
+			}
+		}
+	}
+	
+	// Check if local node-service image exists
+	client := docker.NewClient(false)
+	image := "ghcr.io/aroha-labs/mira-network-node-service:main"
+	if client.ImageExists("node-service:latest") {
+		image = "node-service:latest"
+	}
+	
+	// Start or restart the service
+	if err := service.StartOrRestart(image, opts); err != nil {
+		return errMsg{error: fmt.Errorf("failed to start service: %w", err)}
 	}
 
-	args = append(args, "ghcr.io/aroha-labs/mira-client-service:main")
-
-	runCmd := exec.Command("docker", args...)
-	if err := runCmd.Run(); err != nil {
-		return errMsg{error: fmt.Errorf("failed to start Docker container: %w", err)}
-	}
-
-	return dockerStartedMsg{}
+	return dockerStartedMsg{serviceToken: serviceToken}
 }
 
 // Messages
 type prereqsCheckedMsg struct{}
 type machineIDMsg struct{ id string }
 type ipAddressMsg struct{ ip string }
-type dockerStartedMsg struct{}
+type dockerStartedMsg struct{ serviceToken string }
 type errMsg struct{ error error }
 type tokenSavedMsg struct{}
 
@@ -296,6 +360,7 @@ func (m StartServiceModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case dockerStartedMsg:
 		m.steps[2].Status = StepComplete
+		m.serviceToken = msg.serviceToken
 		m.state = StateComplete
 		return m, nil
 
@@ -437,7 +502,8 @@ func (m StartServiceModel) View() string {
 		s.WriteString(HelpStyle.Render("Enter token or press Esc to skip"))
 
 	case StateComplete:
-		successMsg := SuccessStyle.Render("✅ Service started successfully!")
+		// Success header
+		successMsg := SuccessStyle.Render("✅ Mira Node Service Started Successfully!")
 		s.WriteString(lipgloss.Place(
 			m.width,
 			2,
@@ -447,21 +513,94 @@ func (m StartServiceModel) View() string {
 		))
 		s.WriteString("\n\n")
 		
-		details := fmt.Sprintf(
+		// Get router URL for display
+		routerURL, _ := utils.GetStoredRouterURL()
+		if routerURL == "" {
+			routerURL = constants.DEFAULT_ROUTER_URL
+		}
+		
+		// Create a box with the service details and direct access info
+		detailsContent := fmt.Sprintf(
 			"Your node is now part of the Mira Network!\n\n"+
-			"🌐 API Endpoint: http://%s:34523\n"+
-			"🆔 Node ID: %s",
-			m.ipAddress,
+			"📡 Direct Machine Access:\n"+
+			"   Machine ID: %s\n"+
+			"   Base URL: %s/v1/machines/%s\n"+
+			"   Health: %s/v1/machines/%s/health\n\n"+
+			"🔐 Service Access Token:\n%s",
 			m.machineID,
+			routerURL, m.machineID,
+			routerURL, m.machineID,
+			m.serviceToken,
 		)
+		
+		detailsBox := lipgloss.NewStyle().
+			BorderStyle(lipgloss.RoundedBorder()).
+			BorderForeground(SuccessColor).
+			Padding(1, 2).
+			Width(70).
+			Align(lipgloss.Center).
+			Render(detailsContent)
+		
 		s.WriteString(lipgloss.Place(
 			m.width,
-			4,
+			10,
 			lipgloss.Center,
 			lipgloss.Top,
-			lipgloss.NewStyle().Foreground(TextPrimary).Render(details),
+			detailsBox,
+		))
+		s.WriteString("\n")
+		
+		s.WriteString(lipgloss.Place(
+			m.width,
+			2,
+			lipgloss.Center,
+			lipgloss.Top,
+			WarningStyle.Render("⚠️  Save this token! Use it to authenticate requests to your node."),
 		))
 		s.WriteString("\n\n")
+		
+		// Add quick usage examples
+		examplesContent := fmt.Sprintf(
+			"🚀 Quick Start Examples:\n\n"+
+			"Using OpenAI Python SDK:\n"+
+			"  client = OpenAI(\n"+
+			"      base_url=\"%s/v1/machines/%s\",\n"+
+			"      api_key=\"your_mira_api_key\"\n"+
+			"  )\n\n"+
+			"Using cURL:\n"+
+			"  curl %s/v1/machines/%s/v1/chat/completions \\\n"+
+			"    -H \"Authorization: Bearer your_mira_api_key\" \\\n"+
+			"    -H \"Content-Type: application/json\" \\\n"+
+			"    -d '{\"model\": \"gpt-4\", \"messages\": [{\"role\": \"user\", \"content\": \"Hello!\"}]}'",
+			routerURL, m.machineID,
+			routerURL, m.machineID,
+		)
+		
+		examplesBox := lipgloss.NewStyle().
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderForeground(TextMuted).
+			Padding(1, 2).
+			Width(80).
+			Render(examplesContent)
+		
+		s.WriteString(lipgloss.Place(
+			m.width,
+			14,
+			lipgloss.Center,
+			lipgloss.Top,
+			examplesBox,
+		))
+		s.WriteString("\n\n")
+		
+		s.WriteString(lipgloss.Place(
+			m.width,
+			1,
+			lipgloss.Center,
+			lipgloss.Top,
+			InfoStyle.Render("💡 This URL bypasses the load balancer for direct machine access!"),
+		))
+		s.WriteString("\n")
+		
 		s.WriteString(lipgloss.Place(
 			m.width,
 			1,

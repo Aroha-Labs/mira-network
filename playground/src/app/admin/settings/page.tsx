@@ -141,7 +141,14 @@ const AdminSettings = () => {
                   </button>
                 </div>
                 <button
-                  onClick={() => setEditSetting(setting)}
+                  onClick={() => {
+                    // Create a deep copy to avoid reference issues
+                    const settingCopy = {
+                      ...setting,
+                      value: { ...setting.value }
+                    };
+                    setEditSetting(settingCopy);
+                  }}
                   className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-xs text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 >
                   Edit Setting
@@ -175,14 +182,23 @@ const AdminSettings = () => {
           <div className="space-y-4">
             <div className="bg-gray-50 px-4 py-3 rounded-md border border-gray-200 text-sm text-gray-500">
               {editSetting.description}
+              <div className="mt-2 text-xs">
+                Current state: {Object.keys(editSetting.value).length} models
+              </div>
             </div>
 
             <div className="border rounded-md">
               <SettingEditor
                 value={editSetting.value}
-                onChange={(newValue) =>
-                  setEditSetting({ ...editSetting, value: newValue })
-                }
+                onChange={(newValue) => {
+                  console.log("onChange called with:", newValue);
+                  console.log("Number of models in newValue:", Object.keys(newValue).length);
+                  // Force a complete new object to ensure React detects the change
+                  setEditSetting(prev => ({
+                    ...prev,
+                    value: { ...newValue }
+                  }));
+                }}
                 disabled={updateMutation.isPending}
               />
             </div>
@@ -196,12 +212,15 @@ const AdminSettings = () => {
                 Cancel
               </button>
               <button
-                onClick={() =>
+                onClick={() => {
+                  console.log("Saving setting:", editSetting.name);
+                  console.log("Value being saved:", editSetting.value);
+                  console.log("Number of models:", Object.keys(editSetting.value).length);
                   updateMutation.mutate({
                     name: editSetting.name,
                     value: editSetting.value,
-                  })
-                }
+                  });
+                }}
                 className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 disabled={updateMutation.isPending}
               >

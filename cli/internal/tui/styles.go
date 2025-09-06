@@ -61,6 +61,10 @@ var (
 		Foreground(WarningColor).
 		Bold(true)
 	
+	InfoStyle = lipgloss.NewStyle().
+		Foreground(InfoColor).
+		Bold(true)
+	
 	// Menu Styles
 	MenuItemStyle = lipgloss.NewStyle().
 		PaddingLeft(2)
