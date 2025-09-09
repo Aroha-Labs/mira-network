@@ -37,6 +37,8 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
     providers: ProviderFactory.listAvailableProviders(),
   }));
 
+
+
   // Create auth middleware based on config
   const authMiddleware = createAuthMiddleware(fastify.config);
 

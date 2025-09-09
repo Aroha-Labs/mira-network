@@ -2,6 +2,7 @@ import { FastifyPluginAsync } from "fastify";
 import fastifyEnv from "@fastify/env";
 import fastifySensible from "@fastify/sensible";
 import { envSchema } from "./config/env.schema";
+import fastifyMetrics from "fastify-metrics"
 import rootRoute from "./routes/root";
 
 const app: FastifyPluginAsync = async (fastify): Promise<void> => {
@@ -11,6 +12,7 @@ const app: FastifyPluginAsync = async (fastify): Promise<void> => {
     dotenv: true, // Load from .env file if present
     data: process.env, // Also use existing env vars
   });
+  await fastify.register(fastifyMetrics);
 
   // Register sensible plugin for better error handling
   await fastify.register(fastifySensible);

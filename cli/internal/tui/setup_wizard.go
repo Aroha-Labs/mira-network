@@ -4,7 +4,10 @@ import (
 	"Aroha-Labs/mira-client/constants"
 	"Aroha-Labs/mira-client/internal/vllm"
 	"Aroha-Labs/mira-client/utils"
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -25,6 +28,7 @@ const (
 	WizStateWelcome WizardState = iota
 	WizStateShowInfo
 	WizStateGetAuthToken
+	WizStateGetDBMachineID
 	WizStateGetRouterURL
 	WizStateGetOpenRouterKey
 	WizStateGetOptionalKeys
@@ -37,6 +41,7 @@ const (
 type SetupWizardModel struct {
 	state           WizardState
 	machineID       string
+	dbMachineID     string
 	ipAddress       string
 	routerURL       string
 	openRouterKey   string
@@ -45,6 +50,7 @@ type SetupWizardModel struct {
 	groqKey         string
 	openaiKey       string
 	serviceToken    string  // Service access token to protect the chat endpoint
+	dashboardURL    string  // Grafana dashboard URL
 	useVLLM         bool  // Whether user wants to use VLLM
 	vllmConfigured  bool  // Whether VLLM is already configured
 	currentInput    textinput.Model
@@ -139,6 +145,23 @@ func (m SetupWizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.authToken = token
 				m.error = nil
 				_ = utils.SaveToken(m.authToken)
+				m.state = WizStateGetDBMachineID
+				m.currentInput.SetValue("")
+				m.currentInput.Placeholder = "Enter your database Machine ID (e.g., 26)"
+				return m, textinput.Blink
+			
+			case WizStateGetDBMachineID:
+				dbMachineID := m.currentInput.Value()
+				if dbMachineID == "" {
+					m.error = fmt.Errorf("Database Machine ID is required")
+					return m, nil
+				}
+				m.dbMachineID = dbMachineID
+				m.error = nil
+				// Save it for future use
+				dbIDFile := utils.GetConfigFilePath(".db_machine_id")
+				_ = os.WriteFile(dbIDFile, []byte(dbMachineID), 0644)
+				
 				m.state = WizStateGetRouterURL
 				m.currentInput.SetValue(constants.DEFAULT_ROUTER_URL)
 				m.currentInput.Placeholder = constants.DEFAULT_ROUTER_URL
@@ -248,7 +271,7 @@ func (m SetupWizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		default:
-			if m.state == WizStateGetOpenRouterKey || m.state == WizStateGetAuthToken || m.state == WizStateGetRouterURL || m.state == WizStateGetOptionalKeys || m.state == WizStateAskVLLM {
+			if m.state == WizStateGetOpenRouterKey || m.state == WizStateGetAuthToken || m.state == WizStateGetDBMachineID || m.state == WizStateGetRouterURL || m.state == WizStateGetOptionalKeys || m.state == WizStateAskVLLM {
 				var cmd tea.Cmd
 				m.currentInput, cmd = m.currentInput.Update(msg)
 				return m, cmd
@@ -259,6 +282,7 @@ func (m SetupWizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.containerID = msg.containerID
 		m.isHealthy = msg.healthy
 		m.serviceToken = msg.serviceToken
+		m.dashboardURL = msg.dashboardURL
 		if msg.error != nil {
 			m.error = msg.error
 			m.state = WizStateError
@@ -452,10 +476,17 @@ func (m SetupWizardModel) startContainer() tea.Cmd {
 		// Check health
 		healthy := checkHealth()
 		
+		// Provision Grafana dashboard if we have a DB machine ID
+		dashboardURL := ""
+		if m.dbMachineID != "" {
+			dashboardURL = provisionWizardDashboard(m.machineID, m.dbMachineID, m.authToken)
+		}
+		
 		return wizardDockerStartedMsg{
 			containerID:  containerID,
 			healthy:      healthy,
 			serviceToken: serviceToken,
+			dashboardURL: dashboardURL,
 		}
 	}
 }
@@ -470,10 +501,104 @@ func checkHealth() bool {
 	return resp.StatusCode == 200
 }
 
+// provisionWizardDashboard calls the router API to create a Grafana dashboard for the machine
+func provisionWizardDashboard(machineID, dbMachineID, authToken string) string {
+	// Debug logging
+	debugFile := "/tmp/mira-dashboard-debug.log"
+	if f, err := os.OpenFile(debugFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644); err == nil {
+		defer f.Close()
+		fmt.Fprintf(f, "\n=== Wizard Dashboard provisioning started at %s ===\n", time.Now().Format(time.RFC3339))
+		fmt.Fprintf(f, "Machine ID (UUID): %s\n", machineID)
+		fmt.Fprintf(f, "DB Machine ID: %s\n", dbMachineID)
+	}
+
+	// Use localhost:8000 for Grafana API calls from host
+	routerURL := "http://localhost:8000"
+	
+	// Get machine name for the dashboard
+	hostname, _ := os.Hostname()
+	if hostname == "" {
+		hostname = "Machine"
+	}
+
+	// Create request body with DB machine ID
+	requestBody := map[string]interface{}{
+		"machine_id":   dbMachineID,  // Use the DB machine ID
+		"machine_name": hostname,
+	}
+
+	jsonBody, err := json.Marshal(requestBody)
+	if err != nil {
+		if f, err := os.OpenFile(debugFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644); err == nil {
+			defer f.Close()
+			fmt.Fprintf(f, "❌ Failed to marshal request: %v\n", err)
+		}
+		return ""
+	}
+
+	apiURL := routerURL + "/api/grafana/provision-dashboard"
+	
+	req, err := http.NewRequest("POST", apiURL, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		if f, err := os.OpenFile(debugFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644); err == nil {
+			defer f.Close()
+			fmt.Fprintf(f, "❌ Failed to create request: %v\n", err)
+		}
+		return ""
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer " + authToken)
+
+	if f, err := os.OpenFile(debugFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644); err == nil {
+		defer f.Close()
+		fmt.Fprintf(f, "Request URL: %s\n", apiURL)
+		fmt.Fprintf(f, "Request Body: %s\n", string(jsonBody))
+		fmt.Fprintf(f, "Auth Token: %s...\n", authToken[:10])
+	}
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		if f, err := os.OpenFile(debugFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644); err == nil {
+			defer f.Close()
+			fmt.Fprintf(f, "❌ Request failed: %v\n", err)
+		}
+		return ""
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	
+	if f, err := os.OpenFile(debugFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644); err == nil {
+		defer f.Close()
+		fmt.Fprintf(f, "Response Status: %d\n", resp.StatusCode)
+		fmt.Fprintf(f, "Response Body: %s\n", string(body))
+	}
+
+	if resp.StatusCode == 200 {
+		var result struct {
+			Success      bool   `json:"success"`
+			DashboardURL string `json:"dashboard_url"`
+		}
+		if err := json.Unmarshal(body, &result); err == nil && result.Success {
+			if f, err := os.OpenFile(debugFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644); err == nil {
+				defer f.Close()
+				fmt.Fprintf(f, "✅ Dashboard provisioned successfully!\n")
+				fmt.Fprintf(f, "Dashboard URL: %s\n", result.DashboardURL)
+			}
+			return result.DashboardURL
+		}
+	}
+	
+	return ""
+}
+
 type wizardDockerStartedMsg struct {
 	containerID  string
 	healthy      bool
 	serviceToken string
+	dashboardURL string
 	error        error
 }
 
@@ -493,6 +618,8 @@ func (m SetupWizardModel) View() string {
 		title = "📋 Admin Registration Required"
 	case WizStateGetAuthToken:
 		title = "🔐 Authentication Token (Required)"
+	case WizStateGetDBMachineID:
+		title = "🆔 Database Machine ID (Required)"
 	case WizStateGetRouterURL:
 		title = "🌐 Router URL Configuration"
 	case WizStateGetOpenRouterKey:
@@ -595,6 +722,16 @@ func (m SetupWizardModel) View() string {
 		s.WriteString("  " + HelpStyle.Render("This token is provided by your router admin") + "\n")
 		s.WriteString("  " + HelpStyle.Render("Without it, your node cannot join the network"))
 	
+	case WizStateGetDBMachineID:
+		s.WriteString("  " + InputPromptStyle.Render("Enter your Database Machine ID:") + "\n\n")
+		s.WriteString("  " + m.currentInput.View() + "\n\n")
+		if m.error != nil {
+			s.WriteString("  " + ErrorStyle.Render("❌ " + m.error.Error()) + "\n\n")
+		}
+		s.WriteString("  " + HelpStyle.Render("💡 This is the integer ID assigned by your router admin") + "\n")
+		s.WriteString("  " + HelpStyle.Render("Example: 23, 25, 26 (not a UUID)") + "\n")
+		s.WriteString("  " + HelpStyle.Render("Required for Grafana dashboard provisioning"))
+	
 	case WizStateGetRouterURL:
 		s.WriteString("  " + InputPromptStyle.Render("Enter the Router URL:") + "\n\n")
 		s.WriteString("  " + m.currentInput.View() + "\n\n")
@@ -667,7 +804,13 @@ func (m SetupWizardModel) View() string {
 		if m.isHealthy {
 			health = "🟢 Healthy"
 		}
-		s.WriteString(fmt.Sprintf("  Health:      %s\n\n", health))
+		s.WriteString(fmt.Sprintf("  Health:      %s\n", health))
+		
+		// Show dashboard URL if available
+		if m.dashboardURL != "" {
+			s.WriteString(fmt.Sprintf("  Dashboard:   %s\n", m.dashboardURL))
+		}
+		s.WriteString("\n")
 		
 		// Show direct access information
 		directAccessContent := fmt.Sprintf(
