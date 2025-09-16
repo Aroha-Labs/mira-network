@@ -7,15 +7,19 @@ dotenv.config();
 // Environment variables with defaults
 const {
   // Voyager appchain RPC endpoints from Coinbase Developer Platform
-  RPC_URL_HTTP = "https://voyager-auth-rpc-testnet.appchain.base.org/faPiPRqAL4atStDoWt83EFXOcZS2kaXJ",
-  RPC_URL_WS = "wss://voyager-auth-rpc-testnet.appchain.base.org/faPiPRqAL4atStDoWt83EFXOcZS2kaXJ",
+  RPC_URL_HTTP,
+  RPC_URL_WS,
   SIGNER_PRIVATE_KEY,
-  APP_ID = "Klok",
+  APP_ID = "Mira Network",
   BATCH_SIZE = "100",
   // Gas settings in wei (1 gwei = 1e9 wei)
   // MAX_FEE_PER_GAS = "1000000000", // 1 gwei in wei
   // MAX_PRIORITY_FEE_PER_GAS = "1000000000", // 1 gwei in wei
 } = process.env;
+
+if (!RPC_URL_HTTP || !RPC_URL_WS || !SIGNER_PRIVATE_KEY) {
+  throw new Error("Missing required environment variables");
+}
 
 // Config validation
 // const requiredEnvVars = [
@@ -53,4 +57,3 @@ export const chain: Chain = {
     },
   },
 };
-
