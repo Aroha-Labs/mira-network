@@ -23,6 +23,9 @@ OPENSEARCH_PASSWORD = os.getenv("OPENSEARCH_PASSWORD", "")
 DATA_STREAM_API_URL = os.getenv("DATA_STREAM_API_URL", "")
 DATA_STREAM_SERVICE_KEY = os.getenv("DATA_STREAM_SERVICE_KEY", "")
 
+# Inference Logs Webhook (Node service) Configuration
+INFERENCE_LOGS_WEBHOOK_URL = os.getenv("INFERENCE_LOGS_WEBHOOK_URL", "")
+
 # Cache Configuration
 ENABLE_CACHE = os.getenv("ENABLE_CACHE", "false").lower() == "true"
 CACHE_API_URL = os.getenv("CACHE_API_URL", "http://localhost:3000")

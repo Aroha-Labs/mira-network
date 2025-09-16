@@ -7,10 +7,12 @@ from src.router.utils.user import get_user_credits
 from src.router.core.config import (
     LITELLM_API_KEY,
     LITELLM_API_URL,
+    INFERENCE_LOGS_WEBHOOK_URL,
 )
 from src.router.core.settings_types import SETTINGS_MODELS
 from src.router.core.types import User
 from src.router.db.session import DBSession
+import httpx
 from src.router.core.security import verify_user
 from src.router.schemas.ai import AiRequest, VerifyRequest
 import time
@@ -40,6 +42,9 @@ router = APIRouter()
 
 # Configure OpenAI client for LiteLLM
 openai_client = AsyncOpenAI(api_key=LITELLM_API_KEY, base_url=f"{LITELLM_API_URL}/v1")
+
+# Fixed wallet address for inference logs forwarding
+FIXED_WALLET_ADDRESS = "0x5A3b5E0F1A25Dd1948D186776c04df5e32332Ef2"
 
 
 @router.post(
@@ -418,14 +423,17 @@ async def save_log(
     }
 
     # Prepare data for data stream API
+    # Create a consistent log id for webhook/data-stream
+    log_id = str(uuid.uuid4())
+
     data_stream_payload = {
         "event_name": "llm_usage",
         "user_id": str(user.id),
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "properties": {
             "api_key_id": user.api_key_id,
-            "log_id": str(uuid.uuid4()),
-            "walletAddress": "0x0000000000000000000000000000000000000000",
+            "log_id": log_id,
+            "walletAddress": FIXED_WALLET_ADDRESS,
             "model": req.model,
             "original_model": original_req_model,
             "prompt_tokens": usage.get("prompt_tokens", 0),
@@ -462,6 +470,34 @@ async def save_log(
             ),
             # send_to_data_stream(),  # Commented out - function not defined
         )
+
+        # Optionally forward to inference-logs webhook if configured
+        if INFERENCE_LOGS_WEBHOOK_URL:
+            webhook_url = INFERENCE_LOGS_WEBHOOK_URL.rstrip("/") + "/webhooks"
+            payload = {
+                "logs": [
+                    {
+                        "walletAddress": FIXED_WALLET_ADDRESS,
+                        "logId": log_id,
+                        "@timestamp": datetime.now(timezone.utc).isoformat(),
+                    }
+                ]
+            }
+            try:
+                async with httpx.AsyncClient(timeout=10) as client:
+                    resp = await client.post(
+                        webhook_url,
+                        json=payload,
+                        headers={"Content-Type": "application/json"},
+                    )
+                    if resp.status_code >= 300:
+                        logger.warning(
+                            f"Inference-logs webhook responded with status {resp.status_code}: {resp.text[:200]}"
+                        )
+                    else:
+                        logger.info("Forwarded log to inference-logs webhook")
+            except Exception as e:
+                logger.error(f"Failed to send inference log webhook: {str(e)}")
     except Exception as e:
         track("save_log_error", {"user_id": str(user.id), "error": str(e)})
         logger.error(f"Log saving error: {str(e)}")
