@@ -8,6 +8,7 @@ on:
       - "playground/**"
       - "service/**"
       - "node-service/**"
+      - "inference-logs/**"
       - "cli/**"
       - "sdk/**"
       - ".github/workflows/release.yml"
@@ -17,6 +18,7 @@ env:
   ROUTER_IMAGE: Aroha-Labs/mira-client-router
   SERVICE_IMAGE: Aroha-Labs/mira-client-service
   NODE_SERVICE_IMAGE: Aroha-Labs/mira-network-node-service
+  INFERENCE_LOGS_IMAGE: Aroha-Labs/mira-network-inference-logs
 
 permissions:
   contents: write
@@ -34,6 +36,7 @@ jobs:
       router: ${{ steps.filter.outputs.router }}
       service: ${{ steps.filter.outputs.service }}
       node-service: ${{ steps.filter.outputs.node-service }}
+      inference-logs: ${{ steps.filter.outputs.inference-logs }}
       cli: ${{ steps.filter.outputs.cli }}
       playground: ${{ steps.filter.outputs.playground }}
       sdk: ${{ steps.filter.outputs.sdk }}
@@ -50,6 +53,8 @@ jobs:
               - 'service/**'
             node-service:
               - 'node-service/**'
+            inference-logs:
+              - 'inference-logs/**'
             cli:
               - 'cli/**'
             playground:
@@ -190,6 +195,7 @@ jobs:
       needs.changes.outputs.router == 'true' ||
       needs.changes.outputs.service == 'true' ||
       needs.changes.outputs.node-service == 'true' ||
+      needs.changes.outputs.inference-logs == 'true' ||
       needs.changes.outputs.cli == 'true' ||
       needs.changes.outputs.playground == 'true' ||
       needs.changes.outputs.sdk == 'true'
@@ -458,6 +464,45 @@ jobs:
       - name: Clean up Docker images
         run: docker image prune -f
 
+  publish-inference-logs:
+    needs: [changes, create-tag]
+    if: needs.changes.outputs.inference-logs == 'true'
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.create-tag.outputs.new_tag }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Extract metadata (tags, labels) for Inference Logs
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.INFERENCE_LOGS_IMAGE }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=,format=short
+            type=raw,value=latest
+            type=raw,value=${{ needs.create-tag.outputs.new_tag }}
+      - name: Build and push Inference Logs image
+        uses: docker/build-push-action@v6
+        with:
+          context: inference-logs
+          build-args: |
+            IMAGE_VERSION=${{ env.VERSION }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+      - name: Clean up Docker images
+        run: docker image prune -f
+
   publish-cli:
     needs: [changes, create-tag, sonarqube-cli]
     if: needs.changes.outputs.cli == 'true'
@@ -624,6 +669,7 @@ jobs:
         publish-router,
         publish-service,
         publish-node-service,
+        publish-inference-logs,
         publish-cli,
         deploy-console-testnet,
         sdk-test,
@@ -679,6 +725,16 @@ jobs:
             echo "| ⚙️ Service | Build & Publish | ❌ | **Failed** |" >> $GITHUB_STEP_SUMMARY
           else
             echo "| ⚙️ Service | Build & Publish | ⚠️ | **Cancelled** |" >> $GITHUB_STEP_SUMMARY
+          fi
+          # Inference Logs Status
+          if [ "${{ needs.changes.outputs.inference-logs }}" != "true" ]; then
+            echo "| 📝 Inference Logs | Build & Publish | ⏭️ | **Skipped** (No Changes) |" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.publish-inference-logs.result }}" = "success" ]; then
+            echo "| 📝 Inference Logs | Build & Publish | ✅ | **Successful** |" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.publish-inference-logs.result }}" = "failure" ]; then
+            echo "| 📝 Inference Logs | Build & Publish | ❌ | **Failed** |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| 📝 Inference Logs | Build & Publish | ⚠️ | **Cancelled** |" >> $GITHUB_STEP_SUMMARY
           fi
           # CLI Status
           if [ "${{ needs.changes.outputs.cli }}" != "true" ]; then
