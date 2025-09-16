@@ -25,6 +25,11 @@ DATA_STREAM_SERVICE_KEY = os.getenv("DATA_STREAM_SERVICE_KEY", "")
 
 # Inference Logs Webhook (Node service) Configuration
 INFERENCE_LOGS_WEBHOOK_URL = os.getenv("INFERENCE_LOGS_WEBHOOK_URL", "")
+INFERENCE_LOGS_BATCH_SIZE = int(os.getenv("INFERENCE_LOGS_BATCH_SIZE", "100"))
+INFERENCE_LOGS_BATCH_INTERVAL_SEC = float(
+    os.getenv("INFERENCE_LOGS_BATCH_INTERVAL_SEC", "60")
+)
+INFERENCE_LOGS_QUEUE_MAX = int(os.getenv("INFERENCE_LOGS_QUEUE_MAX", "10000"))
 
 # Cache Configuration
 ENABLE_CACHE = os.getenv("ENABLE_CACHE", "false").lower() == "true"
