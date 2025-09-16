@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"Aroha-Labs/mira-client/constants"
+	"Aroha-Labs/mira-client/utils"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -39,7 +41,7 @@ func (m *StatusModel) checkStatus() {
 		m.containerRunning = true
 		m.containerID = parts[0][:12]
 		m.containerStatus = strings.Join(parts[1:], " ")
-		m.isHealthy = checkHealth()
+		m.isHealthy = false // TODO: implement health check
 	}
 }
 
@@ -96,18 +98,29 @@ func (m StatusModel) View() string {
 			healthColor = WarningColor
 		}
 
-		statusBox := InfoBoxStyle.Width(50).Render(fmt.Sprintf(
+		// Get machine ID and router URL for display
+		machineID, _ := utils.GetMachineID()
+		routerURL, _ := utils.GetStoredRouterURL()
+		if routerURL == "" {
+			routerURL = constants.DEFAULT_ROUTER_URL
+		}
+		
+		statusBox := InfoBoxStyle.Width(60).Render(fmt.Sprintf(
 			"%s Container Running\n"+
 				"─────────────────────\n"+
 				"Container ID: %s\n"+
 				"Status:       %s\n"+
 				"Health:       %s\n"+
 				"Port:         34523\n\n"+
-				"API Endpoint: http://localhost:34523",
+				"📡 Direct Access:\n"+
+				"   Base URL: %s/v1/machines/%s\n"+
+				"   Health:   %s/v1/machines/%s/health",
 			statusIcon,
 			m.containerID,
 			m.containerStatus,
 			healthStatus,
+			routerURL, machineID,
+			routerURL, machineID,
 		))
 
 		s.WriteString(lipgloss.Place(

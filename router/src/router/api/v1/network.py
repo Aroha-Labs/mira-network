@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any
-from fastapi import APIRouter, Depends, Response, HTTPException
+from fastapi import APIRouter, Depends, Response, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from src.router.utils.user import get_user_credits
@@ -34,6 +34,9 @@ from src.router.utils.opensearch import (
 )
 from src.router.utils.nr import track
 from openai import AsyncOpenAI
+import httpx
+from src.router.models.machines import Machine
+from sqlmodel import select
 
 
 router = APIRouter()
@@ -610,6 +613,9 @@ async def chatCompletionGenerate(
                         },
                         timeout=600,
                     )
+
+                    logger.info(f"LiteLLM stream: {stream}")
+                    logger.debug(f"LiteLLM stream: {stream}")
 
                     # Extract machine ID from LiteLLM response headers
                     if hasattr(stream, "response") and hasattr(

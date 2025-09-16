@@ -16,7 +16,7 @@ RUN yarn install --frozen-lockfile
 COPY . .
 
 # Build TypeScript into JavaScript
-RUN yarn build:ts
+RUN yarn build
 
 # ========================
 # Stage 2: Runtime image

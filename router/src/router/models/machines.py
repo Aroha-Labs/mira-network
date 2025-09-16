@@ -1,4 +1,4 @@
-from sqlalchemy import Column, func, Float, JSON
+from sqlalchemy import Column, func, Float, JSON, String
 from sqlmodel import SQLModel, Field
 from sqlalchemy.dialects.postgresql import BOOLEAN
 from datetime import datetime
@@ -38,6 +38,11 @@ class Machine(SQLModel, table=True):
         default=None,
         sa_column=Column(JSON, nullable=True),
         description="List of model names this machine supports. If None, supports all models."
+    )
+    service_access_token: Optional[str] = Field(
+        default=None,
+        sa_column=Column(String, nullable=True),
+        description="Service access token to authenticate with the node-service"
     )
     created_at: datetime = Field(default=func.now(), nullable=False)
     updated_at: datetime = Field(default=func.now(), nullable=False)

@@ -149,8 +149,19 @@ export default function Chat() {
   const supportedModelsOptions = useMemo(() => {
     if (!supportedModelsData) return [];
     return supportedModelsData.map((m) => {
-      const s = m.split("/");
-      return { value: m, label: s[s.length - 1] };
+      const parts = m.split("/");
+      const provider = parts[0];
+      const modelName = parts[parts.length - 1];
+      
+      // Add provider indicator to the label
+      let label = modelName;
+      if (provider === "vllm") {
+        label = `${modelName} (GPU)`;
+      } else if (provider === "openrouter") {
+        label = `${modelName} (Proxy)`;
+      }
+      
+      return { value: m, label, provider };
     });
   }, [supportedModelsData]);
 
@@ -362,7 +373,7 @@ export default function Chat() {
 
   if (supportedModelsError) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="flex justify-center items-center h-screen">
         <div className="text-red-500">Error loading models</div>
       </div>
     );
@@ -370,7 +381,7 @@ export default function Chat() {
 
   if (!userSession?.user) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="flex justify-center items-center h-screen">
         <Link
           href="/login"
           className="p-4 text-white bg-blue-500 rounded-lg hover:bg-blue-600"
@@ -387,13 +398,13 @@ export default function Chat() {
   };
 
   return (
-    <div className="flex flex-col items-center flex-1 min-h-screen bg-gray-50">
-      <div className="sticky top-0 z-10 flex items-center justify-between w-full p-3 bg-white border-b border-gray-200 shadow-sm">
+    <div className="flex flex-col flex-1 items-center min-h-screen bg-gray-50">
+      <div className="flex sticky top-0 justify-between items-center p-3 w-full bg-white border-b border-gray-200 shadow-sm">
         <div className="flex items-center space-x-2">
           <select
             value={selectedModel}
             onChange={handleModelChange}
-            className="p-2 text-sm transition-colors bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-blue-400"
+            className="p-2 text-sm bg-white rounded-md border border-gray-300 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-blue-400"
           >
             {supportedModelsOptions.map((o) => (
               <option key={o.value} value={o.value}>
@@ -404,7 +415,7 @@ export default function Chat() {
           {messages.length > 0 && (
             <button
               onClick={handleClearHistory}
-              className="p-2 text-sm text-gray-600 transition-colors rounded-md hover:text-red-500 hover:bg-red-50 focus:outline-none"
+              className="p-2 text-sm text-gray-600 rounded-md transition-colors hover:text-red-500 hover:bg-red-50 focus:outline-none"
               title="Clear chat history"
             >
               Clear History
@@ -414,7 +425,7 @@ export default function Chat() {
 
         <button
           onClick={() => setShowConfig(!showConfig)}
-          className={`p-2 rounded-md transition-colors focus:outline-none ${showConfig ? "bg-blue-50 text-blue-600" : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"}`}
+          className={`p-2 rounded-md transition-colors focus:outline-none ${showConfig ? "text-blue-600 bg-blue-50" : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"}`}
           title="Configuration"
         >
           <Cog6ToothIcon className="w-5 h-5" />
@@ -422,8 +433,8 @@ export default function Chat() {
       </div>
 
       {showConfig && (
-        <div className="w-full p-4 transition-all duration-300 ease-in-out bg-white border-b border-gray-200 shadow-sm">
-          <div className="flex flex-wrap max-w-3xl gap-6 mx-auto">
+        <div className="z-0 p-4 w-full bg-white border-b border-gray-200 shadow-sm transition-all duration-300 ease-in-out">
+          <div className="flex flex-wrap gap-6 mx-auto max-w-3xl">
             <div className="flex flex-col gap-1">
               <label
                 htmlFor="reasoning-effort"
@@ -436,7 +447,7 @@ export default function Chat() {
                   id="reasoning-effort"
                   value={reasoningEffort}
                   onChange={handleReasoningEffortChange}
-                  className="w-56 py-2 pl-10 pr-8 text-sm font-medium transition-all duration-200 ease-in-out bg-white border border-gray-300 rounded-lg shadow-sm appearance-none cursor-pointer hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="py-2 pr-8 pl-10 w-56 text-sm font-medium bg-white rounded-lg border border-gray-300 shadow-sm transition-all duration-200 ease-in-out appearance-none cursor-pointer hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Select reasoning depth"
                 >
                   <option value="disabled" className="text-gray-700 bg-gray-50">
@@ -452,7 +463,7 @@ export default function Chat() {
                     🤯 Deep Reasoning
                   </option>
                 </select>
-                <div className="absolute transform -translate-y-1/2 pointer-events-none left-3 top-1/2">
+                <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
                   <Brain
                     className={`w-4 h-4 ${
                       reasoningEffort === "disabled"
@@ -465,7 +476,7 @@ export default function Chat() {
                     }`}
                   />
                 </div>
-                <div className="absolute transform -translate-y-1/2 pointer-events-none right-2 top-1/2">
+                <div className="absolute right-2 top-1/2 transform -translate-y-1/2 pointer-events-none">
                   <svg
                     className="w-5 h-5 text-gray-400"
                     xmlns="http://www.w3.org/2000/svg"
@@ -495,7 +506,7 @@ export default function Chat() {
                 value={maxTokens || ""}
                 onChange={handleMaxTokensChange}
                 placeholder="Unlimited"
-                className="w-40 p-2 text-sm transition-colors border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-blue-400"
+                className="p-2 w-40 text-sm rounded-md border border-gray-300 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-blue-400"
                 min="1"
                 max="8192"
               />
@@ -508,10 +519,10 @@ export default function Chat() {
       )}
 
       {/* <SystemPromptInput onChange={handleSystemPromptChange} /> */}
-      <div className="flex-1 w-full p-4 space-y-6 overflow-y-auto">
+      <div className="overflow-y-auto flex-1 p-4 space-y-6 w-full">
         {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center text-gray-500 h-96">
-            <ChatBubbleBottomCenterIcon className="w-16 h-16 mb-6 text-gray-300" />
+          <div className="flex flex-col justify-center items-center h-96 text-gray-500">
+            <ChatBubbleBottomCenterIcon className="mb-6 w-16 h-16 text-gray-300" />
             <div className="mb-2 text-xl font-medium">Start chatting with AI</div>
             <div className="max-w-md text-sm text-center text-gray-400">
               Send a message to begin your conversation. Use the configuration options to
@@ -533,7 +544,7 @@ export default function Chat() {
         )}
 
         {!isSending && messages.length ? (
-          <div className="relative flex justify-start max-w-2xl px-4 mx-auto -top-4">
+          <div className="flex relative -top-4 justify-start px-4 mx-auto max-w-2xl">
             <button
               className="text-sm text-gray-400 underline hover:text-gray-600 focus:outline-hidden"
               onClick={sendContinueMessage}
@@ -557,11 +568,11 @@ export default function Chat() {
           </div>
         )}
       </div>
-      <div className="sticky bottom-0 w-full p-4 bg-white border-t border-gray-200 shadow-lg">
-        <div className="flex flex-col max-w-3xl gap-2 mx-auto">
+      <div className="sticky bottom-0 p-4 w-full bg-white border-t border-gray-200 shadow-lg">
+        <div className="flex flex-col gap-2 mx-auto max-w-3xl">
           <div className="flex justify-center space-x-2">
             <AutoGrowTextarea
-              className="flex-1 p-3 text-base transition-colors border border-gray-300 rounded-l-lg shadow-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-blue-300"
+              className="flex-1 p-3 text-base rounded-l-lg border border-gray-300 shadow-sm transition-colors resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-blue-300"
               value={input}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
@@ -569,13 +580,13 @@ export default function Chat() {
               disabled={isSending}
             />
             <button
-              className="px-4 py-2 text-white transition-colors bg-blue-600 rounded-r-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 text-white bg-blue-600 rounded-r-lg shadow-sm transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
               onClick={() => sendMessage(input)}
               disabled={isSending}
             >
               {isSending ? (
                 <span className="flex items-center">
-                  <Spinner className="w-4 h-4 mr-2" />
+                  <Spinner className="mr-2 w-4 h-4" />
                   Sending
                 </span>
               ) : (
@@ -584,7 +595,7 @@ export default function Chat() {
             </button>
             {isSending && (
               <button
-                className="p-2 text-white transition-colors bg-red-500 rounded-md shadow-sm hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                className="p-2 text-white bg-red-500 rounded-md shadow-sm transition-colors hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
                 onClick={handleStop}
                 title="Stop generating"
               >
@@ -593,7 +604,7 @@ export default function Chat() {
             )}
           </div>
           {errorMessage && (
-            <div className="px-3 py-2 mt-2 text-sm text-center text-red-600 border border-red-200 rounded-md bg-red-50">
+            <div className="px-3 py-2 mt-2 text-sm text-center text-red-600 bg-red-50 rounded-md border border-red-200">
               {errorMessage}
             </div>
           )}

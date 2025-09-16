@@ -398,14 +398,23 @@ const RawJsonEditor = ({
 }) => {
   const [jsonString, setJsonString] = useState(() => JSON.stringify(value, null, 2));
   const [error, setError] = useState<string | null>(null);
+  
+  // Update JSON string if value changes from outside
+  useEffect(() => {
+    setJsonString(JSON.stringify(value, null, 2));
+    setError(null);
+  }, [value]);
 
   const handleSave = () => {
     try {
       const parsed = JSON.parse(jsonString);
+      console.log("Parsed JSON:", parsed);
+      console.log("Number of models:", Object.keys(parsed).length);
       onChange(parsed);
-      onCancel();
+      setError(`✓ JSON applied successfully (${Object.keys(parsed).length} models). Click 'Save Changes' to persist.`);
+      // Don't close the editor automatically - let user decide
     } catch (e: unknown) {
-      console.log(e);
+      console.log("JSON Parse Error:", e);
       setError("Invalid JSON format");
     }
   };
@@ -413,21 +422,23 @@ const RawJsonEditor = ({
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <div className="text-sm text-red-500">{error}</div>
+        <div className={`text-sm ${error?.startsWith('✓') ? 'text-green-600' : 'text-red-500'}`}>
+          {error}
+        </div>
         <div className="space-x-2">
           <button
             onClick={onCancel}
             className="px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 rounded-sm"
             disabled={disabled}
           >
-            Cancel
+            Back to Visual Editor
           </button>
           <button
             onClick={handleSave}
             className="px-3 py-1 text-sm bg-blue-500 text-white hover:bg-blue-600 rounded-sm"
             disabled={disabled}
           >
-            Apply Changes
+            Apply JSON to Form
           </button>
         </div>
       </div>
