@@ -36,7 +36,7 @@ jobs:
       router: ${{ steps.filter.outputs.router }}
       service: ${{ steps.filter.outputs.service }}
       node-service: ${{ steps.filter.outputs.node-service }}
-      inference-logs: ${{ steps.filter.outputs.inference-logs }}
+      inference-logs: ${{ steps.filter.outputs.inference-logs-rs }}
       cli: ${{ steps.filter.outputs.cli }}
       playground: ${{ steps.filter.outputs.playground }}
       sdk: ${{ steps.filter.outputs.sdk }}
@@ -53,8 +53,8 @@ jobs:
               - 'service/**'
             node-service:
               - 'node-service/**'
-            inference-logs:
-              - 'inference-logs/**'
+            inference-logs-rs:
+              - 'inference-logs-rs/**'
             cli:
               - 'cli/**'
             playground:
