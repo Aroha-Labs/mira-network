@@ -1,8 +1,8 @@
 // Footer Component
 const Footer = () => (
-  <footer className="bg-gray-800 text-white p-4 mt-32">
+  <footer className="p-4 mt-32 text-white bg-gray-800">
     <p className="text-center">
-      &copy; 2023 My Application. All rights reserved.
+      &copy; 2025 Mira Network. All rights reserved.
     </p>
   </footer>
 );

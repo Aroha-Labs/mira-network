@@ -56,7 +56,7 @@ const Footer = ({ className }: { className?: string }) => (
           "ml-4 text-[12px] font-medium leading-[22px] tracking-[-0.156px] text-[#000]"
         )}
       >
-        ©2025 Aroha Labs. All rights reserved.
+        ©2025 Mira Network. All rights reserved.
       </span>
     </div>
   </div>
