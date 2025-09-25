@@ -16,6 +16,7 @@ use tower_http::{
 
 use config::Config;
 use services::blockchain::BlockchainService;
+use services::batch_accumulator::BatchAccumulator;
 use routes::webhook::{health, inference_webhook};
 
 #[tokio::main]
@@ -31,12 +32,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let port = config.port;
 
     tracing::info!("Initializing blockchain service...");
-    let blockchain_service = Arc::new(BlockchainService::new(config).await?);
+    let blockchain_service = Arc::new(BlockchainService::new(config.clone()).await?);
+
+    tracing::info!("Initializing batch accumulator...");
+    let (batch_accumulator, log_sender) = BatchAccumulator::new(
+        blockchain_service,
+        config.clone(),
+    );
+
+    // Start the batch accumulator
+    batch_accumulator.start().await;
+
+    tracing::info!(
+        "Batch accumulator started - batch_size: {}, timeout: {}s, queue_max: {}",
+        config.batch_size,
+        config.batch_timeout_sec,
+        config.queue_max_size
+    );
 
     let app = Router::new()
         .route("/health", get(health))
         .route("/webhooks", post(inference_webhook))
-        .with_state(blockchain_service)
+        .with_state(log_sender)
         .layer(
             ServiceBuilder::new()
                 .layer(RequestBodyLimitLayer::new(10 * 1024 * 1024))

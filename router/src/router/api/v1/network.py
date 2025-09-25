@@ -8,9 +8,6 @@ from src.router.core.config import (
     LITELLM_API_KEY,
     LITELLM_API_URL,
     INFERENCE_LOGS_WEBHOOK_URL,
-    INFERENCE_LOGS_BATCH_SIZE,
-    INFERENCE_LOGS_BATCH_INTERVAL_SEC,
-    INFERENCE_LOGS_QUEUE_MAX,
 )
 from src.router.core.settings_types import SETTINGS_MODELS
 from src.router.core.types import User
@@ -39,7 +36,6 @@ from src.router.utils.opensearch import (
 )
 from src.router.utils.nr import track
 from openai import AsyncOpenAI
-from asyncio import Queue
 
 
 router = APIRouter()
@@ -50,73 +46,39 @@ openai_client = AsyncOpenAI(api_key=LITELLM_API_KEY, base_url=f"{LITELLM_API_URL
 # Fixed wallet address for inference logs forwarding
 FIXED_WALLET_ADDRESS = "0xE83507Bd91e1b470792fFFc1377c8f3959d7e674"
 
-# Inference logs batching state
-_inference_log_queue: Queue | None = None
-_batch_task_started: bool = False
 
+async def send_inference_log(log_data: dict) -> None:
+    """Send a single log to the inference-logs webhook immediately."""
+    if not INFERENCE_LOGS_WEBHOOK_URL:
+        return
 
-def _init_inference_log_batcher() -> None:
-    """Initialize the in-memory queue and start the batch flush loop once."""
-    global _inference_log_queue, _batch_task_started
-    if _inference_log_queue is None:
-        # Use a bounded queue to cap memory; items dropped oldest on overflow
-        _inference_log_queue = Queue(maxsize=INFERENCE_LOGS_QUEUE_MAX)
-    if not _batch_task_started:
-        _batch_task_started = True
-        asyncio.create_task(_inference_log_batch_loop())
+    try:
+        payload = {"logs": [log_data]}
+        webhook_url = INFERENCE_LOGS_WEBHOOK_URL.rstrip("/") + "/webhooks"
 
+        async with httpx.AsyncClient(timeout=10) as client:
+            # gzip compress the JSON payload
+            data_bytes = json.dumps(payload).encode("utf-8")
+            import gzip
 
-async def _drain_queue(max_items: int) -> list[dict]:
-    """Drain up to max_items from the queue without blocking."""
-    assert _inference_log_queue is not None
-    items: list[dict] = []
-    for _ in range(max_items):
-        if _inference_log_queue.empty():
-            break
-        try:
-            items.append(_inference_log_queue.get_nowait())
-        except asyncio.QueueEmpty:
-            break
-    return items
-
-
-async def _inference_log_batch_loop() -> None:
-    """Periodically flush queued logs to the inference-logs webhook in batches."""
-    while True:
-        try:
-            await asyncio.sleep(INFERENCE_LOGS_BATCH_INTERVAL_SEC)
-            if not INFERENCE_LOGS_WEBHOOK_URL:
-                continue
-            batch = await _drain_queue(INFERENCE_LOGS_BATCH_SIZE)
-            if not batch:
-                continue
-            payload = {"logs": batch}
-            webhook_url = INFERENCE_LOGS_WEBHOOK_URL.rstrip("/") + "/webhooks"
-            async with httpx.AsyncClient(timeout=10) as client:
-                # gzip compress the JSON payload
-                data_bytes = json.dumps(payload).encode("utf-8")
-                import gzip
-
-                compressed = gzip.compress(data_bytes)
-                resp = await client.post(
-                    webhook_url,
-                    content=compressed,
-                    headers={
-                        "Content-Type": "application/json",
-                        "Content-Encoding": "gzip",
-                        "Accept-Encoding": "gzip, deflate",
-                    },
+            compressed = gzip.compress(data_bytes)
+            resp = await client.post(
+                webhook_url,
+                content=compressed,
+                headers={
+                    "Content-Type": "application/json",
+                    "Content-Encoding": "gzip",
+                    "Accept-Encoding": "gzip, deflate",
+                },
+            )
+            if resp.status_code >= 300:
+                logger.warning(
+                    f"Inference log webhook status {resp.status_code}: {resp.text[:200]}"
                 )
-                if resp.status_code >= 300:
-                    logger.warning(
-                        f"Inference-logs batch webhook status {resp.status_code}: {resp.text[:200]}"
-                    )
-                else:
-                    logger.info(
-                        f"Forwarded {len(batch)} logs to inference-logs webhook"
-                    )
-        except Exception as e:
-            logger.error(f"Failed to flush inference logs batch: {str(e)}")
+            else:
+                logger.debug(f"Sent log to inference-logs webhook: {log_data['logId']}")
+    except Exception as e:
+        logger.error(f"Failed to send inference log: {str(e)}")
 
 
 @router.post(
@@ -543,28 +505,15 @@ async def save_log(
             # send_to_data_stream(),  # Commented out - function not defined
         )
 
-        # Enqueue for batch forwarding if configured
+        # Send log directly to inference-logs service
         if INFERENCE_LOGS_WEBHOOK_URL:
-            _init_inference_log_batcher()
-            assert _inference_log_queue is not None
-            item = {
+            log_data = {
                 "walletAddress": FIXED_WALLET_ADDRESS,
                 "logId": log_id,
                 "@timestamp": datetime.now(timezone.utc).isoformat(),
             }
-            try:
-                _inference_log_queue.put_nowait(item)
-            except asyncio.QueueFull:
-                # Drop oldest to make room (best-effort)
-                try:
-                    _ = _inference_log_queue.get_nowait()
-                except asyncio.QueueEmpty:
-                    pass
-                try:
-                    _inference_log_queue.put_nowait(item)
-                except asyncio.QueueFull:
-                    # If still full, drop newest and warn
-                    logger.warning("Inference logs queue full; dropping newest log")
+            # Fire and forget - send asynchronously
+            asyncio.create_task(send_inference_log(log_data))
     except Exception as e:
         track("save_log_error", {"user_id": str(user.id), "error": str(e)})
         logger.error(f"Log saving error: {str(e)}")

@@ -1,13 +1,11 @@
 use ethers::{
-    abi::{Abi, AbiEncode},
+    abi::Abi,
     contract::Contract,
-    core::types::{Address, Bytes, H256, TransactionRequest, U256},
+    core::types::{Address, H256},
     middleware::SignerMiddleware,
     providers::{Http, Middleware, Provider},
     signers::{LocalWallet, Signer},
-    utils::keccak256,
 };
-use serde_json::json;
 use sha3::{Digest, Keccak256};
 use std::sync::Arc;
 
@@ -70,7 +68,10 @@ impl BlockchainService {
         tracing::info!("Contract address: {}", CONTRACT_ADDRESS);
 
         if balance_eth < 0.001 {
-            tracing::warn!("⚠️  LOW BALANCE: Wallet has {:.6} ETH. Recommend at least 0.001 ETH for gas fees.", balance_eth);
+            tracing::warn!(
+                "⚠️  LOW BALANCE: Wallet has {:.6} ETH. Recommend at least 0.001 ETH for gas fees.",
+                balance_eth
+            );
             tracing::warn!("⚠️  Send Base ETH to wallet: {:?}", wallet_address);
         }
 
@@ -103,12 +104,10 @@ impl BlockchainService {
         let wallet_address: Address = log.wallet_address.parse()?;
         let log_hash = self.hash_log(log);
 
-        let contract_call = self
-            .contract
-            .method::<_, ()>(
-                "submitInferenceLog",
-                (self.config.app_id.clone(), wallet_address, log_hash),
-            )?;
+        let contract_call = self.contract.method::<_, ()>(
+            "submitInferenceLog",
+            (self.config.app_id.clone(), wallet_address, log_hash),
+        )?;
 
         // Estimate gas and add buffer
         let estimated_gas = contract_call.estimate_gas().await?;
@@ -182,12 +181,14 @@ impl BlockchainService {
 
             let chunk_hashes: Vec<H256> = chunk.iter().map(|log| self.hash_log(log)).collect();
 
-            let contract_call = self
-                .contract
-                .method::<_, ()>(
-                    "submitBatchInferenceLogs",
-                    (self.config.app_id.clone(), chunk_wallets.clone(), chunk_hashes),
-                )?;
+            let contract_call = self.contract.method::<_, ()>(
+                "submitBatchInferenceLogs",
+                (
+                    self.config.app_id.clone(),
+                    chunk_wallets.clone(),
+                    chunk_hashes,
+                ),
+            )?;
 
             // Estimate gas and add buffer
             let estimated_gas = contract_call.estimate_gas().await?;
@@ -213,7 +214,11 @@ impl BlockchainService {
             let effective_gas_price = tx_receipt.effective_gas_price.unwrap_or_default();
             let gas_fee_wei = gas_used * effective_gas_price;
             let gas_fee_eth = gas_fee_wei.as_u128() as f64 / 1e18;
-            let logs_per_gas = if gas_used.is_zero() { 0.0 } else { chunk.len() as f64 / gas_used.as_u128() as f64 };
+            let logs_per_gas = if gas_used.is_zero() {
+                0.0
+            } else {
+                chunk.len() as f64 / gas_used.as_u128() as f64
+            };
 
             tracing::info!(
                 "Batch {} of {} submitted - TX: {:?}, Logs: {}, Gas used: {}, Gas price: {} wei, Gas fee: {:.6} ETH, Efficiency: {:.2} logs/gas",
