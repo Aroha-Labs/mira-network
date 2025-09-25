@@ -6,10 +6,9 @@ use axum::{
 };
 use flate2::read::GzDecoder;
 use std::io::Read;
-use std::sync::Arc;
 
-use crate::models::{WebhookBody, WebhookResponse};
-use crate::services::blockchain::BlockchainService;
+use crate::models::{WebhookBody, WebhookResponse, InferenceLog};
+use tokio::sync::mpsc;
 
 pub async fn health() -> (StatusCode, Json<WebhookResponse>) {
     (
@@ -23,7 +22,7 @@ pub async fn health() -> (StatusCode, Json<WebhookResponse>) {
 }
 
 pub async fn inference_webhook(
-    State(blockchain): State<Arc<BlockchainService>>,
+    State(log_sender): State<mpsc::UnboundedSender<InferenceLog>>,
     headers: HeaderMap,
     body: Bytes,
 ) -> (StatusCode, Json<WebhookResponse>) {
@@ -94,28 +93,33 @@ pub async fn inference_webhook(
         );
     }
 
-    match blockchain.submit_batch_logs(payload.logs).await {
-        Ok(_) => {
-            tracing::info!("Successfully submitted {} logs", logs_count);
-            (
-                StatusCode::OK,
-                Json(WebhookResponse {
-                    success: true,
-                    message: format!("Successfully submitted {} logs", logs_count),
-                    count: Some(logs_count),
-                })
-            )
-        },
-        Err(e) => {
-            tracing::error!("Failed to submit logs: {}", e);
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(WebhookResponse {
-                    success: false,
-                    message: format!("Failed to submit logs: {}", e),
-                    count: None,
-                })
-            )
+    // Send logs to batch accumulator
+    let mut failed_logs = 0;
+    for log in payload.logs {
+        if let Err(_) = log_sender.send(log) {
+            failed_logs += 1;
         }
+    }
+
+    if failed_logs > 0 {
+        tracing::warn!("Failed to queue {} logs", failed_logs);
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(WebhookResponse {
+                success: false,
+                message: format!("Failed to queue {} out of {} logs", failed_logs, logs_count),
+                count: None,
+            })
+        )
+    } else {
+        tracing::info!("Queued {} logs for batching", logs_count);
+        (
+            StatusCode::OK,
+            Json(WebhookResponse {
+                success: true,
+                message: format!("Queued {} logs for processing", logs_count),
+                count: Some(logs_count),
+            })
+        )
     }
 }
