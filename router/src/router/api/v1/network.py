@@ -48,7 +48,7 @@ router = APIRouter()
 openai_client = AsyncOpenAI(api_key=LITELLM_API_KEY, base_url=f"{LITELLM_API_URL}/v1")
 
 # Fixed wallet address for inference logs forwarding
-FIXED_WALLET_ADDRESS = "0x5A3b5E0F1A25Dd1948D186776c04df5e32332Ef2"
+FIXED_WALLET_ADDRESS = "0xE83507Bd91e1b470792fFFc1377c8f3959d7e674"
 
 # Inference logs batching state
 _inference_log_queue: Queue | None = None
