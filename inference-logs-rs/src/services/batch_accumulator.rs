@@ -57,12 +57,9 @@ impl BatchAccumulator {
                 // Strict limit: only keep 100 logs max (BATCH_SIZE)
                 if logs_guard.len() >= receiver_config.batch_size {
                     logs_guard.remove(0); // Remove oldest
-                    tracing::debug!("Queue full ({}), dropped oldest log", receiver_config.batch_size);
                 }
 
                 logs_guard.push(log);
-                tracing::debug!("Queued log {}/{} (next batch in {} minutes)",
-                    logs_guard.len(), receiver_config.batch_size, receiver_config.batch_timeout_sec / 60);
             }
         });
 
