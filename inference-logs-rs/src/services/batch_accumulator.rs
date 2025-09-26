@@ -54,35 +54,15 @@ impl BatchAccumulator {
             while let Some(log) = receiver.recv().await {
                 let mut logs_guard = receiver_logs.lock().await;
 
-                // Check if queue is full, remove oldest if needed
-                if logs_guard.len() >= receiver_config.queue_max_size {
-                    logs_guard.remove(0);
-                    tracing::warn!("Queue full, dropped oldest log");
+                // Strict limit: only keep 100 logs max (BATCH_SIZE)
+                if logs_guard.len() >= receiver_config.batch_size {
+                    logs_guard.remove(0); // Remove oldest
+                    tracing::debug!("Queue full ({}), dropped oldest log", receiver_config.batch_size);
                 }
 
                 logs_guard.push(log);
-                tracing::debug!("Added log to batch queue, total: {}", logs_guard.len());
-
-                // Check if we should send immediately (batch size reached)
-                if logs_guard.len() >= receiver_config.batch_size {
-                    drop(logs_guard); // Release lock before sending
-
-                    tracing::info!(
-                        "Batch size reached ({}), sending immediately",
-                        receiver_config.batch_size
-                    );
-                    if let Err(e) = Self::send_batch_if_ready(
-                        &receiver_logs,
-                        &receiver_last_send,
-                        &receiver_blockchain_service,
-                        &receiver_config,
-                        true,
-                    )
-                    .await
-                    {
-                        tracing::error!("Failed to send batch: {}", e);
-                    }
-                }
+                tracing::debug!("Queued log {}/{} (next batch in {} minutes)",
+                    logs_guard.len(), receiver_config.batch_size, receiver_config.batch_timeout_sec / 60);
             }
         });
 
@@ -93,26 +73,37 @@ impl BatchAccumulator {
         let timer_config = config.clone();
         tokio::spawn(async move {
             loop {
-                sleep(Duration::from_secs(30)).await; // Check every 30 seconds
+                sleep(Duration::from_secs(timer_config.batch_timeout_sec)).await; // Wait exactly 10 minutes
 
-                if let Err(e) = Self::send_batch_if_ready(
-                    &timer_logs,
-                    &timer_last_send,
-                    &timer_blockchain_service,
-                    &timer_config,
-                    false,
-                )
-                .await
-                {
-                    tracing::error!("Failed to send timed batch: {}", e);
+                let logs_count = {
+                    let logs_guard = timer_logs.lock().await;
+                    logs_guard.len()
+                };
+
+                if logs_count > 0 {
+                    tracing::info!("⏰ 10-minute timer triggered, sending batch of {} logs", logs_count);
+
+                    if let Err(e) = Self::send_batch_if_ready(
+                        &timer_logs,
+                        &timer_last_send,
+                        &timer_blockchain_service,
+                        &timer_config,
+                        false,
+                    )
+                    .await
+                    {
+                        tracing::error!("Failed to send timed batch: {}", e);
+                    }
+                } else {
+                    tracing::debug!("⏰ 10-minute timer triggered, but no logs to send");
                 }
             }
         });
 
         tracing::info!(
-            "BatchAccumulator started with batch_size={}, timeout={}s",
+            "BatchAccumulator started - STRICT RATE LIMIT: {} logs max every {} minutes (excess logs dropped)",
             config.batch_size,
-            config.batch_timeout_sec
+            config.batch_timeout_sec / 60
         );
     }
 
