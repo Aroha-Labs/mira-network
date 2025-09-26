@@ -112,7 +112,7 @@ pub async fn inference_webhook(
             })
         )
     } else {
-        tracing::info!("Queued {} logs for batching", logs_count);
+        // Remove verbose logging - only log errors/submissions
         (
             StatusCode::OK,
             Json(WebhookResponse {
