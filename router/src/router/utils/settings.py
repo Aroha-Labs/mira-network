@@ -5,7 +5,11 @@ from src.router.db.session import get_session_context
 from src.router.models.system_settings import SystemSettings
 from fastapi import HTTPException
 from src.router.core.settings_types import SETTINGS_MODELS
-from src.router.utils.redis import get_cached_setting, set_cached_setting
+from src.router.utils.redis import (
+    delete_cached_setting,
+    get_cached_setting,
+    set_cached_setting,
+)
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -99,6 +103,7 @@ async def update_setting_value(
         await db.refresh(setting)
 
     # Update cache
+    await delete_cached_setting(name)
     await set_cached_setting(name, setting.value)
 
     return setting

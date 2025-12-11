@@ -27,3 +27,7 @@ class RegisterMachineRequest(BaseModel):
         default=None,
         description="List of model names this machine supports. If None, supports all models."
     )
+    service_access_token: Optional[str] = Field(
+        default=None,
+        description="Service access token to authenticate with the node-service"
+    )

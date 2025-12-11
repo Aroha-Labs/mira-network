@@ -2,6 +2,8 @@ package utils
 
 import (
 	"Aroha-Labs/mira-client/constants"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"strings"
@@ -60,4 +62,50 @@ func DeleteToken() error {
 func TokenExists() bool {
 	token, _ := GetStoredToken()
 	return token != ""
+}
+
+// GenerateAccessToken generates a secure random token for service access
+func GenerateAccessToken() (string, error) {
+	bytes := make([]byte, 32)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", fmt.Errorf("failed to generate random bytes: %w", err)
+	}
+	return hex.EncodeToString(bytes), nil
+}
+
+// SaveServiceAccessToken saves the service access token
+func SaveServiceAccessToken(token string) error {
+	if token == "" {
+		return fmt.Errorf("cannot save empty token")
+	}
+	
+	tokenFile := GetConfigFilePath(".service_access_token")
+	
+	// Ensure config directory exists
+	configDir := GetConfigFilePath("")
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
+	}
+	
+	// Write token with restricted permissions (readable only by owner)
+	if err := os.WriteFile(tokenFile, []byte(token), 0600); err != nil {
+		return fmt.Errorf("failed to write service access token file: %w", err)
+	}
+	
+	return nil
+}
+
+// GetServiceAccessToken retrieves the stored service access token
+func GetServiceAccessToken() (string, error) {
+	tokenFile := GetConfigFilePath(".service_access_token")
+	
+	content, err := os.ReadFile(tokenFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", fmt.Errorf("no service access token found")
+		}
+		return "", fmt.Errorf("failed to read service access token file: %w", err)
+	}
+	
+	return strings.TrimSpace(string(content)), nil
 }

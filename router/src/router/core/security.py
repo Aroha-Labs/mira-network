@@ -66,6 +66,8 @@ async def verify_token(
     token = credentials.credentials
     cache_key = f"token:{token}"
 
+    logger.info(f"Verifying token: {token}")
+
     # Try Redis first
     cached_data = await redis_client.get(cache_key)
     if cached_data:
@@ -81,6 +83,7 @@ async def verify_token(
         return result
 
     if token.startswith("mk-mira-"):
+        logger.info(f"Verifying machine token: {token}")
         result = await handle_machine_token(token, db)
         await cache_token_data(cache_key, json.dumps(result), CACHE_TTL)
         return result
@@ -199,6 +202,10 @@ async def verify_admin(user: User = Depends(verify_token)):
 
 
 async def verify_machine(token_data: dict = Depends(verify_token)):
+
+    logger.info(f"Verifying machine token: {token_data}")
+
     if token_data.get("type") != "machine":
+        logger.warning(f"Token is not a machine token. Type: {token_data.get('type')}")
         raise HTTPException(status_code=401, detail="Invalid machine token")
     return token_data

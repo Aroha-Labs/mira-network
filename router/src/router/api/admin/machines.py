@@ -57,6 +57,7 @@ async def register_machine(
         description=request.description,
         traffic_weight=request.traffic_weight,
         supported_models=request.supported_models,
+        service_access_token=request.service_access_token,
     )
     
     # Start transaction
@@ -76,6 +77,7 @@ async def register_machine(
                 machine_name=new_machine.name or f"machine-{new_machine.id}",
                 traffic_weight=new_machine.traffic_weight,
                 supported_models_list=new_machine.supported_models,
+                service_access_token=new_machine.service_access_token,
             )
             litellm_added = True
             logger.info(f"Machine {new_machine.id} added to LiteLLM")
@@ -119,6 +121,7 @@ async def register_machine(
             "disabled": new_machine.disabled,
             "traffic_weight": new_machine.traffic_weight,
             "supported_models": new_machine.supported_models,
+            "service_access_token": new_machine.service_access_token,
             "status": "registered",
             "message": "Machine registered successfully",
             "litellm_configured": litellm_added,
@@ -188,6 +191,7 @@ async def update_machine(
     old_disabled = machine.disabled
     old_traffic_weight = machine.traffic_weight
     old_supported_models = machine.supported_models
+    old_service_access_token = machine.service_access_token
     redis_updated = False
     litellm_updated = False
 
@@ -204,13 +208,15 @@ async def update_machine(
                     detail=f"Failed to update Redis: {str(e)}"
                 )
 
-        # Update LiteLLM if disabled status, traffic weight, or supported models changed
+        # Update LiteLLM if disabled status, traffic weight, supported models, or service token changed
         # Use current values if not provided in request
         new_disabled = request.disabled if request.disabled is not None else machine.disabled
         new_traffic_weight = request.traffic_weight if request.traffic_weight is not None else machine.traffic_weight
         new_supported_models = request.supported_models if request.supported_models is not None else machine.supported_models
+        new_service_access_token = request.service_access_token if request.service_access_token is not None else machine.service_access_token
         
-        if machine.disabled != new_disabled or machine.traffic_weight != new_traffic_weight or machine.supported_models != new_supported_models:
+        if (machine.disabled != new_disabled or machine.traffic_weight != new_traffic_weight or 
+            machine.supported_models != new_supported_models or machine.service_access_token != new_service_access_token):
             try:
                 await update_machine_in_litellm(
                     machine_id=machine.id,
@@ -219,6 +225,7 @@ async def update_machine(
                     enabled=not new_disabled,  # LiteLLM uses enabled, we store disabled
                     traffic_weight=new_traffic_weight,
                     supported_models_list=new_supported_models,
+                    service_access_token=new_service_access_token,
                 )
                 litellm_updated = True
                 logger.info(f"Machine {machine.id} updated in LiteLLM: {'disabled' if request.disabled else 'enabled'}, weight={request.traffic_weight}")
@@ -252,6 +259,8 @@ async def update_machine(
         # Only update supported_models if explicitly provided (not None)
         if request.supported_models is not None:
             machine.supported_models = request.supported_models
+        if request.service_access_token is not None:
+            machine.service_access_token = request.service_access_token
         machine.updated_at = datetime.utcnow()
 
         db.add(machine)
@@ -268,6 +277,7 @@ async def update_machine(
             "disabled": machine.disabled,
             "traffic_weight": machine.traffic_weight,
             "supported_models": machine.supported_models,
+            "service_access_token": machine.service_access_token,
             "litellm_synced": litellm_updated,
         }
 

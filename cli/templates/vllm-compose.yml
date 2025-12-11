@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  vllm:
+    image: vllm/vllm-openai:latest
+    container_name: mira-vllm
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['{{.GPUDevice}}']
+              capabilities: [gpu]
+    volumes:
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    environment:
+      - HUGGING_FACE_HUB_TOKEN={{.HFToken}}
+    ports:
+      - "{{.Port}}:8000"
+    ipc: host
+    command:
+      - "--model"
+      - "{{.Model}}"
+      - "--api-key"
+      - "{{.APIKey}}"
+      - "--max-model-len"
+      - "{{.MaxModelLen}}"
+    restart: unless-stopped
+    networks:
+      - mira-network
+
+networks:
+  mira-network:
+    external: true
+    name: mira-network

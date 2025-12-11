@@ -35,3 +35,7 @@ INFERENCE_LOGS_QUEUE_MAX = int(os.getenv("INFERENCE_LOGS_QUEUE_MAX", "10000"))
 ENABLE_CACHE = os.getenv("ENABLE_CACHE", "false").lower() == "true"
 CACHE_API_URL = os.getenv("CACHE_API_URL", "http://localhost:3000")
 CACHE_API_KEY = os.getenv("CACHE_API_KEY", "your-secret-api-key")
+
+# Grafana Configuration
+GRAFANA_API_URL = os.getenv("GRAFANA_API_URL", "http://localhost:3005")
+GRAFANA_API_KEY = os.getenv("GRAFANA_API_KEY", "")

@@ -2,10 +2,16 @@ package tui
 
 import (
 	"Aroha-Labs/mira-client/constants"
+	"Aroha-Labs/mira-client/internal/vllm"
 	"Aroha-Labs/mira-client/utils"
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -22,9 +28,11 @@ const (
 	WizStateWelcome WizardState = iota
 	WizStateShowInfo
 	WizStateGetAuthToken
+	WizStateGetDBMachineID
 	WizStateGetRouterURL
 	WizStateGetOpenRouterKey
 	WizStateGetOptionalKeys
+	WizStateAskVLLM
 	WizStateStartingContainer
 	WizStateComplete
 	WizStateError
@@ -33,6 +41,7 @@ const (
 type SetupWizardModel struct {
 	state           WizardState
 	machineID       string
+	dbMachineID     string
 	ipAddress       string
 	routerURL       string
 	openRouterKey   string
@@ -40,6 +49,10 @@ type SetupWizardModel struct {
 	anthropicKey    string
 	groqKey         string
 	openaiKey       string
+	serviceToken    string  // Service access token to protect the chat endpoint
+	dashboardURL    string  // Grafana dashboard URL
+	useVLLM         bool  // Whether user wants to use VLLM
+	vllmConfigured  bool  // Whether VLLM is already configured
 	currentInput    textinput.Model
 	spinner         spinner.Model
 	dockerOutput    []string
@@ -132,6 +145,23 @@ func (m SetupWizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.authToken = token
 				m.error = nil
 				_ = utils.SaveToken(m.authToken)
+				m.state = WizStateGetDBMachineID
+				m.currentInput.SetValue("")
+				m.currentInput.Placeholder = "Enter your database Machine ID (e.g., 26)"
+				return m, textinput.Blink
+			
+			case WizStateGetDBMachineID:
+				dbMachineID := m.currentInput.Value()
+				if dbMachineID == "" {
+					m.error = fmt.Errorf("Database Machine ID is required")
+					return m, nil
+				}
+				m.dbMachineID = dbMachineID
+				m.error = nil
+				// Save it for future use
+				dbIDFile := utils.GetConfigFilePath(".db_machine_id")
+				_ = os.WriteFile(dbIDFile, []byte(dbMachineID), 0644)
+				
 				m.state = WizStateGetRouterURL
 				m.currentInput.SetValue(constants.DEFAULT_ROUTER_URL)
 				m.currentInput.Placeholder = constants.DEFAULT_ROUTER_URL
@@ -193,7 +223,29 @@ func (m SetupWizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, textinput.Blink
 				}
 				
-				// Done with optional keys, start container
+				// Done with optional keys, now ask about VLLM
+				m.state = WizStateAskVLLM
+				// Check if VLLM is already configured
+				m.vllmConfigured = vllm.IsConfigured()
+				// Reset input for y/n question
+				m.currentInput.SetValue("")
+				m.currentInput.Placeholder = "n"
+				m.currentInput.Focus()
+				return m, textinput.Blink
+				
+			case WizStateAskVLLM:
+				// Process VLLM response (y/n)
+				response := strings.ToLower(strings.TrimSpace(m.currentInput.Value()))
+				if response == "y" || response == "yes" {
+					m.useVLLM = true
+				} else {
+					m.useVLLM = false
+				}
+				
+				// Save all API keys to env file
+				m.saveAPIKeys()
+				
+				// Start container
 				m.state = WizStateStartingContainer
 				m.progressSteps = []string{
 					"Pulling Docker image",
@@ -205,12 +257,21 @@ func (m SetupWizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.currentStep = 0
 				return m, tea.Batch(m.startContainer(), m.spinner.Tick)
 
-			case WizStateComplete, WizStateError:
+			case WizStateComplete:
+				// If user wants VLLM but it's not configured, offer to set it up
+				if m.useVLLM && !m.vllmConfigured {
+					// Go to VLLM menu for setup
+					vllmMenu := NewVLLMMenu()
+					return vllmMenu, vllmMenu.Init()
+				}
+				return NewMainMenu(), nil
+				
+			case WizStateError:
 				return NewMainMenu(), nil
 			}
 
 		default:
-			if m.state == WizStateGetOpenRouterKey || m.state == WizStateGetAuthToken || m.state == WizStateGetRouterURL || m.state == WizStateGetOptionalKeys {
+			if m.state == WizStateGetOpenRouterKey || m.state == WizStateGetAuthToken || m.state == WizStateGetDBMachineID || m.state == WizStateGetRouterURL || m.state == WizStateGetOptionalKeys || m.state == WizStateAskVLLM {
 				var cmd tea.Cmd
 				m.currentInput, cmd = m.currentInput.Update(msg)
 				return m, cmd
@@ -220,6 +281,8 @@ func (m SetupWizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case wizardDockerStartedMsg:
 		m.containerID = msg.containerID
 		m.isHealthy = msg.healthy
+		m.serviceToken = msg.serviceToken
+		m.dashboardURL = msg.dashboardURL
 		if msg.error != nil {
 			m.error = msg.error
 			m.state = WizStateError
@@ -251,8 +314,87 @@ func (m SetupWizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// saveAPIKeys saves all the API keys to the env file
+func (m *SetupWizardModel) saveAPIKeys() error {
+	// Create the config directory if it doesn't exist
+	configDir := utils.GetConfigFilePath("")
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
+	}
+	
+	// Build the env file content
+	var envContent strings.Builder
+	
+	// Always save OpenRouter key (required)
+	envContent.WriteString(fmt.Sprintf("OPENROUTER_API_KEY=%s\n", m.openRouterKey))
+	
+	// Save optional keys if provided
+	if m.anthropicKey != "" {
+		envContent.WriteString(fmt.Sprintf("ANTHROPIC_API_KEY=%s\n", m.anthropicKey))
+	}
+	if m.groqKey != "" {
+		envContent.WriteString(fmt.Sprintf("GROQ_API_KEY=%s\n", m.groqKey))
+	}
+	if m.openaiKey != "" {
+		envContent.WriteString(fmt.Sprintf("OPENAI_API_KEY=%s\n", m.openaiKey))
+	}
+	
+	// Write to the LLM keys env file
+	llmKeyFile := utils.GetConfigFilePath(constants.LLM_KEY_DOTENV_FILE)
+	if err := os.WriteFile(llmKeyFile, []byte(envContent.String()), 0600); err != nil {
+		return fmt.Errorf("failed to save API keys: %w", err)
+	}
+	
+	return nil
+}
+
 func (m SetupWizardModel) startContainer() tea.Cmd {
 	return func() tea.Msg {
+		// Generate service access token
+		serviceToken, err := utils.GenerateAccessToken()
+		if err != nil {
+			return wizardDockerStartedMsg{error: fmt.Errorf("failed to generate service token: %w", err)}
+		}
+		
+		// Save service access token
+		if err := utils.SaveServiceAccessToken(serviceToken); err != nil {
+			return wizardDockerStartedMsg{error: fmt.Errorf("failed to save service token: %w", err)}
+		}
+		
+		// Save LLM keys to env file
+		llmKeyFile := utils.GetConfigFilePath(constants.LLM_KEY_DOTENV_FILE)
+		configDir := filepath.Dir(llmKeyFile)
+		
+		// Create directory if it doesn't exist
+		if err := os.MkdirAll(configDir, 0755); err != nil {
+			return wizardDockerStartedMsg{error: fmt.Errorf("failed to create config directory: %w", err)}
+		}
+		
+		// Build env file content
+		var envContent strings.Builder
+		envContent.WriteString("# LLM Provider API Keys\n")
+		envContent.WriteString("# Generated by Mira CLI Setup Wizard\n\n")
+		
+		// OpenRouter is required
+		envContent.WriteString(fmt.Sprintf("OPENROUTER_API_KEY=%s\n", m.openRouterKey))
+		
+		// Optional keys
+		if m.anthropicKey != "" {
+			envContent.WriteString(fmt.Sprintf("ANTHROPIC_API_KEY=%s\n", m.anthropicKey))
+		}
+		if m.groqKey != "" {
+			envContent.WriteString(fmt.Sprintf("GROQ_API_KEY=%s\n", m.groqKey))
+			envContent.WriteString("GROQ_BASE_URL=https://api.groq.com/openai/v1\n")
+		}
+		if m.openaiKey != "" {
+			envContent.WriteString(fmt.Sprintf("OPENAI_API_KEY=%s\n", m.openaiKey))
+		}
+		
+		// Write the env file
+		if err := os.WriteFile(llmKeyFile, []byte(envContent.String()), 0600); err != nil {
+			return wizardDockerStartedMsg{error: fmt.Errorf("failed to write env file: %w", err)}
+		}
+		
 		// Pull latest image
 		pullCmd := exec.Command("docker", "pull", "ghcr.io/aroha-labs/mira-network-node-service:main")
 		if output, err := pullCmd.CombinedOutput(); err != nil {
@@ -260,19 +402,20 @@ func (m SetupWizardModel) startContainer() tea.Cmd {
 		}
 		
 		// Stop and remove existing container
-		exec.Command("docker", "stop", "mira-node").Run()
-		exec.Command("docker", "rm", "mira-node").Run()
+		exec.Command("docker", "stop", "mira-node-service").Run()
+		exec.Command("docker", "rm", "mira-node-service").Run()
 
 		// Start new container
 		args := []string{
 			"run", "-d",
-			"--name", "mira-node",
+			"--name", "mira-node-service",
 			"-p", "34523:8000",
 			"-e", "PORT=8000",  // Set Fastify to run on port 8000 inside container
 			"-e", fmt.Sprintf("MC_MACHINE_ID=%s", m.machineID),
 			"-e", fmt.Sprintf("MACHINE_IP=%s", m.ipAddress),
 			"-e", fmt.Sprintf("MACHINE_API_TOKEN=%s", m.authToken),
 			"-e", fmt.Sprintf("OPENROUTER_API_KEY=%s", m.openRouterKey),
+			"-e", fmt.Sprintf("SERVICE_ACCESS_TOKEN=%s", serviceToken),
 		}
 
 		// Add optional API keys if provided
@@ -295,6 +438,18 @@ func (m SetupWizardModel) startContainer() tea.Cmd {
 		}
 		args = append(args, "-e", fmt.Sprintf("ROUTER_BASE_URL=%s", routerURL))
 		args = append(args, "-e", fmt.Sprintf("MACHINE_NAME=mira-%s", m.machineID[:8]))
+		args = append(args, "-e", "LOG_LEVEL=info")
+		
+		// Only add VLLM env vars if user wants to use VLLM and it's configured
+		if m.useVLLM && m.vllmConfigured {
+			vllmConfig, err := vllm.LoadConfig()
+			if err == nil {
+				// Use host.docker.internal so container can reach VLLM on host
+				vllmURL := fmt.Sprintf("http://host.docker.internal:%d/v1", vllmConfig.Port)
+				args = append(args, "-e", fmt.Sprintf("VLLM_BASE_URL=%s", vllmURL))
+				args = append(args, "-e", fmt.Sprintf("VLLM_API_KEY=%s", vllmConfig.APIKey))
+			}
+		}
 		
 		// Add New Relic configuration
 		args = append(args, "-e", fmt.Sprintf("NEW_RELIC_APP_NAME=mira-network-node-%s", m.machineID[:8]))
@@ -321,9 +476,17 @@ func (m SetupWizardModel) startContainer() tea.Cmd {
 		// Check health
 		healthy := checkHealth()
 		
+		// Provision Grafana dashboard if we have a DB machine ID
+		dashboardURL := ""
+		if m.dbMachineID != "" {
+			dashboardURL = provisionWizardDashboard(m.machineID, m.dbMachineID, m.authToken)
+		}
+		
 		return wizardDockerStartedMsg{
-			containerID: containerID,
-			healthy:     healthy,
+			containerID:  containerID,
+			healthy:      healthy,
+			serviceToken: serviceToken,
+			dashboardURL: dashboardURL,
 		}
 	}
 }
@@ -338,10 +501,105 @@ func checkHealth() bool {
 	return resp.StatusCode == 200
 }
 
+// provisionWizardDashboard calls the router API to create a Grafana dashboard for the machine
+func provisionWizardDashboard(machineID, dbMachineID, authToken string) string {
+	// Debug logging
+	debugFile := "/tmp/mira-dashboard-debug.log"
+	if f, err := os.OpenFile(debugFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644); err == nil {
+		defer f.Close()
+		fmt.Fprintf(f, "\n=== Wizard Dashboard provisioning started at %s ===\n", time.Now().Format(time.RFC3339))
+		fmt.Fprintf(f, "Machine ID (UUID): %s\n", machineID)
+		fmt.Fprintf(f, "DB Machine ID: %s\n", dbMachineID)
+	}
+
+	// Use localhost:8000 for Grafana API calls from host
+	routerURL := "http://localhost:8000"
+	
+	// Get machine name for the dashboard
+	hostname, _ := os.Hostname()
+	if hostname == "" {
+		hostname = "Machine"
+	}
+
+	// Create request body with DB machine ID
+	requestBody := map[string]interface{}{
+		"machine_id":   dbMachineID,  // Use the DB machine ID
+		"machine_name": hostname,
+	}
+
+	jsonBody, err := json.Marshal(requestBody)
+	if err != nil {
+		if f, err := os.OpenFile(debugFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644); err == nil {
+			defer f.Close()
+			fmt.Fprintf(f, "❌ Failed to marshal request: %v\n", err)
+		}
+		return ""
+	}
+
+	apiURL := routerURL + "/api/grafana/provision-dashboard"
+	
+	req, err := http.NewRequest("POST", apiURL, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		if f, err := os.OpenFile(debugFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644); err == nil {
+			defer f.Close()
+			fmt.Fprintf(f, "❌ Failed to create request: %v\n", err)
+		}
+		return ""
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer " + authToken)
+
+	if f, err := os.OpenFile(debugFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644); err == nil {
+		defer f.Close()
+		fmt.Fprintf(f, "Request URL: %s\n", apiURL)
+		fmt.Fprintf(f, "Request Body: %s\n", string(jsonBody))
+		fmt.Fprintf(f, "Auth Token: %s...\n", authToken[:10])
+	}
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		if f, err := os.OpenFile(debugFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644); err == nil {
+			defer f.Close()
+			fmt.Fprintf(f, "❌ Request failed: %v\n", err)
+		}
+		return ""
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	
+	if f, err := os.OpenFile(debugFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644); err == nil {
+		defer f.Close()
+		fmt.Fprintf(f, "Response Status: %d\n", resp.StatusCode)
+		fmt.Fprintf(f, "Response Body: %s\n", string(body))
+	}
+
+	if resp.StatusCode == 200 {
+		var result struct {
+			Success      bool   `json:"success"`
+			DashboardURL string `json:"dashboard_url"`
+		}
+		if err := json.Unmarshal(body, &result); err == nil && result.Success {
+			if f, err := os.OpenFile(debugFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644); err == nil {
+				defer f.Close()
+				fmt.Fprintf(f, "✅ Dashboard provisioned successfully!\n")
+				fmt.Fprintf(f, "Dashboard URL: %s\n", result.DashboardURL)
+			}
+			return result.DashboardURL
+		}
+	}
+	
+	return ""
+}
+
 type wizardDockerStartedMsg struct {
-	containerID string
-	healthy     bool
-	error       error
+	containerID  string
+	healthy      bool
+	serviceToken string
+	dashboardURL string
+	error        error
 }
 
 type dockerProgressMsg struct {
@@ -360,12 +618,16 @@ func (m SetupWizardModel) View() string {
 		title = "📋 Admin Registration Required"
 	case WizStateGetAuthToken:
 		title = "🔐 Authentication Token (Required)"
+	case WizStateGetDBMachineID:
+		title = "🆔 Database Machine ID (Required)"
 	case WizStateGetRouterURL:
 		title = "🌐 Router URL Configuration"
 	case WizStateGetOpenRouterKey:
 		title = "🔑 OpenRouter API Key (Required)"
 	case WizStateGetOptionalKeys:
 		title = "🔧 Additional API Keys (Optional)"
+	case WizStateAskVLLM:
+		title = "🤖 Local VLLM Setup"
 	case WizStateStartingContainer:
 		title = "⚙️ Starting Node Service"
 	case WizStateComplete:
@@ -460,6 +722,16 @@ func (m SetupWizardModel) View() string {
 		s.WriteString("  " + HelpStyle.Render("This token is provided by your router admin") + "\n")
 		s.WriteString("  " + HelpStyle.Render("Without it, your node cannot join the network"))
 	
+	case WizStateGetDBMachineID:
+		s.WriteString("  " + InputPromptStyle.Render("Enter your Database Machine ID:") + "\n\n")
+		s.WriteString("  " + m.currentInput.View() + "\n\n")
+		if m.error != nil {
+			s.WriteString("  " + ErrorStyle.Render("❌ " + m.error.Error()) + "\n\n")
+		}
+		s.WriteString("  " + HelpStyle.Render("💡 This is the integer ID assigned by your router admin") + "\n")
+		s.WriteString("  " + HelpStyle.Render("Example: 23, 25, 26 (not a UUID)") + "\n")
+		s.WriteString("  " + HelpStyle.Render("Required for Grafana dashboard provisioning"))
+	
 	case WizStateGetRouterURL:
 		s.WriteString("  " + InputPromptStyle.Render("Enter the Router URL:") + "\n\n")
 		s.WriteString("  " + m.currentInput.View() + "\n\n")
@@ -469,6 +741,26 @@ func (m SetupWizardModel) View() string {
 		s.WriteString("  " + HelpStyle.Render("💡 Default: https://api.mira.network") + "\n")
 		s.WriteString("  " + HelpStyle.Render("This is the URL of your Mira Network router") + "\n")
 		s.WriteString("  " + HelpStyle.Render("Press Enter to use default or enter custom URL"))
+
+	case WizStateAskVLLM:
+		s.WriteString("  Do you have a local VLLM instance for running models locally?\n\n")
+		
+		if m.vllmConfigured {
+			s.WriteString("  " + SuccessStyle.Render("✓ VLLM is already configured on this system") + "\n")
+			s.WriteString("  Would you like to use it with the node service?\n\n")
+		} else {
+			s.WriteString("  VLLM allows you to run large language models locally on your GPU.\n")
+			s.WriteString("  If you have VLLM set up, the node service can route requests to it.\n\n")
+		}
+		
+		s.WriteString("  " + InputPromptStyle.Render("Use VLLM? (y/n):") + " ")
+		m.currentInput.Placeholder = "n"
+		s.WriteString(m.currentInput.View() + "\n\n")
+		
+		if !m.vllmConfigured {
+			s.WriteString("  " + HelpStyle.Render("ℹ️  VLLM setup will be offered after the wizard completes") + "\n")
+		}
+		s.WriteString("  " + HelpStyle.Render("You can always configure VLLM later from the main menu"))
 
 	case WizStateStartingContainer:
 		s.WriteString("  " + lipgloss.NewStyle().Foreground(BrandPrimary).Render("Starting Mira Node Service...") + "\n\n")
@@ -512,23 +804,45 @@ func (m SetupWizardModel) View() string {
 		if m.isHealthy {
 			health = "🟢 Healthy"
 		}
-		s.WriteString(fmt.Sprintf("  Health:      %s\n\n", health))
+		s.WriteString(fmt.Sprintf("  Health:      %s\n", health))
 		
-		// Show API endpoint
-		endpointContent := fmt.Sprintf("API Endpoint: http://%s:34523", m.ipAddress)
-		endpointBox := lipgloss.NewStyle().
+		// Show dashboard URL if available
+		if m.dashboardURL != "" {
+			s.WriteString(fmt.Sprintf("  Dashboard:   %s\n", m.dashboardURL))
+		}
+		s.WriteString("\n")
+		
+		// Show direct access information
+		directAccessContent := fmt.Sprintf(
+			"📡 Direct Machine Access:\n"+
+			"   Base URL: %s/v1/machines/%s\n"+
+			"   Health:   %s/v1/machines/%s/health\n\n"+
+			"🔐 Service Access Token:\n%s",
+			m.routerURL, m.machineID,
+			m.routerURL, m.machineID,
+			m.serviceToken,
+		)
+		
+		accessBox := lipgloss.NewStyle().
 			BorderStyle(lipgloss.RoundedBorder()).
 			BorderForeground(SuccessColor).
 			Padding(0, 2).
-			Width(50).
-			Render(endpointContent)
+			Width(70).
+			Render(directAccessContent)
 		
 		// Add each line of the box with proper indentation
-		for _, line := range strings.Split(endpointBox, "\n") {
+		for _, line := range strings.Split(accessBox, "\n") {
 			s.WriteString("  " + line + "\n")
 		}
 		s.WriteString("\n")
-		s.WriteString("  " + lipgloss.NewStyle().Foreground(TextSecondary).Render("Your node is now part of the Mira Network!") + "\n\n")
+		
+		// Show quick usage example
+		s.WriteString("  🚀 Quick Start:\n")
+		s.WriteString(fmt.Sprintf("     client = OpenAI(base_url=\"%s/v1/machines/%s\", api_key=\"your_api_key\")\n", m.routerURL, m.machineID))
+		s.WriteString("\n")
+		
+		s.WriteString("  " + WarningStyle.Render("⚠️  IMPORTANT: Save this service access token!") + "\n")
+		s.WriteString("  " + InfoStyle.Render("💡 This URL bypasses the load balancer for direct machine access") + "\n\n")
 		s.WriteString("  " + HelpStyle.Render("Press Enter to return to menu"))
 
 	case WizStateError:

@@ -13,7 +13,7 @@ import {
 } from "@heroicons/react/24/outline";
 import Loading from "src/components/PageLoading";
 import ErrorMessage from "src/components/ErrorMessage";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog } from "@headlessui/react";
 import { Menu, Transition } from "@headlessui/react";
@@ -41,6 +41,9 @@ interface Machine {
   traffic_weight?: number;
   supported_models?: string[];
   auth_tokens?: MachineToken[];
+  service_access_token?: string;
+  proxy_base_url?: string;
+  openai_compatible_base?: string;
 }
 
 interface RegisterMachineRequest {
@@ -49,6 +52,7 @@ interface RegisterMachineRequest {
   description?: string;
   traffic_weight?: number;
   supported_models?: string[];
+  service_access_token?: string;
 }
 
 interface UpdateMachineRequest {
@@ -58,6 +62,7 @@ interface UpdateMachineRequest {
   disabled?: boolean;
   traffic_weight?: number;
   supported_models?: string[];
+  service_access_token?: string;
 }
 
 interface SortConfig {
@@ -110,7 +115,195 @@ const truncateString = (str: string, showLength: number = 4) => {
   return `${str.slice(0, showLength)}...${str.slice(-showLength)}`;
 };
 
-const MachineCard = ({ machine }: { machine: Machine }) => {
+const getModelDisplayInfo = (model: string, settings?: any) => {
+  // If we have settings, look up the full ID from the model key
+  let fullId = model;
+  if (settings) {
+    const supportedModels = settings.find(
+      (s: SystemSetting) => s.name === "SUPPORTED_MODELS"
+    );
+    if (supportedModels?.value?.[model]?.id) {
+      fullId = supportedModels.value[model].id;
+    }
+  }
+
+  // Parse provider from the full ID
+  const parts = fullId.split("/");
+  const provider = parts.length > 1 ? parts[0] : "";
+
+  let badge = "";
+  let badgeClass = "";
+
+  if (provider === "vllm") {
+    badge = "GPU";
+    badgeClass = "bg-green-100 text-green-800";
+  } else if (provider === "openrouter") {
+    badge = "Proxy";
+    badgeClass = "bg-blue-100 text-blue-800";
+  }
+
+  // Always return the original model name (key) for display
+  return { modelName: model, badge, badgeClass, provider };
+};
+
+const DirectAccessDropdown = ({ machine }: { machine: Machine }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  // Use the router URL from environment or default
+  const routerUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const baseUrl = `${routerUrl}${machine.proxy_base_url}`;
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isOpen]);
+
+  // Get a sample model from the machine's supported models
+  const sampleModel = machine.supported_models?.[0] || "gpt-4";
+  
+  const examples = [
+    {
+      title: "OpenAI SDK (Python)",
+      code: `from openai import OpenAI
+
+client = OpenAI(
+    base_url="${baseUrl}",
+    api_key="your_mira_api_key"  # Your Mira router API key
+)
+
+response = client.chat.completions.create(
+    model="${sampleModel}",  # Routes directly to machine ${machine.id}
+    messages=[
+        {"role": "user", "content": "Hello!"}
+    ]
+)`,
+    },
+    {
+      title: "OpenAI SDK (Node.js)",
+      code: `import OpenAI from 'openai';
+
+const client = new OpenAI({
+    baseURL: '${baseUrl}',
+    apiKey: 'your_mira_api_key'  // Your Mira router API key
+});
+
+const response = await client.chat.completions.create({
+    model: '${sampleModel}',  // Routes directly to machine ${machine.id}
+    messages: [
+        { role: 'user', content: 'Hello!' }
+    ]
+});`,
+    },
+    {
+      title: "cURL Request",
+      code: `curl -X POST "${baseUrl}/v1/chat/completions" \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer your_mira_api_key" \\
+  -d '{
+    "model": "${sampleModel}",
+    "messages": [
+      {"role": "user", "content": "Hello!"}
+    ]
+  }'`,
+    },
+    {
+      title: "Direct URL",
+      code: baseUrl,
+      isUrl: true,
+    },
+  ];
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="p-1.5 text-gray-400 hover:text-gray-600 rounded-md hover:bg-gray-50"
+        title="Direct access examples"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+          strokeWidth={1.5}
+          stroke="currentColor"
+          className="w-5 h-5"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244"
+          />
+        </svg>
+      </button>
+
+      {isOpen && (
+        <div className="overflow-y-auto absolute right-0 z-30 mt-2 w-96 max-h-96 bg-white rounded-lg border border-gray-200 shadow-xl">
+          <div className="p-4">
+            <div className="pb-2 mb-3 text-sm font-semibold text-gray-800 border-b border-gray-100">
+              Direct Access Examples
+            </div>
+            <div className="p-2 mb-3 bg-blue-50 rounded-md border border-blue-200">
+              <div className="mb-1 text-xs font-medium text-blue-800">Base URL:</div>
+              <div className="flex items-center gap-1.5">
+                <span className="font-mono text-xs text-blue-700 break-all">
+                  {baseUrl}
+                </span>
+                <CopyToClipboardIcon
+                  text={baseUrl}
+                  className="text-blue-600 hover:text-blue-800 shrink-0"
+                  tooltipText="Copy base URL"
+                />
+              </div>
+            </div>
+            {examples.slice(0, 3).map((example, index) => (
+              <div key={index} className="mb-4 last:mb-0">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-sm font-medium text-gray-700">
+                    {example.title}
+                  </span>
+                  <CopyToClipboardIcon
+                    text={example.code}
+                    className="text-gray-400 hover:text-gray-600"
+                    tooltipText={`Copy ${example.title.toLowerCase()}`}
+                  />
+                </div>
+                <div
+                  className={`p-3 bg-gray-900 rounded-md text-xs font-mono overflow-x-auto border ${
+                    example.isUrl ? "text-blue-300" : "text-green-300"
+                  }`}
+                >
+                  <pre className="leading-relaxed whitespace-pre-wrap">
+                    {example.code}
+                  </pre>
+                </div>
+              </div>
+            ))}
+            <div className="pt-3 mt-4 border-t border-gray-100">
+              <p className="text-xs text-gray-500">
+                💡 Replace "gpt-4" with any supported model from your machine's model
+                list.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const MachineCard = ({ machine, settings }: { machine: Machine; settings?: any }) => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isAuthTokenModalOpen, setIsAuthTokenModalOpen] = useState(false);
   const [showStatusConfirmation, setShowStatusConfirmation] = useState(false);
@@ -242,6 +435,7 @@ const MachineCard = ({ machine }: { machine: Machine }) => {
                   </svg>
                 )}
               </button>
+              {machine.proxy_base_url && <DirectAccessDropdown machine={machine} />}
               <button
                 onClick={() => setIsAuthTokenModalOpen(true)}
                 className="p-1.5 text-gray-400 hover:text-gray-600 rounded-md hover:bg-gray-50"
@@ -299,14 +493,27 @@ const MachineCard = ({ machine }: { machine: Machine }) => {
                   <dt className="text-sm font-medium text-gray-500">Supported Models</dt>
                   <dd className="mt-1 text-sm text-gray-900">
                     <div className="flex flex-wrap gap-1">
-                      {machine.supported_models.slice(0, 3).map((model) => (
-                        <span
-                          key={model}
-                          className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800"
-                        >
-                          {model}
-                        </span>
-                      ))}
+                      {machine.supported_models.slice(0, 3).map((model) => {
+                        const { modelName, badge, badgeClass } = getModelDisplayInfo(
+                          model,
+                          settings
+                        );
+                        return (
+                          <span
+                            key={model}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800"
+                          >
+                            {modelName}
+                            {badge && (
+                              <span
+                                className={`px-1 py-0 font-semibold rounded text-[10px] ${badgeClass}`}
+                              >
+                                {badge}
+                              </span>
+                            )}
+                          </span>
+                        );
+                      })}
                       {machine.supported_models.length > 3 && (
                         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
                           +{machine.supported_models.length - 3} more
@@ -328,6 +535,23 @@ const MachineCard = ({ machine }: { machine: Machine }) => {
                   )}
                 </dd>
               </div>
+              {machine.service_access_token && (
+                <div className="col-span-2">
+                  <dt className="text-sm font-medium text-gray-500">
+                    Service Access Token
+                  </dt>
+                  <dd className="flex items-center gap-1.5 mt-1">
+                    <span className="font-mono text-xs text-gray-600">
+                      {truncateString(machine.service_access_token, 8)}
+                    </span>
+                    <CopyToClipboardIcon
+                      text={machine.service_access_token}
+                      className="text-gray-400"
+                      tooltipText="Copy service token"
+                    />
+                  </dd>
+                </div>
+              )}
             </dl>
           </div>
         </div>
@@ -394,6 +618,7 @@ const RegisterMachineModal = ({
     description: "",
     traffic_weight: 0.5,
     supported_models: undefined,
+    service_access_token: "",
   });
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const queryClient = useQueryClient();
@@ -412,6 +637,7 @@ const RegisterMachineModal = ({
       (s: SystemSetting) => s.name === "SUPPORTED_MODELS"
     );
     if (supportedModels?.value) {
+      // Return just the keys for cleaner display
       return Object.keys(supportedModels.value);
     }
     return [];
@@ -428,6 +654,7 @@ const RegisterMachineModal = ({
         description: "",
         traffic_weight: 0.5,
         supported_models: undefined,
+        service_access_token: "",
       });
       setSelectedModels([]);
     },
@@ -519,6 +746,31 @@ const RegisterMachineModal = ({
 
               <div>
                 <label
+                  htmlFor="service_access_token"
+                  className="block mb-1 text-sm font-medium text-gray-700"
+                >
+                  Service Access Token
+                </label>
+                <input
+                  type="text"
+                  id="service_access_token"
+                  value={formData.service_access_token}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      service_access_token: e.target.value,
+                    }))
+                  }
+                  className="w-full rounded-md border-gray-300 shadow-xs focus:border-blue-500 focus:ring-blue-500"
+                  placeholder="Token from node-service"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  The service access token that protects this node&apos;s chat endpoint
+                </p>
+              </div>
+
+              <div>
+                <label
                   htmlFor="traffic_weight"
                   className="block mb-1 text-sm font-medium text-gray-700"
                 >
@@ -558,20 +810,35 @@ const RegisterMachineModal = ({
                 </p>
                 {availableModels.length > 0 ? (
                   <div className="overflow-y-auto p-2 space-y-2 max-h-40 rounded-md border border-gray-200">
-                    {availableModels.map((model) => (
-                      <label
-                        key={model}
-                        className="flex items-center p-1 space-x-2 rounded cursor-pointer hover:bg-gray-50"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedModels.includes(model)}
-                          onChange={() => toggleModel(model)}
-                          className="text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                        />
-                        <span className="text-sm text-gray-700">{model}</span>
-                      </label>
-                    ))}
+                    {availableModels.map((model) => {
+                      const { modelName, badge, badgeClass } = getModelDisplayInfo(
+                        model,
+                        settings
+                      );
+                      return (
+                        <label
+                          key={model}
+                          className="flex items-center p-1 space-x-2 rounded cursor-pointer hover:bg-gray-50"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedModels.includes(model)}
+                            onChange={() => toggleModel(model)}
+                            className="text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                          />
+                          <span className="flex gap-1 items-center text-sm text-gray-700">
+                            {modelName}
+                            {badge && (
+                              <span
+                                className={`px-1.5 py-0 rounded text-[10px] font-semibold ${badgeClass}`}
+                              >
+                                {badge}
+                              </span>
+                            )}
+                          </span>
+                        </label>
+                      );
+                    })}
                   </div>
                 ) : (
                   <p className="text-sm italic text-gray-500">
@@ -626,6 +893,7 @@ const EditMachineModal = ({
     disabled: machine.disabled,
     traffic_weight: machine.traffic_weight || 0.5,
     supported_models: machine.supported_models, // Include existing supported_models
+    service_access_token: machine.service_access_token || "",
   });
   const [selectedModels, setSelectedModels] = useState<string[]>(
     machine.supported_models || []
@@ -647,6 +915,7 @@ const EditMachineModal = ({
       (s: SystemSetting) => s.name === "SUPPORTED_MODELS"
     );
     if (supportedModels?.value) {
+      // Return just the keys for cleaner display
       return Object.keys(supportedModels.value);
     }
     return [];
@@ -773,6 +1042,31 @@ const EditMachineModal = ({
 
               <div>
                 <label
+                  htmlFor="edit-service-token"
+                  className="block mb-1 text-sm font-medium text-gray-700"
+                >
+                  Service Access Token
+                </label>
+                <input
+                  type="text"
+                  id="edit-service-token"
+                  value={formData.service_access_token}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      service_access_token: e.target.value,
+                    }))
+                  }
+                  className="w-full rounded-md border-gray-300 shadow-xs focus:border-blue-500 focus:ring-blue-500"
+                  placeholder="Token from node-service"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  The service access token that protects this node&apos;s chat endpoint
+                </p>
+              </div>
+
+              <div>
+                <label
                   htmlFor="edit-traffic-weight"
                   className="block mb-1 text-sm font-medium text-gray-700"
                 >
@@ -826,20 +1120,35 @@ const EditMachineModal = ({
                           </button>
                         )}
                       </div>
-                      {availableModels.map((model) => (
-                        <label
-                          key={model}
-                          className="flex items-center px-2 py-1 space-x-2 rounded cursor-pointer hover:bg-gray-100"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedModels.includes(model)}
-                            onChange={() => toggleModel(model)}
-                            className="text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                          />
-                          <span className="text-sm text-gray-700">{model}</span>
-                        </label>
-                      ))}
+                      {availableModels.map((model) => {
+                        const { modelName, badge, badgeClass } = getModelDisplayInfo(
+                          model,
+                          settings
+                        );
+                        return (
+                          <label
+                            key={model}
+                            className="flex items-center px-2 py-1 space-x-2 rounded cursor-pointer hover:bg-gray-100"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedModels.includes(model)}
+                              onChange={() => toggleModel(model)}
+                              className="text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                            />
+                            <span className="flex gap-1 items-center text-sm text-gray-700">
+                              {modelName}
+                              {badge && (
+                                <span
+                                  className={`px-1.5 py-0 rounded text-[10px] font-semibold ${badgeClass}`}
+                                >
+                                  {badge}
+                                </span>
+                              )}
+                            </span>
+                          </label>
+                        );
+                      })}
                     </>
                   ) : (
                     <p className="text-sm text-gray-500">Loading models...</p>
@@ -1154,6 +1463,16 @@ const AdminMachines = () => {
     refetchInterval: 30000,
   });
 
+  // Fetch settings for model provider badges
+  const { data: settings } = useQuery({
+    queryKey: ["settings"],
+    queryFn: async () => {
+      const response = await api.get("/admin/settings");
+      return response.data;
+    },
+    enabled: !!userSession?.access_token,
+  });
+
   const filteredAndSortedMachines = useMemo(() => {
     if (!data) return [];
 
@@ -1406,7 +1725,11 @@ const AdminMachines = () => {
           ) : (
             <>
               {filteredAndSortedMachines.map((machine) => (
-                <MachineCard key={machine.network_ip} machine={machine} />
+                <MachineCard
+                  key={machine.network_ip}
+                  machine={machine}
+                  settings={settings}
+                />
               ))}
             </>
           )}
