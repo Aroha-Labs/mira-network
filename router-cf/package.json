@@ -1,0 +1,26 @@
+{
+  "name": "mira-router-cf",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun run alchemy.run.ts --dev",
+    "deploy": "bun run alchemy.run.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260301.1",
+    "@types/bun": "latest",
+    "drizzle-kit": "^0.31.9",
+    "typescript": "^5",
+    "wrangler": "^4.70.0"
+  },
+  "dependencies": {
+    "@hono/zod-validator": "^0.7.6",
+    "@supabase/supabase-js": "^2.98.0",
+    "alchemy": "^0.87.0",
+    "drizzle-orm": "^0.45.1",
+    "hono": "^4.12.5",
+    "zod": "^4.3.6"
+  }
+}
