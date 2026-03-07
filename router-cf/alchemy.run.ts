@@ -25,6 +25,7 @@ const gateway = await AiGateway("mira-gateway", {
   rateLimitingInterval: 60,
   rateLimitingLimit: 1000,
   rateLimitingTechnique: "sliding",
+  authentication: true, // Required for cf-aig-authorization header
 });
 
 console.log("SUPABASE_SECRET_KEY", process.env.SUPABASE_WEBHOOK_SECRET);
@@ -39,7 +40,7 @@ export const api = await Worker("mira-api", {
     BILLING_DB: billingDb,
     KV: kv,
     AI: Ai(),
-    GATEWAY_ID: "mira-gateway",
+    GATEWAY_ID: gateway.id,
     CF_ACCOUNT_ID: process.env.CLOUDFLARE_ACCOUNT_ID!,
     CF_API_TOKEN: process.env.CLOUDFLARE_API_TOKEN!,
     SUPABASE_URL: process.env.SUPABASE_URL!,
