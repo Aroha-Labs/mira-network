@@ -1,10 +1,10 @@
 import { Hono } from "hono";
 import type { AppContext } from "../env";
-import { authMiddleware } from "../middleware/auth";
 
 export const proxyRoutes = new Hono<AppContext>();
 
-proxyRoutes.use("*", authMiddleware);
+// No auth - browser <img> tags don't send Authorization headers
+// This only proxies from allowed domains (Google, GitHub, etc.)
 
 // GET /proxy-image - Proxy external images (for avatars, etc.)
 proxyRoutes.get("/proxy-image", async (c) => {
@@ -36,7 +36,7 @@ proxyRoutes.get("/proxy-image", async (c) => {
     });
 
     if (!response.ok) {
-      return c.json({ error: "Failed to fetch image" }, response.status);
+      return c.json({ error: "Failed to fetch image" }, 502);
     }
 
     const contentType = response.headers.get("content-type") || "image/jpeg";

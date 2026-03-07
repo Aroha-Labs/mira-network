@@ -61,11 +61,13 @@ adminRoutes.get("/users", zValidator("query", usersQuerySchema), async (c) => {
 
       return {
         id: user.id,
+        user_id: user.id, // Alias for frontend compatibility
         email: user.email,
         full_name: user.fullName,
         avatar_url: user.avatarUrl,
         provider: user.provider,
         roles: JSON.parse(user.roles || '["user"]'),
+        custom_claim: { roles: JSON.parse(user.roles || '["user"]') }, // For RoleTag component
         credits,
         created_at: user.createdAt,
         updated_at: user.updatedAt,
@@ -76,7 +78,7 @@ adminRoutes.get("/users", zValidator("query", usersQuerySchema), async (c) => {
   const filteredUsers = usersWithCredits.filter((u) => u !== null);
 
   return c.json({
-    items: filteredUsers,
+    users: filteredUsers,
     total,
     page,
     page_size: pageSize,

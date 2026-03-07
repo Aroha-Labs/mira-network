@@ -84,7 +84,7 @@ const AnalyticsSection: React.FC<AnalyticsSectionProps> = () => {
         </div>
         {isLoggedIn ? (
           <Link
-            href="/analytics"
+            href="/api-logs"
             className="flex items-center text-gray-700 rounded-full px-3 py-1 ml-4 border border-gray-300 text-sm hover:bg-gray-200 active:bg-gray-300 transition"
           >
             View analytics

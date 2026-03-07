@@ -53,6 +53,7 @@ webhooksRoutes.post("/user-claims", async (c) => {
     }, webhookSecret);
 
     if (!isValid) {
+      console.log("[webhook] Signature verification failed");
       return c.json({ error: "Invalid webhook signature" }, 401);
     }
   }

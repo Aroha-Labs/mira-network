@@ -2,7 +2,7 @@ import { createMiddleware } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
 import { createClient } from "@supabase/supabase-js";
 import type { AppContext, AuthUser } from "../env";
-import { createUsersDb, apiTokens } from "../db";
+import { createUsersDb, apiTokens, users } from "../db";
 import { eq, isNull, and } from "drizzle-orm";
 
 // Hash token for KV key (tokens can be 1000+ chars, KV limit is 512)
@@ -51,10 +51,21 @@ export const authMiddleware = createMiddleware<AppContext>(async (c, next) => {
       throw new HTTPException(401, { message: "Invalid API token" });
     }
 
+    // Fetch roles from D1
+    const userRecord = await usersDb
+      .select({ roles: users.roles })
+      .from(users)
+      .where(eq(users.id, tokenRecord.userId))
+      .limit(1);
+
+    const roles = userRecord[0]?.roles
+      ? JSON.parse(userRecord[0].roles)
+      : ["user"];
+
     user = {
       id: tokenRecord.userId,
       email: "",
-      roles: ["user"],
+      roles,
     };
   } else {
     // Supabase JWT
@@ -68,10 +79,22 @@ export const authMiddleware = createMiddleware<AppContext>(async (c, next) => {
       throw new HTTPException(401, { message: "Invalid JWT token" });
     }
 
+    // Fetch roles from D1 (our source of truth for roles)
+    const usersDb = createUsersDb(c.env.USERS_DB);
+    const userRecord = await usersDb
+      .select({ roles: users.roles })
+      .from(users)
+      .where(eq(users.id, supabaseUser.id))
+      .limit(1);
+
+    const roles = userRecord[0]?.roles
+      ? JSON.parse(userRecord[0].roles)
+      : ["user"];
+
     user = {
       id: supabaseUser.id,
       email: supabaseUser.email || "",
-      roles: (supabaseUser.user_metadata?.roles as string[]) || ["user"],
+      roles,
     };
   }
 

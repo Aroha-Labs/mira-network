@@ -99,13 +99,6 @@ export const paginationQuerySchema = z.object({
   page_size: z.coerce.number().min(1).max(100).optional(),
 });
 
-export const logsQuerySchema = paginationQuerySchema.extend({
-  start_date: z.string().optional(),
-  end_date: z.string().optional(),
-  model: z.string().optional(),
-  user_id: z.string().optional(),
-});
-
 export const usersQuerySchema = paginationQuerySchema.extend({
   search: z.string().optional(),
   sort_by: z.string().optional(),

@@ -8,10 +8,10 @@ import { flowsRoutes } from "./routes/flows";
 import { flowCompletionsRoutes } from "./routes/flow-completions";
 import { tokensRoutes } from "./routes/tokens";
 import { creditsRoutes } from "./routes/credits";
-import { logsRoutes } from "./routes/logs";
 import { adminRoutes } from "./routes/admin/index";
 import { webhooksRoutes } from "./routes/webhooks";
 import { proxyRoutes } from "./routes/proxy";
+import { logsRoutes } from "./routes/logs";
 
 const app = new Hono<AppContext>();
 
@@ -41,11 +41,11 @@ app.route("/flows", flowsRoutes);
 // API tokens - /api-tokens
 app.route("/api-tokens", tokensRoutes);
 
-// Proxy - /proxy-image
-app.route("/", proxyRoutes);
-
 // Webhooks - /webhooks/* (no auth, verified by signature) - MUST be before root-mounted routes
 app.route("/webhooks", webhooksRoutes);
+
+// Proxy - /proxy-image
+app.route("/", proxyRoutes);
 
 // Admin routes - /admin/* (requires admin auth)
 app.route("/admin", adminRoutes);
@@ -53,7 +53,7 @@ app.route("/admin", adminRoutes);
 // Credits - /user-credits, /user-credits-history (mounted at root, has auth middleware)
 app.route("/", creditsRoutes);
 
-// Logs - /api-logs, /api-logs/metrics, /total-inference-calls (mounted at root, has auth middleware)
+// Logs - /api-logs, /api-logs/metrics, /total-inference-calls (fetches from AI Gateway)
 app.route("/", logsRoutes);
 
 export default app;

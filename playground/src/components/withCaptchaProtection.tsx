@@ -1,23 +1,15 @@
 import React from "react";
-import { useCaptcha } from "src/contexts/CaptchaContext";
-import Loading from "src/components/PageLoading";
 
-// Hook for protecting content
+// CAPTCHA is disabled - always return verified
 export const useCaptchaProtection = () => {
-  const { isVerified, showCaptcha } = useCaptcha();
-  return { isVerified, showCaptcha };
+  return { isVerified: true, showCaptcha: false };
 };
 
+// CAPTCHA is disabled - just render the component directly
 export const withCaptchaProtection = <P extends object>(
   Component: React.ComponentType<P>
 ) => {
   return function ProtectedComponent(props: P) {
-    const { isVerified } = useCaptcha();
-
-    if (!isVerified) {
-      return <Loading fullPage text="Waiting for verification..." />;
-    }
-
     return <Component {...props} />;
   };
 };
