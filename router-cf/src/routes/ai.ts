@@ -10,14 +10,11 @@ import { calculateCost, deductCredits, estimateTokens } from "../lib/credits";
 
 export const aiRoutes = new Hono<AppContext>();
 
-// Create OpenAI client for AI Gateway
+// Create OpenAI client for AI Gateway (Unified Billing)
 function createGatewayClient(env: AppContext["Bindings"]) {
   return new OpenAI({
     apiKey: env.CF_API_TOKEN,
     baseURL: `https://gateway.ai.cloudflare.com/v1/${env.CF_ACCOUNT_ID}/${env.GATEWAY_ID}/compat`,
-    defaultHeaders: {
-      "cf-aig-authorization": `Bearer ${env.CF_API_TOKEN}`,
-    },
   });
 }
 
