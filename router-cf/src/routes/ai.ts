@@ -6,7 +6,7 @@ import type { AppContext } from "../env";
 import { authMiddleware } from "../middleware/auth";
 import { getAllModels, getModel } from "../lib/models";
 import { chatCompletionRequestSchema, verifyRequestSchema } from "../schemas";
-import { calculateCost, deductCredits, estimateTokens } from "../lib/credits";
+import { calculateCost, deductCredits, estimateTokens, getUserCredits } from "../lib/credits";
 
 export const aiRoutes = new Hono<AppContext>();
 
@@ -41,8 +41,7 @@ aiRoutes.post(
     // Check credits (skip for free models)
     const isFreeModel = modelInfo.promptTokenPrice === 0 && modelInfo.completionTokenPrice === 0;
     if (!isFreeModel) {
-      const creditsStr = await c.env.KV.get(`credits:${user.id}`);
-      const credits = creditsStr ? parseFloat(creditsStr) : 0;
+      const credits = await getUserCredits(c.env, user.id);
       if (credits <= 0) {
         return c.json({ detail: "Insufficient credits" }, 402);
       }
@@ -139,8 +138,7 @@ aiRoutes.post(
     const user = c.get("user")!;
 
     // Check credits
-    const creditsStr = await c.env.KV.get(`credits:${user.id}`);
-    const credits = creditsStr ? parseFloat(creditsStr) : 0;
+    const credits = await getUserCredits(c.env, user.id);
     if (credits <= 0) {
       return c.json({ detail: "Insufficient credits" }, 402);
     }

@@ -1,5 +1,5 @@
 import alchemy from "alchemy";
-import { Worker, D1Database, KVNamespace, AiGateway, Ai } from "alchemy/cloudflare";
+import { Worker, D1Database, KVNamespace, AiGateway, Ai, DurableObjectNamespace } from "alchemy/cloudflare";
 
 const app = await alchemy("mira-router", {
   stage: process.env.STAGE ?? "dev",
@@ -18,6 +18,12 @@ const billingDb = await D1Database("mira-billing-db", {
 
 // KV Namespace
 const kv = await KVNamespace("mira-kv");
+
+// Durable Object for credits (atomic operations, no race conditions)
+const creditsDO = DurableObjectNamespace("credits", {
+  className: "CreditsDO",
+  sqlite: true,
+});
 
 // AI Gateway
 const gateway = await AiGateway("mira-gateway", {
@@ -39,6 +45,7 @@ export const api = await Worker("mira-api", {
     APP_DB: appDb,
     BILLING_DB: billingDb,
     KV: kv,
+    CREDITS_DO: creditsDO,
     AI: Ai(),
     GATEWAY_ID: gateway.id,
     CF_ACCOUNT_ID: process.env.CLOUDFLARE_ACCOUNT_ID!,

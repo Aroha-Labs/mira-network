@@ -8,6 +8,7 @@ import { createAppDb, flows } from "../db";
 import { eq } from "drizzle-orm";
 import { getModel } from "../lib/models";
 import { flowChatCompletionRequestSchema } from "../schemas";
+import { getUserCredits } from "../lib/credits";
 
 export const flowCompletionsRoutes = new Hono<AppContext>();
 
@@ -31,8 +32,7 @@ flowCompletionsRoutes.post(
     const { model, messages, variables = {}, stream, tools, tool_choice } = c.req.valid("json");
 
     // Check credits
-    const creditsStr = await c.env.KV.get(`credits:${user.id}`);
-    const credits = creditsStr ? parseFloat(creditsStr) : 0;
+    const credits = await getUserCredits(c.env, user.id);
     if (credits <= 0) {
       return c.json({ detail: "Insufficient credits" }, 402);
     }

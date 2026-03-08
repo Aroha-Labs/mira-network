@@ -3,6 +3,7 @@ import type { AppContext } from "../env";
 import { authMiddleware } from "../middleware/auth";
 import { createBillingDb, createUsersDb, creditHistory, users } from "../db";
 import { eq, desc, count } from "drizzle-orm";
+import { getUserCredits } from "../lib/credits";
 
 export const creditsRoutes = new Hono<AppContext>();
 
@@ -20,8 +21,7 @@ creditsRoutes.get("/me", async (c) => {
   }
 
   const user = result[0]!;
-  const creditsStr = await c.env.KV.get(`credits:${user.id}`);
-  const credits = creditsStr ? parseFloat(creditsStr) : 0;
+  const credits = await getUserCredits(c.env, user.id);
 
   return c.json({
     id: user.id,
@@ -37,13 +37,10 @@ creditsRoutes.get("/me", async (c) => {
   });
 });
 
-// GET /user-credits - get current balance from KV
+// GET /user-credits - get current balance
 creditsRoutes.get("/user-credits", async (c) => {
   const user = c.get("user")!;
-
-  const creditsStr = await c.env.KV.get(`credits:${user.id}`);
-  const credits = creditsStr ? parseFloat(creditsStr) : 0;
-
+  const credits = await getUserCredits(c.env, user.id);
   return c.json({ credits });
 });
 

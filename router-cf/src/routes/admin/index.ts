@@ -2,14 +2,15 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import type { AppContext } from "../../env";
 import { authMiddleware, requireAdmin } from "../../middleware/auth";
-import { createUsersDb, createAppDb, createBillingDb, users, settings, creditHistory } from "../../db";
-import { eq, like, sql, desc, and, gte, lte } from "drizzle-orm";
+import { createUsersDb, createAppDb, users, settings } from "../../db";
+import { eq, like, sql, and } from "drizzle-orm";
 import {
   addCreditRequestSchema,
   updateUserClaimsRequestSchema,
   updateSettingRequestSchema,
   usersQuerySchema,
 } from "../../schemas";
+import { getUserCredits, addCredits } from "../../lib/credits";
 
 export const adminRoutes = new Hono<AppContext>();
 
@@ -49,11 +50,10 @@ adminRoutes.get("/users", zValidator("query", usersQuerySchema), async (c) => {
 
   const total = countResult[0]?.count || 0;
 
-  // Get credits for each user from KV
+  // Get credits for each user
   const usersWithCredits = await Promise.all(
     usersList.map(async (user) => {
-      const creditsStr = await c.env.KV.get(`credits:${user.id}`);
-      const credits = creditsStr ? parseFloat(creditsStr) : 0;
+      const credits = await getUserCredits(c.env, user.id);
 
       // Filter by credits if specified
       if (min_credits !== undefined && credits < min_credits) return null;
@@ -90,30 +90,12 @@ adminRoutes.get("/users", zValidator("query", usersQuerySchema), async (c) => {
 adminRoutes.post("/add-credit", zValidator("json", addCreditRequestSchema), async (c) => {
   const { user_id, amount, description } = c.req.valid("json");
 
-  // Update credits in KV
-  const currentCreditsStr = await c.env.KV.get(`credits:${user_id}`);
-  const currentCredits = currentCreditsStr ? parseFloat(currentCreditsStr) : 0;
-  const newCredits = currentCredits + amount;
-
-  await c.env.KV.put(`credits:${user_id}`, newCredits.toString());
-
-  // Log to billing DB
-  const billingDb = createBillingDb(c.env.BILLING_DB);
-  const id = crypto.randomUUID();
-  const now = new Date().toISOString();
-
-  await billingDb.insert(creditHistory).values({
-    id,
-    userId: user_id,
-    amount,
-    description: description || `Admin credit adjustment`,
-    createdAt: now,
-  });
+  const result = await addCredits(c.env, user_id, amount, description);
 
   return c.json({
     user_id,
-    previous_balance: currentCredits,
-    new_balance: newCredits,
+    previous_balance: result.previousBalance,
+    new_balance: result.newBalance,
     amount,
     description,
   });
@@ -211,9 +193,6 @@ adminRoutes.put("/settings/:name", zValidator("json", updateSettingRequestSchema
 // GET /admin/user-credits/:id
 adminRoutes.get("/user-credits/:id", async (c) => {
   const userId = c.req.param("id");
-
-  const creditsStr = await c.env.KV.get(`credits:${userId}`);
-  const credits = creditsStr ? parseFloat(creditsStr) : 0;
-
+  const credits = await getUserCredits(c.env, userId);
   return c.json({ user_id: userId, credits });
 });

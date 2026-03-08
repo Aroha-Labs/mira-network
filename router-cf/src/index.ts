@@ -13,6 +13,9 @@ import { webhooksRoutes } from "./routes/webhooks";
 import { proxyRoutes } from "./routes/proxy";
 import { logsRoutes } from "./routes/logs";
 
+// Export Durable Object classes
+export { CreditsDO } from "./durable-objects/credits";
+
 const app = new Hono<AppContext>();
 
 // Middleware
