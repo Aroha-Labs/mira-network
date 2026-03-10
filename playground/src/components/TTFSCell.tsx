@@ -1,7 +1,7 @@
 import { ApiLog } from "src/types/api-log";
 
 const TTFSCell = ({ log }: { log: ApiLog }) => {
-  const formatTime = (ttft: ApiLog["ttft"]) => {
+  const formatTime = (ttft: number) => {
     if (ttft < 1) {
       return `${(ttft * 1000).toFixed(0)}ms`;
     }
@@ -10,7 +10,7 @@ const TTFSCell = ({ log }: { log: ApiLog }) => {
 
   return (
     <div className="px-4 py-2">
-      <span className="">{log.ttft ? formatTime(log.ttft) : "-"}</span>
+      <span className="">{log.ttft != null ? formatTime(log.ttft) : "-"}</span>
     </div>
   );
 };
