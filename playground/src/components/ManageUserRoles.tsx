@@ -5,7 +5,6 @@ import { CheckIcon } from "@heroicons/react/24/outline";
 import { toast } from "react-hot-toast";
 import api from "src/lib/axios";
 import { User } from "src/types/user";
-import { trackEvent } from "src/lib/mira";
 
 interface ManageUserRolesProps {
   user: User;
@@ -48,13 +47,6 @@ const ManageUserRoles = ({ user, onClose }: ManageUserRolesProps) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
-    trackEvent('admin_update_user_roles', {
-      user_id: user.user_id,
-      previous_roles: user.custom_claim?.roles || [],
-      new_roles: selectedRoles
-    });
-
     updateUserRolesMutation.mutate(selectedRoles);
   };
 

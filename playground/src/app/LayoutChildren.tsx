@@ -6,7 +6,6 @@ import { userRolesState } from "src/state/userRolesState";
 import { usePathname } from "next/navigation";
 import { redirectToLogin } from "src/utils/auth";
 import { isPublicRoute } from "src/config/routes";
-import { useCaptchaProtection } from "src/components/withCaptchaProtection";
 
 interface LayoutChildrenProps {
   children: React.ReactNode;
@@ -17,7 +16,6 @@ const LayoutChildren = ({ children }: LayoutChildrenProps) => {
   const { isLoading, session } = usePermissions();
   const userRoles = useStore(userRolesState, (state) => state);
   const logoutMutation = useLogout();
-  const { isVerified } = useCaptchaProtection();
 
   const hasPermission = userRoles.includes("user");
 
@@ -54,11 +52,6 @@ const LayoutChildren = ({ children }: LayoutChildrenProps) => {
         </div>
       </div>
     );
-  }
-
-  // Block access to non-public routes if not verified
-  if (session && !isPublicRoute(pathname) && !isVerified) {
-    return <Loading fullPage text="Verification required..." />;
   }
 
   return children;

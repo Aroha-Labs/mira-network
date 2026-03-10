@@ -24,7 +24,6 @@ import toast from "react-hot-toast";
 import CopyToClipboardIcon from "src/components/CopyToClipboardIcon";
 import { Menu, Transition } from "@headlessui/react";
 import { Fragment } from "react";
-import { trackEvent } from "src/lib/mira";
 
 interface ApiKey {
   id: number;
@@ -125,7 +124,6 @@ const ApiKeyPage = () => {
   });
 
   const handleAddApiKey = () => {
-    trackEvent('api_key_add_modal_open', {});
     if (!description.trim()) {
       toast.error("Description is required");
       return;
@@ -176,12 +174,10 @@ const ApiKeyPage = () => {
   };
 
   const handleDeleteApiKey = (tokenId: string) => {
-    trackEvent('api_key_delete_click', {});
     setTokenToDelete(tokenId);
   };
 
   const confirmDeleteApiKey = () => {
-    trackEvent('api_key_delete_confirm', {});
     if (tokenToDelete) {
       deleteMutation.mutate(tokenToDelete);
     }
