@@ -14,11 +14,9 @@ import { JsonValue } from "src/types/json";
 import { ClipboardDocumentIcon, CodeBracketIcon } from "@heroicons/react/24/outline";
 
 interface SystemSetting {
-  id: number;
   name: string;
   value: Record<string, JsonValue>;
   description: string | null;
-  created_at: string;
   updated_at: string;
 }
 
@@ -26,7 +24,7 @@ const AdminSettings = () => {
   const { data: userSession } = useSession();
   const queryClient = useQueryClient();
   const [editSetting, setEditSetting] = useState<SystemSetting | null>(null);
-  const [rawJsonMap, setRawJsonMap] = useState<Record<number, boolean>>({});
+  const [rawJsonMap, setRawJsonMap] = useState<Record<string, boolean>>({});
 
   const { data: settings, isLoading } = useQuery({
     queryKey: ["settings"],
@@ -69,10 +67,10 @@ const AdminSettings = () => {
     },
   });
 
-  const toggleRawJson = (settingId: number) => {
+  const toggleRawJson = (settingName: string) => {
     setRawJsonMap((prev) => ({
       ...prev,
-      [settingId]: !prev[settingId],
+      [settingName]: !prev[settingName],
     }));
   };
 
@@ -101,7 +99,7 @@ const AdminSettings = () => {
       {/* Settings List */}
       <div className="bg-white rounded-lg shadow-xs border border-gray-200 divide-y divide-gray-200">
         {settings?.map((setting) => (
-          <div key={setting.id} className="p-6 transition-colors hover:bg-gray-50">
+          <div key={setting.name} className="p-6 transition-colors hover:bg-gray-50">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
               <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
@@ -131,12 +129,12 @@ const AdminSettings = () => {
                     <span className="ml-1 hidden sm:inline">Copy</span>
                   </button>
                   <button
-                    onClick={() => toggleRawJson(setting.id)}
+                    onClick={() => toggleRawJson(setting.name)}
                     className="inline-flex items-center px-2 py-1 text-sm text-gray-600 hover:text-gray-900"
                   >
                     <CodeBracketIcon className="h-4 w-4" />
                     <span className="ml-1 hidden sm:inline">
-                      {rawJsonMap[setting.id] ? "Show Formatted" : "Show Raw"}
+                      {rawJsonMap[setting.name] ? "Show Formatted" : "Show Raw"}
                     </span>
                   </button>
                 </div>
@@ -152,7 +150,7 @@ const AdminSettings = () => {
             <div className="mt-3">
               <SettingValue
                 value={setting.value}
-                showRaw={rawJsonMap[setting.id] || false}
+                showRaw={rawJsonMap[setting.name] || false}
               />
             </div>
 
