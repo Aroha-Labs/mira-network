@@ -9,7 +9,6 @@ import {
   ChartBarSquareIcon,
   UsersIcon,
   Cog6ToothIcon,
-  ComputerDesktopIcon,
 } from "@heroicons/react/24/outline";
 import { useStore } from "@tanstack/react-store";
 import { userRolesState } from "src/state/userRolesState";
@@ -31,11 +30,6 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
       name: "Users",
       href: "/admin/users",
       icon: UsersIcon,
-    },
-    {
-      name: "Machines",
-      href: "/admin/machines",
-      icon: ComputerDesktopIcon,
     },
     {
       name: "Settings",

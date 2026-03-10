@@ -143,7 +143,6 @@ export default function Home() {
 
       <LinkBox href="/api-logs" label="View API Logs" isDisabled={!userSession?.user} />
       <LinkBox href="/api-keys" label="Manage API Keys" isDisabled={!userSession?.user} />
-      <LinkBox href="/machine-stats" label="View Machine Stats" isDisabled={!userSession?.user} />
       <LinkBox href="/terminal" label="AI Flow Builder" isDisabled={!userSession?.user} />
       <Link
         href="/privacy-policy.html"

@@ -26,7 +26,8 @@ interface UsersResponse {
   users: User[];
   total: number; // Total number of users
   page: number; // Current page number
-  per_page: number; // Number of users per page
+  page_size: number; // Number of users per page
+  total_pages: number; // Total number of pages
 }
 
 interface Filters {
@@ -52,11 +53,6 @@ const fetchUsers = async (
     },
   });
   return response.data;
-};
-
-// Add this helper function before the AdminUsers component
-const calculateTotalPages = (total: number, perPage: number) => {
-  return Math.ceil(total / perPage);
 };
 
 const AdminUsers = () => {
@@ -410,7 +406,7 @@ const AdminUsers = () => {
         {!isError &&
           data &&
           data.total > 0 &&
-          data.page >= calculateTotalPages(data.total, data.per_page) && (
+          data.page >= data.total_pages && (
             <div className="mt-8 mb-6 text-center">
               <div className="inline-flex items-center gap-3">
                 <div className="w-12 h-px bg-gray-200"></div>
@@ -442,14 +438,14 @@ const AdminUsers = () => {
               ) : data.total === 0 ? (
                 "No results"
               ) : (
-                `Page ${data.page} of ${calculateTotalPages(data.total, data.per_page)}`
+                `Page ${data.page} of ${data.total_pages}`
               )}
             </div>
             <button
               onClick={() => handlePageChange(currentPage + 1)}
               disabled={
                 !data ||
-                data.page >= calculateTotalPages(data.total, data.per_page) ||
+                data.page >= data.total_pages ||
                 isLoading
               }
               className="inline-flex items-center gap-1 px-4 py-2 transition-colors bg-white border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"

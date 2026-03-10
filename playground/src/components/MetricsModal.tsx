@@ -55,15 +55,19 @@ const ChartShimmer = () => (
   <div className="w-full h-full rounded-lg animate-pulse bg-gray-200/60" />
 );
 
-// Add new types for the metrics response
+// Types matching router-cf /api-logs/metrics response
 interface MetricsResponse {
+  total_requests: number;
+  successful_requests: number;
+  cached_requests: number;
+  success_rate: number;
+  cache_rate: number;
+  total_tokens_in: number;
+  total_tokens_out: number;
   total_tokens: number;
-  prompt_tokens: number;
-  completion_tokens: number;
-  avg_response_time: number;
-  avg_ttft: number;
   total_cost: number;
-  model_distribution: [string, number][];
+  avg_duration_ms: number;
+  model_breakdown: Array<{ model: string; requests: number; tokens: number; cost: number }>;
 }
 
 const MetricsModal = ({
@@ -150,13 +154,13 @@ const MetricsModal = ({
   const chartData = useMemo(() => {
     if (!data) return null;
 
-    // Since we don't have time series data, we'll create simple aggregate visualizations
+    // Create visualizations from the metrics data
     return {
       models: {
-        labels: data.model_distribution.map(([model]) => model),
+        labels: data.model_breakdown.map((m) => m.model),
         datasets: [
           {
-            data: data.model_distribution.map(([, count]) => count),
+            data: data.model_breakdown.map((m) => m.requests),
             backgroundColor: [
               "rgba(255, 99, 132, 0.5)",
               "rgba(54, 162, 235, 0.5)",
@@ -172,7 +176,7 @@ const MetricsModal = ({
         labels: ["Prompt Tokens", "Completion Tokens"],
         datasets: [
           {
-            data: [data.prompt_tokens, data.completion_tokens],
+            data: [data.total_tokens_in, data.total_tokens_out],
             backgroundColor: ["rgba(54, 162, 235, 0.5)", "rgba(75, 192, 192, 0.5)"],
           },
         ],
@@ -215,7 +219,7 @@ const MetricsModal = ({
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {renderMetricBlock("Total Cost", null, null, false, true)}
             {renderMetricBlock("Token Usage", null, null, false, true)}
-            {renderMetricBlock("Avg TTFT", null, null, false, true)}
+            {renderMetricBlock("Success Rate", null, null, false, true)}
             {renderMetricBlock("Avg Response Time", null, null, false, true)}
           </div>
 
@@ -264,10 +268,10 @@ const MetricsModal = ({
             data.total_tokens.toLocaleString(),
             chartData && <Doughnut data={chartData.tokens} options={chartOptions} />
           )}
-          {renderMetricBlock("Avg TTFT", `${data.avg_ttft.toFixed(2)}ms`, null)}
+          {renderMetricBlock("Success Rate", `${data.success_rate.toFixed(1)}%`, null)}
           {renderMetricBlock(
             "Avg Response Time",
-            `${data.avg_response_time.toFixed(2)}ms`,
+            `${(data.avg_duration_ms / 1000).toFixed(2)}s`,
             null
           )}
         </div>
@@ -280,14 +284,14 @@ const MetricsModal = ({
           <div className="p-3">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div className="space-y-1.5 text-sm">
-                {data.model_distribution.map(([model, count]) => (
+                {data.model_breakdown.map((m) => (
                   <div
-                    key={model}
+                    key={m.model}
                     className="flex items-center justify-between px-2 py-1 rounded-sm bg-gray-50"
                   >
-                    <span className="mr-2 text-xs text-gray-600 truncate">{model}</span>
+                    <span className="mr-2 text-xs text-gray-600 truncate">{m.model}</span>
                     <span className="text-xs font-medium text-gray-900">
-                      {count} calls
+                      {m.requests} calls
                     </span>
                   </div>
                 ))}
