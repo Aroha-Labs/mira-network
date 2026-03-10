@@ -23,7 +23,7 @@ const ApiLogRow = ({ log, onClick }: { log: ApiLog; onClick: () => void }) => {
       <td>
         <ResponseTimeCell log={log} />
       </td>
-      <td className="px-4 py-2">{log.machine_id || "-"}</td>
+      <td className="px-4 py-2">{log.provider || "-"}</td>
       <td className="px-4 py-2">{log.model}</td>
       <td>
         <CostCell log={log} />

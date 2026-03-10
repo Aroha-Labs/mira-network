@@ -12,6 +12,7 @@ export interface ApiLog {
   cost: number;
   status_code?: number;
   metadata?: Record<string, unknown>;
+  ttft?: number; // Time to first token - not available from AI Gateway
 }
 
 export interface ApiLogsResponse {
