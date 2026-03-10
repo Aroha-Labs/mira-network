@@ -27,7 +27,6 @@ import Link from "next/link";
 import { useSession } from "src/hooks/useSession";
 import { MessageVerification } from "src/components/MessageVerification";
 import ReactMarkdown from "src/components/ReactMarkdown";
-import { trackEvent } from "src/lib/mira";
 
 interface Flow {
   id: string;
@@ -290,15 +289,6 @@ export default function Workbench() {
       return;
     }
 
-    // Track terminal execution
-    trackEvent("terminal_execution", {
-      flow_id: selectedFlow.id,
-      flow_name: selectedFlow.name,
-      model: selectedModel || "claude-3-opus-20240229",
-      has_variables: Object.keys(variables).length > 0,
-      has_tools: tools.length > 0,
-    });
-
     try {
       setIsLoading(true);
       setIsGenerating(true);
@@ -420,11 +410,6 @@ export default function Workbench() {
   const handleSaveFlow = async () => {
     if (!selectedFlow) return;
 
-    trackEvent("terminal_flow_save", {
-      flow_id: selectedFlow.id,
-      flow_name: selectedFlow.name,
-    });
-
     try {
       setIsSavingFlow(true);
       await updateFlow(String(selectedFlow.id), {
@@ -478,8 +463,6 @@ export default function Workbench() {
   const handleCreateFlow = async () => {
     if (isCreatingFlow) return;
 
-    trackEvent("terminal_flow_create", {});
-
     try {
       setIsCreatingFlow(true);
       const newFlow = await createFlow({
@@ -517,11 +500,6 @@ export default function Workbench() {
   // Add function to handle flow name update
   const handleUpdateFlowName = async (flowId: string, newName: string) => {
     if (isUpdatingFlowName || !newName.trim()) return;
-
-    trackEvent("terminal_flow_rename", {
-      flow_id: flowId,
-      new_name: newName,
-    });
 
     try {
       setIsUpdatingFlowName(true);
@@ -1424,13 +1402,7 @@ export default function Workbench() {
               )}
               {selectedFlow && (
                 <button
-                  onClick={() => {
-                    trackEvent("terminal_api_examples_view", {
-                      flow_id: selectedFlow.id,
-                      flow_name: selectedFlow.name,
-                    });
-                    setShowAPIExamples(true);
-                  }}
+                  onClick={() => setShowAPIExamples(true)}
                   className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors group relative"
                 >
                   <CodeBracketIcon className="w-4 h-4 md:mr-1.5" />

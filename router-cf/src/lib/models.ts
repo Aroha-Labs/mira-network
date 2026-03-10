@@ -22,11 +22,11 @@ export const MODELS: Record<string, ModelInfo> = {
     promptTokenPrice: 0.00015,
     completionTokenPrice: 0.0006,
   },
-  "gpt-4.1": {
-    id: "gpt-4.1",
-    gatewayModel: "openai/gpt-4.1",
-    promptTokenPrice: 0.002,
-    completionTokenPrice: 0.008,
+  "gpt-5.2": {
+    id: "gpt-5.2",
+    gatewayModel: "openai/gpt-5.2",
+    promptTokenPrice: 0.005,
+    completionTokenPrice: 0.015,
   },
   "o4-mini": {
     id: "o4-mini",
@@ -36,53 +36,65 @@ export const MODELS: Record<string, ModelInfo> = {
   },
 
   // Anthropic
-  "claude-3-5-sonnet-20241022": {
-    id: "claude-3-5-sonnet-20241022",
-    gatewayModel: "anthropic/claude-3-5-sonnet-20241022",
+  "claude-3.5-sonnet": {
+    id: "claude-3.5-sonnet",
+    gatewayModel: "anthropic/claude-3-5-sonnet-latest",
     promptTokenPrice: 0.003,
     completionTokenPrice: 0.015,
   },
-  "claude-sonnet-4-20250514": {
-    id: "claude-sonnet-4-20250514",
-    gatewayModel: "anthropic/claude-sonnet-4-20250514",
+  "claude-sonnet-4.5": {
+    id: "claude-sonnet-4.5",
+    gatewayModel: "anthropic/claude-sonnet-4-5-20250514",
     promptTokenPrice: 0.003,
     completionTokenPrice: 0.015,
   },
 
-  // Workers AI (FREE) - format: workers-ai/@cf/...
+  // DeepSeek
+  "deepseek-r1": {
+    id: "deepseek-r1",
+    gatewayModel: "deepseek/deepseek-reasoner",
+    promptTokenPrice: 0.00055,
+    completionTokenPrice: 0.00219,
+  },
+  "deepseek-v3.2": {
+    id: "deepseek-v3.2",
+    gatewayModel: "deepseek/deepseek-chat",
+    promptTokenPrice: 0.00027,
+    completionTokenPrice: 0.0011,
+  },
+
+  // Google
+  "gemini-3-flash-preview": {
+    id: "gemini-3-flash-preview",
+    gatewayModel: "google-ai-studio/gemini-2.5-flash-preview-05-20",
+    promptTokenPrice: 0.00015,
+    completionTokenPrice: 0.0006,
+  },
+
+  // Workers AI (FREE)
   "llama-3.1-8b-instruct": {
     id: "llama-3.1-8b-instruct",
     gatewayModel: "workers-ai/@cf/meta/llama-3.1-8b-instruct",
     promptTokenPrice: 0,
     completionTokenPrice: 0,
   },
-  "llama-3.3-70b-instruct-fp8-fast": {
-    id: "llama-3.3-70b-instruct-fp8-fast",
+  "llama-3.3-70b-instruct": {
+    id: "llama-3.3-70b-instruct",
     gatewayModel: "workers-ai/@cf/meta/llama-3.3-70b-instruct-fp8-fast",
     promptTokenPrice: 0,
     completionTokenPrice: 0,
   },
-  "qwen2.5-coder-32b-instruct": {
-    id: "qwen2.5-coder-32b-instruct",
-    gatewayModel: "workers-ai/@cf/qwen/qwen2.5-coder-32b-instruct",
+  "qwen2-1.5b-instruct": {
+    id: "qwen2-1.5b-instruct",
+    gatewayModel: "workers-ai/@cf/qwen/qwen1.5-1.8b-chat",
     promptTokenPrice: 0,
     completionTokenPrice: 0,
   },
-
-  // Google AI Studio
-  "gemini-2.0-flash": {
-    id: "gemini-2.0-flash",
-    gatewayModel: "google-ai-studio/gemini-2.0-flash",
-    promptTokenPrice: 0.0001,
-    completionTokenPrice: 0.0004,
-  },
-
-  // Groq (fast inference)
-  "llama-3.3-70b-versatile": {
-    id: "llama-3.3-70b-versatile",
-    gatewayModel: "groq/llama-3.3-70b-versatile",
-    promptTokenPrice: 0.00059,
-    completionTokenPrice: 0.00079,
+  "qwen-2.5-32b-instruct": {
+    id: "qwen-2.5-32b-instruct",
+    gatewayModel: "workers-ai/@cf/qwen/qwen2.5-coder-32b-instruct",
+    promptTokenPrice: 0,
+    completionTokenPrice: 0,
   },
 };
 

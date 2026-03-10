@@ -23,9 +23,12 @@ app.use("*", logger());
 app.use(
   "*",
   cors({
-    origin: "*",
-    allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowHeaders: ["Content-Type", "Authorization"],
+    origin: (origin) => origin || "*", // Allow any origin
+    allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allowHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
+    exposeHeaders: ["Content-Length", "X-Request-Id"],
+    credentials: true,
+    maxAge: 86400,
   })
 );
 
