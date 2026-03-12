@@ -10,11 +10,18 @@ import { calculateCost, deductCredits, estimateTokens, getUserCredits } from "..
 
 export const aiRoutes = new Hono<AppContext>();
 
-// Create OpenAI client for AI Gateway (Unified Billing)
+// Create OpenAI client for AI Gateway -> OpenRouter (BYOK)
+// Note: We must strip the Authorization header — the gateway rejects requests
+// that include it, even when cf-aig-authorization is present.
 function createGatewayClient(env: AppContext["Bindings"]) {
   return new OpenAI({
-    apiKey: env.CF_API_TOKEN,
-    baseURL: `https://gateway.ai.cloudflare.com/v1/${env.CF_ACCOUNT_ID}/${env.GATEWAY_ID}/compat`,
+    apiKey: "placeholder",
+    baseURL: `https://gateway.ai.cloudflare.com/v1/${env.CF_ACCOUNT_ID}/${env.GATEWAY_ID}/openrouter`,
+    defaultHeaders: {
+      "cf-aig-authorization": `Bearer ${env.CF_API_TOKEN}`,
+      "cf-aig-byok-alias": "default",
+      Authorization: "",
+    },
   });
 }
 
