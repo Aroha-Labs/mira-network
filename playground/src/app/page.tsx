@@ -52,7 +52,7 @@ export default function Home() {
         through a unified interface
       </p>
       <div className="h-0.5 "></div>
-      <UserInfo user={sessionUser}>
+      <UserInfo user={sessionUser ?? undefined}>
         <AnalyticsSection />
       </UserInfo>
 

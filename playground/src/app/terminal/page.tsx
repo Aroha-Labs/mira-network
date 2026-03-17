@@ -135,7 +135,7 @@ const createFlow = async (data: { system_prompt: string; name: string }) => {
 // };
 
 export default function Workbench() {
-  const { data: userSession } = useSession();
+  const { data: userSession, user: sessionUser } = useSession();
 
   // UI state
   const [isSliderOpen, setIsSliderOpen] = useState(true);
@@ -562,7 +562,7 @@ export default function Workbench() {
   // Update the computation for any operation in progress
   const isAnyOperationInProgress = isSavingFlow || isCreatingFlow || isUpdatingFlowName;
 
-  if (!userSession?.user) {
+  if (!sessionUser) {
     return (
       <div className="flex items-center justify-center h-screen">
         <Link
