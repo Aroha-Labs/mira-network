@@ -42,7 +42,7 @@ const CreditHistoryPage = () => {
   } = useQuery({
     queryKey: ["creditHistory", page],
     queryFn: () => fetchCreditHistory(page),
-    enabled: !!userSession?.access_token,
+    enabled: !!userSession,
   });
 
   if (isLoading) {

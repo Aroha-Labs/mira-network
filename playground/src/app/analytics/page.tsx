@@ -31,14 +31,11 @@ interface ApiLogsResponse {
 }
 
 const fetchApiLogs = async (
-  token: string,
   startDate: string,
   endDate: string
 ): Promise<ApiLogsResponse> => {
   const response = await axios.get(`${API_BASE_URL}/api-logs`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    withCredentials: true,
     params: {
       start_date: startDate,
       end_date: endDate,
@@ -55,13 +52,8 @@ const AnalyticsPage = () => {
 
   const { data, error, isLoading } = useQuery({
     queryKey: ["apiLogs", startDate, endDate],
-    queryFn: () => {
-      if (!userSession?.access_token) {
-        throw new Error("User session not found");
-      }
-      return fetchApiLogs(userSession.access_token, startDate, endDate);
-    },
-    enabled: !!userSession?.access_token,
+    queryFn: () => fetchApiLogs(startDate, endDate),
+    enabled: !!userSession,
   });
 
   if (isLoading) {

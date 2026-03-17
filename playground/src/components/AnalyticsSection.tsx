@@ -1,22 +1,17 @@
 import Link from "next/link";
 import React from "react";
-import { Session } from "@supabase/supabase-js";
 import { useQuery } from "@tanstack/react-query";
 import api from "src/lib/axios";
 import { useSession } from "src/hooks/useSession";
-
-interface AnalyticsSectionProps {
-  userSession?: Session | null;
-}
 
 const fetchInferenceCalls = async () => {
   const response = await api.get("/total-inference-calls");
   return response.data;
 };
 
-const AnalyticsSection: React.FC<AnalyticsSectionProps> = () => {
-  const session = useSession();
-  const isLoggedIn = !!session.data?.access_token;
+const AnalyticsSection: React.FC = () => {
+  const { data: session } = useSession();
+  const isLoggedIn = !!session;
 
   const {
     data: inferenceCalls,

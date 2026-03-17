@@ -1,18 +1,11 @@
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "src/utils/supabase/client";
+import { useSession } from "src/hooks/useSession";
 
 export function useUser() {
-  return useQuery({
-    queryKey: ["user"],
-    queryFn: async () => {
-      const { data, error } = await supabase.auth.getUser();
-      if (error) {
-        if (error.message === "Auth session missing!") {
-          return null;
-        }
-        throw new Error(error.message);
-      }
-      return data.user;
-    },
-  });
+  const { user, isLoading, error } = useSession();
+
+  return {
+    data: user,
+    isLoading,
+    error,
+  };
 }

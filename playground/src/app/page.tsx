@@ -22,7 +22,7 @@ export default function Home() {
   const { data: userData, isLoading: isUserLoading } = useQuery({
     queryKey: ["userData"],
     queryFn: fetchUserDetails,
-    enabled: !!userSession?.access_token,
+    enabled: !!userSession,
   });
 
   if (isLoading) {

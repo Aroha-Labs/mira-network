@@ -1,4 +1,3 @@
-import { supabase } from "src/utils/supabase/client";
 import api from "src/lib/axios";
 
 export interface Message {
@@ -71,19 +70,12 @@ export interface Flow {
   tools?: Tool[];
 }
 
-async function getAuthHeaders() {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (!session?.access_token) {
-    throw new Error("Not authenticated");
-  }
+function getAuthHeaders() {
   return {
     "Content-Type": "application/json",
     Accept: "text/event-stream",
     "Cache-Control": "no-cache",
     Connection: "keep-alive",
-    Authorization: `Bearer ${session.access_token}`,
   };
 }
 
@@ -277,7 +269,7 @@ export async function streamChatCompletion(
   handlers: StreamProcessor
 ) {
   try {
-    const headers = await getAuthHeaders();
+    const headers = getAuthHeaders();
     const { endpoint, flowId, systemPrompt, tools, reasoning_effort, ...chatOptions } = options;
 
     // Convert tools to match backend's Tool model exactly
@@ -358,6 +350,7 @@ export async function streamChatCompletion(
       headers,
       body: JSON.stringify(body),
       signal: controller.signal,
+      credentials: "include",
     });
 
     if (!response.ok) {
@@ -402,7 +395,7 @@ export interface VerificationResponse {
 export const verifyMessages = async (
   request: VerificationRequest
 ): Promise<VerificationResponse> => {
-  const headers = await getAuthHeaders();
+  const headers = getAuthHeaders();
   const response = await fetch(`${api.defaults.baseURL}/v1/verify`, {
     method: "POST",
     headers: {
@@ -410,6 +403,7 @@ export const verifyMessages = async (
       "Content-Type": "application/json",
     },
     body: JSON.stringify(request),
+    credentials: "include",
   });
 
   if (!response.ok) {

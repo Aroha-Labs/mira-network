@@ -82,7 +82,7 @@ const AdminUsers = () => {
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: ["users", submittedQuery, currentPage, sortBy, sortOrder, filters],
     queryFn: () => fetchUsers(currentPage, submittedQuery, sortBy, sortOrder, filters),
-    enabled: !!userSession?.access_token,
+    enabled: !!userSession,
     retry: 2,
   });
 
@@ -287,7 +287,7 @@ const AdminUsers = () => {
     </div>
   );
 
-  if (!userSession?.access_token) {
+  if (!userSession) {
     return (
       <div className="flex items-center justify-center h-64">
         Please log in to view users.
