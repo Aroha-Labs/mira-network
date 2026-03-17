@@ -84,7 +84,7 @@ const ApiKeyPage = () => {
   const { data, error, isLoading } = useQuery<PaginatedApiKeys | ApiKey[]>({
     queryKey: ["apiKeys", currentPage, pageSize],
     queryFn: () => fetchApiKeys(currentPage, pageSize),
-    enabled: !!userSession?.access_token,
+    enabled: !!userSession,
   });
 
   const [isModalOpen, setIsModalOpen] = useState(false);

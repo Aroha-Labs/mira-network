@@ -57,13 +57,13 @@ const ApiLogsPage = () => {
   const { data, error, isLoading } = useQuery({
     queryKey: ["apiLogs", page, startDate, endDate, successFilter],
     queryFn: () => fetchApiLogs(page, perPage, startDate, endDate, successFilter),
-    enabled: !!userSession?.access_token,
+    enabled: !!userSession,
   });
 
   const { data: metrics } = useQuery({
     queryKey: ["apiLogsMetrics", startDate, endDate],
     queryFn: () => fetchMetrics(startDate, endDate),
-    enabled: !!userSession?.access_token,
+    enabled: !!userSession,
   });
 
   const handleNextPage = () => {

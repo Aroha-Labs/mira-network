@@ -31,15 +31,11 @@ const AdminSettings = () => {
     queryFn: async () => {
       const response = await axios.get<SystemSetting[]>(
         `${API_BASE_URL}/admin/settings`,
-        {
-          headers: {
-            Authorization: `Bearer ${userSession?.access_token}`,
-          },
-        }
+        { withCredentials: true }
       );
       return response.data;
     },
-    enabled: !!userSession?.access_token,
+    enabled: !!userSession,
   });
 
   const updateMutation = useMutation({
@@ -47,11 +43,7 @@ const AdminSettings = () => {
       return axios.put(
         `${API_BASE_URL}/admin/settings/${data.name}`,
         { value: data.value },
-        {
-          headers: {
-            Authorization: `Bearer ${userSession?.access_token}`,
-          },
-        }
+        { withCredentials: true }
       );
     },
     onSuccess: () => {
@@ -74,7 +66,7 @@ const AdminSettings = () => {
     }));
   };
 
-  if (!userSession?.access_token) {
+  if (!userSession) {
     return (
       <div className="flex items-center justify-center h-64 text-gray-500">
         Please log in to manage settings.

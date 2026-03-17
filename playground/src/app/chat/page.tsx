@@ -21,7 +21,6 @@ const fetchChatCompletion = async (
   onMessage: (message: Partial<Message>) => void,
   controller: AbortController,
   model: string,
-  token: string,
   reasoningEffort: "disabled" | "low" | "medium" | "high" | undefined,
   maxTokens?: number
 ) => {
@@ -29,8 +28,8 @@ const fetchChatCompletion = async (
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
     },
+    credentials: "include",
     body: JSON.stringify({
       model,
       messages,
@@ -110,7 +109,7 @@ const fetchSupportedModels = async () => {
 };
 
 export default function Chat() {
-  const { data: userSession, isLoading } = useSession();
+  const { data: userSession, user: sessionUser, isLoading } = useSession();
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -181,7 +180,7 @@ export default function Chat() {
     const i = (userInput || input).trim();
 
     if (!i) return;
-    if (!userSession?.access_token) {
+    if (!userSession) {
       setErrorMessage("Please login to continue.");
       return;
     }
@@ -230,7 +229,6 @@ export default function Chat() {
         },
         abortControllerRef.current,
         selectedModel,
-        userSession.access_token,
         reasoningEffort === "disabled" ? undefined : reasoningEffort,
         maxTokens
       );
@@ -263,7 +261,7 @@ export default function Chat() {
   };
 
   const handleRefreshMessage = async (index: number) => {
-    if (!userSession?.access_token) {
+    if (!userSession) {
       setErrorMessage("Please login to continue.");
       return;
     }
@@ -314,7 +312,6 @@ export default function Chat() {
         },
         abortControllerRef.current,
         selectedModel,
-        userSession.access_token,
         reasoningEffort === "disabled" ? undefined : reasoningEffort,
         maxTokens
       );
@@ -360,7 +357,7 @@ export default function Chat() {
     );
   }
 
-  if (!userSession?.user) {
+  if (!userSession) {
     return (
       <div className="flex items-center justify-center h-screen">
         <Link
@@ -373,9 +370,9 @@ export default function Chat() {
     );
   }
 
-  const userInfo = userSession.user.user_metadata as {
-    name: string;
-    avatar_url: string;
+  const userInfo = {
+    name: sessionUser?.name || "",
+    avatar_url: sessionUser?.image || "",
   };
 
   return (

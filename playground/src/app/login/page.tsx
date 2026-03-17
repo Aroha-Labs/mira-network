@@ -4,7 +4,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useSession } from "src/hooks/useSession";
 import React from "react";
-import { supabase } from "src/utils/supabase/client";
+import { signIn } from "src/lib/auth-client";
 import Loading from "src/components/PageLoading";
 
 export default function Login() {
@@ -42,14 +42,10 @@ export default function Login() {
     try {
       setIsAuthenticating(true);
 
-      const { error } = await supabase.auth.signInWithOAuth({
+      await signIn.social({
         provider: "google",
-        options: {
-          redirectTo: `${window.location.origin}${redirect}`,
-        },
+        callbackURL: redirect,
       });
-
-      if (error) throw error;
     } catch (error) {
       console.error("Error signing in with Google:", error);
     } finally {

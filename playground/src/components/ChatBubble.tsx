@@ -9,7 +9,6 @@ import {
 import { Brain } from "lucide-react";
 import CopyToClipboardIcon from "src/components/CopyToClipboardIcon";
 import ConfirmModal from "src/components/ConfirmModal";
-import { User } from "@supabase/supabase-js";
 import { useState, useEffect } from "react";
 import ProfileImage from "./ProfileImage";
 import ToolDisplay from "./ToolDisplay";
@@ -18,7 +17,7 @@ import ReactMarkdown from "./ReactMarkdown";
 
 interface ChatBubbleProps {
   msg: Message;
-  userInfo: User["user_metadata"];
+  userInfo: { avatar_url?: string; full_name?: string };
   onDelete: () => void;
   onEdit: () => void;
   onRefresh: () => void;

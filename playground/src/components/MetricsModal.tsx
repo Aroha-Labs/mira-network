@@ -148,7 +148,7 @@ const MetricsModal = ({
       });
       return resp.data;
     },
-    enabled: !!userSession?.access_token,
+    enabled: !!userSession,
   });
 
   const chartData = useMemo(() => {
