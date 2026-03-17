@@ -44,6 +44,7 @@ const gateway = await AiGateway("mira-gateway", {
 export const api = await Worker("mira-api", {
   entrypoint: "./src/index.ts",
   compatibilityDate: "2024-12-01",
+  compatibilityFlags: ["nodejs_compat"],
   observability: {
     enabled: true,
     head_sampling_rate: 1, // Log all requests
@@ -58,9 +59,10 @@ export const api = await Worker("mira-api", {
     GATEWAY_ID: gateway.id,
     CF_ACCOUNT_ID: process.env.CLOUDFLARE_ACCOUNT_ID!,
     CF_API_TOKEN: alchemy.secret(process.env.CLOUDFLARE_API_TOKEN!),
-    SUPABASE_URL: process.env.SUPABASE_URL!,
-    SUPABASE_KEY: alchemy.secret(process.env.SUPABASE_KEY!),
-    SUPABASE_WEBHOOK_SECRET: alchemy.secret(process.env.SUPABASE_WEBHOOK_SECRET || ""),
+    BETTER_AUTH_SECRET: alchemy.secret(process.env.BETTER_AUTH_SECRET!),
+    BETTER_AUTH_URL: process.env.BETTER_AUTH_URL!,
+    GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID!,
+    GOOGLE_CLIENT_SECRET: alchemy.secret(process.env.GOOGLE_CLIENT_SECRET!),
   },
   adopt: true,
 });
