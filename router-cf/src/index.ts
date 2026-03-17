@@ -2,6 +2,8 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import type { AppContext } from "./env";
+import { createAuth } from "./lib/auth";
+import { drizzle } from "drizzle-orm/d1";
 
 import { aiRoutes } from "./routes/ai";
 import { flowsRoutes } from "./routes/flows";
@@ -9,7 +11,6 @@ import { flowCompletionsRoutes } from "./routes/flow-completions";
 import { tokensRoutes } from "./routes/tokens";
 import { creditsRoutes } from "./routes/credits";
 import { adminRoutes } from "./routes/admin/index";
-import { webhooksRoutes } from "./routes/webhooks";
 import { proxyRoutes } from "./routes/proxy";
 import { logsRoutes } from "./routes/logs";
 
@@ -35,6 +36,17 @@ app.use(
 // Health check
 app.get("/health", (c) => c.json({ status: "ok" }));
 
+// Better Auth handler
+app.on(["POST", "GET"], "/api/auth/**", (c) => {
+  const auth = createAuth(drizzle(c.env.USERS_DB), {
+    BETTER_AUTH_SECRET: c.env.BETTER_AUTH_SECRET,
+    BETTER_AUTH_URL: c.env.BETTER_AUTH_URL,
+    GOOGLE_CLIENT_ID: c.env.GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET: c.env.GOOGLE_CLIENT_SECRET,
+  });
+  return auth.handler(c.req.raw);
+});
+
 // AI routes - /v1/models, /v1/chat/completions, /v1/verify
 app.route("/v1", aiRoutes);
 
@@ -46,9 +58,6 @@ app.route("/flows", flowsRoutes);
 
 // API tokens - /api-tokens
 app.route("/api-tokens", tokensRoutes);
-
-// Webhooks - /webhooks/* (no auth, verified by signature) - MUST be before root-mounted routes
-app.route("/webhooks", webhooksRoutes);
 
 // Proxy - /proxy-image
 app.route("/", proxyRoutes);

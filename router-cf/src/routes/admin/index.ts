@@ -63,9 +63,9 @@ adminRoutes.get("/users", zValidator("query", usersQuerySchema), async (c) => {
         id: user.id,
         user_id: user.id, // Alias for frontend compatibility
         email: user.email,
-        full_name: user.fullName,
-        avatar_url: user.avatarUrl,
-        provider: user.provider,
+        full_name: user.name,
+        avatar_url: user.image,
+        provider: null,
         roles: JSON.parse(user.roles || '["user"]'),
         custom_claim: { roles: JSON.parse(user.roles || '["user"]') }, // For RoleTag component
         credits,

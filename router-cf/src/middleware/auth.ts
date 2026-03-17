@@ -1,9 +1,10 @@
 import { createMiddleware } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
-import { createClient } from "@supabase/supabase-js";
 import type { AppContext, AuthUser } from "../env";
 import { createUsersDb, apiTokens, users } from "../db";
 import { eq, isNull, and } from "drizzle-orm";
+import { createAuth } from "../lib/auth";
+import { drizzle } from "drizzle-orm/d1";
 
 // Hash token for KV key (tokens can be 1000+ chars, KV limit is 512)
 async function hashToken(token: string): Promise<string> {
@@ -17,8 +18,41 @@ async function hashToken(token: string): Promise<string> {
 export const authMiddleware = createMiddleware<AppContext>(async (c, next) => {
   const authHeader = c.req.header("Authorization");
 
+  // Better Auth sessions use cookies — no Authorization header needed
+  // But API tokens still use Bearer auth
   if (!authHeader) {
-    throw new HTTPException(401, { message: "Missing authorization header" });
+    // Try cookie-based Better Auth session
+    const auth = createAuth(drizzle(c.env.USERS_DB), {
+      BETTER_AUTH_SECRET: c.env.BETTER_AUTH_SECRET,
+      BETTER_AUTH_URL: c.env.BETTER_AUTH_URL,
+      GOOGLE_CLIENT_ID: c.env.GOOGLE_CLIENT_ID,
+      GOOGLE_CLIENT_SECRET: c.env.GOOGLE_CLIENT_SECRET,
+    });
+
+    const session = await auth.api.getSession({
+      headers: c.req.raw.headers,
+    });
+
+    if (!session) {
+      throw new HTTPException(401, { message: "Missing authorization" });
+    }
+
+    const userRecord = await createUsersDb(c.env.USERS_DB)
+      .select({ roles: users.roles })
+      .from(users)
+      .where(eq(users.id, session.user.id))
+      .limit(1);
+
+    const roles = userRecord[0]?.roles
+      ? JSON.parse(userRecord[0].roles)
+      : ["user"];
+
+    c.set("user", {
+      id: session.user.id,
+      email: session.user.email,
+      roles,
+    });
+    return next();
   }
 
   const token = authHeader.replace("Bearer ", "");
@@ -68,23 +102,27 @@ export const authMiddleware = createMiddleware<AppContext>(async (c, next) => {
       roles,
     };
   } else {
-    // Supabase JWT
-    const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_KEY);
-    const {
-      data: { user: supabaseUser },
-      error,
-    } = await supabase.auth.getUser(token);
+    // Better Auth session token via Bearer header
+    const auth = createAuth(drizzle(c.env.USERS_DB), {
+      BETTER_AUTH_SECRET: c.env.BETTER_AUTH_SECRET,
+      BETTER_AUTH_URL: c.env.BETTER_AUTH_URL,
+      GOOGLE_CLIENT_ID: c.env.GOOGLE_CLIENT_ID,
+      GOOGLE_CLIENT_SECRET: c.env.GOOGLE_CLIENT_SECRET,
+    });
 
-    if (error || !supabaseUser) {
-      throw new HTTPException(401, { message: "Invalid JWT token" });
+    const session = await auth.api.getSession({
+      headers: c.req.raw.headers,
+    });
+
+    if (!session) {
+      throw new HTTPException(401, { message: "Invalid session token" });
     }
 
-    // Fetch roles from D1 (our source of truth for roles)
     const usersDb = createUsersDb(c.env.USERS_DB);
     const userRecord = await usersDb
       .select({ roles: users.roles })
       .from(users)
-      .where(eq(users.id, supabaseUser.id))
+      .where(eq(users.id, session.user.id))
       .limit(1);
 
     const roles = userRecord[0]?.roles
@@ -92,8 +130,8 @@ export const authMiddleware = createMiddleware<AppContext>(async (c, next) => {
       : ["user"];
 
     user = {
-      id: supabaseUser.id,
-      email: supabaseUser.email || "",
+      id: session.user.id,
+      email: session.user.email,
       roles,
     };
   }
