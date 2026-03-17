@@ -87,9 +87,9 @@ export default function TryFlowModal({
   // Reset saveClicked when loading state changes from true to false
   useEffect(() => {
     if (!isLoading && saveClicked) {
-      setSaveClicked(true);
+      setSaveClicked(false);
     }
-  }, [isLoading]);
+  }, [isLoading, saveClicked]);
 
   const handleExtractVariables = (prompt: string) => {
     const matches = prompt.match(/{{(.*?)}}/g) || [];

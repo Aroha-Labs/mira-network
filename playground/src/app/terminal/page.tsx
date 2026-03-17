@@ -135,7 +135,7 @@ const createFlow = async (data: { system_prompt: string; name: string }) => {
 // };
 
 export default function Workbench() {
-  const { data: userSession, user: sessionUser } = useSession();
+  const { user: sessionUser } = useSession();
 
   // UI state
   const [isSliderOpen, setIsSliderOpen] = useState(true);
