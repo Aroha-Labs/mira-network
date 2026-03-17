@@ -14,7 +14,7 @@ import { useLogout } from "src/hooks/useLogout";
 import { Menu, Transition } from "@headlessui/react";
 
 const UserProfile = () => {
-  const { data: session, isLoading } = useSession();
+  const { data: session, user: sessionUser, isLoading } = useSession();
   const logout = useLogout();
 
   const handleLogoutClick = () => {
@@ -41,7 +41,7 @@ const UserProfile = () => {
       <Menu.Button className="flex items-center gap-2 p-2 text-gray-600 rounded-md hover:text-gray-900 hover:bg-gray-50">
         <UserCircleIcon className="w-6 h-6" />
         <span className="hidden text-sm md:block">
-          {session?.user?.email?.split("@")[0]}
+          {sessionUser?.email?.split("@")[0]}
         </span>
       </Menu.Button>
       <Transition

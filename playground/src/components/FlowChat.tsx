@@ -431,7 +431,7 @@ export default function FlowChat({ flow, onClose }: FlowChatProps) {
                   <ChatBubble
                     key={index}
                     msg={msg}
-                    userInfo={{ name: "You", avatar_url: "" }}
+                    userInfo={{ full_name: "You", avatar_url: "" }}
                     onDelete={() => handleDeleteMessage(index)}
                     onEdit={() => handleEditMessage(index)}
                     onRefresh={() => handleRefreshMessage(index)}

@@ -20,16 +20,16 @@ export default function SystemPromptInput({ onChange }: SystemPromptInputProps) 
   useEffect(() => {
     const variableMatches = systemPrompt.match(/{{(.*?)}}/g);
     if (variableMatches) {
-      const oldVars = { ...variables };
-      const vars = variableMatches.reduce(
-        (acc, match) => {
-          const varName = match.replace(/{{|}}/g, "").trim();
-          acc[varName] = oldVars[varName] || "";
-          return acc;
-        },
-        {} as { [key: string]: string }
+      setVariables((prevVariables) =>
+        variableMatches.reduce(
+          (acc, match) => {
+            const varName = match.replace(/{{|}}/g, "").trim();
+            acc[varName] = prevVariables[varName] || "";
+            return acc;
+          },
+          {} as { [key: string]: string }
+        )
       );
-      setVariables(vars);
     } else {
       setVariables({});
     }

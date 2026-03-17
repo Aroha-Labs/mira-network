@@ -1,5 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useSession } from "src/hooks/useSession";
+import { useStore } from "@tanstack/react-store";
+import { userRolesState } from "src/state/userRolesState";
 import Modal from "./Modal";
 import { useMemo } from "react";
 import {
@@ -81,6 +83,7 @@ const MetricsModal = ({
   flowId,
 }: MetricsModalProps) => {
   const { data: userSession } = useSession();
+  const userRoles = useStore(userRolesState, (state) => state);
 
   const chartOptions = useMemo(
     () => ({
@@ -336,7 +339,7 @@ const MetricsModal = ({
               ? `API Key ${apiKeyId}`
               : userId
                 ? `User ${userId}`
-                : userSession?.user.role === "admin"
+                : userRoles.includes("admin")
                   ? "All Users"
                   : "Your Usage"
         }`

@@ -17,7 +17,7 @@ const fetchUserDetails = async () => {
 };
 
 export default function Home() {
-  const { data: userSession, error, isLoading } = useSession();
+  const { data: userSession, user: sessionUser, error, isLoading } = useSession();
 
   const { data: userData, isLoading: isUserLoading } = useQuery({
     queryKey: ["userData"],
@@ -52,7 +52,7 @@ export default function Home() {
         through a unified interface
       </p>
       <div className="h-0.5 "></div>
-      <UserInfo user={userSession?.user_id}>
+      <UserInfo user={sessionUser ?? undefined}>
         <AnalyticsSection />
       </UserInfo>
 
@@ -111,7 +111,7 @@ export default function Home() {
             <div className="text-lg font-bold">
               {isUserLoading ? (
                 <div className="w-12 h-6 mt-1 bg-gray-300 rounded-sm animate-pulse"></div>
-              ) : userSession?.user ? (
+              ) : sessionUser ? (
                 <Link
                   href="/credit-history"
                   className="text-blue-600 underline decoration-dotted hover:decoration-solid"
