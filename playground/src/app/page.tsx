@@ -141,9 +141,9 @@ export default function Home() {
         </div>
       </div>
 
-      <LinkBox href="/api-logs" label="View API Logs" isDisabled={!sessionUser} />
-      <LinkBox href="/api-keys" label="Manage API Keys" isDisabled={!sessionUser} />
-      <LinkBox href="/terminal" label="AI Flow Builder" isDisabled={!sessionUser} />
+      <LinkBox href="/api-logs" label="View API Logs" isDisabled={!userSession?.user} />
+      <LinkBox href="/api-keys" label="Manage API Keys" isDisabled={!userSession?.user} />
+      <LinkBox href="/terminal" label="AI Flow Builder" isDisabled={!userSession?.user} />
       <Link
         href="/privacy-policy.html"
         target="_blank"
