@@ -54,10 +54,7 @@ export function createAuth(
     advanced: {
       crossSubDomainCookies: {
         enabled: true,
-      },
-      defaultCookieAttributes: {
-        sameSite: "none",
-        secure: true,
+        domain: ".arohalabs.tech",
       },
     },
     plugins: [admin()],
