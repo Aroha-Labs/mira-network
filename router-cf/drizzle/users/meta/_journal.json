@@ -15,6 +15,27 @@
       "when": 1773878400000,
       "tag": "0001_better_auth",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1773788558922,
+      "tag": "0002_chubby_roulette",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1773845889554,
+      "tag": "0003_ambiguous_smiling_tiger",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1773851674776,
+      "tag": "0004_chief_donald_blake",
+      "breakpoints": true
     }
   ]
 }
