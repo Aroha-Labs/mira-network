@@ -9,19 +9,20 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260307.1",
+    "@cloudflare/workers-types": "^4.20260317.1",
     "@types/bun": "latest",
-    "drizzle-kit": "^0.31.9",
+    "better-sqlite3": "^12.8.0",
+    "drizzle-kit": "^0.31.10",
     "typescript": "^5.9.3",
-    "wrangler": "^4.71.0"
+    "wrangler": "^4.75.0"
   },
   "dependencies": {
     "@hono/zod-validator": "^0.7.6",
     "alchemy": "^0.87.0",
     "better-auth": "^1.5.5",
     "drizzle-orm": "^0.45.1",
-    "hono": "^4.12.5",
-    "openai": "^6.27.0",
+    "hono": "^4.12.8",
+    "openai": "^6.32.0",
     "zod": "^4.3.6"
   }
 }

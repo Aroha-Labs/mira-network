@@ -63,6 +63,7 @@ export const api = await Worker("mira-api", {
     BETTER_AUTH_URL: process.env.BETTER_AUTH_URL!,
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID!,
     GOOGLE_CLIENT_SECRET: alchemy.secret(process.env.GOOGLE_CLIENT_SECRET!),
+    TRUSTED_ORIGINS: process.env.TRUSTED_ORIGINS ?? "",
   },
   adopt: true,
 });

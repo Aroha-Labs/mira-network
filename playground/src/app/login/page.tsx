@@ -44,7 +44,7 @@ export default function Login() {
 
       await signIn.social({
         provider: "google",
-        callbackURL: redirect,
+        callbackURL: `${window.location.origin}${redirect}`,
       });
     } catch (error) {
       console.error("Error signing in with Google:", error);

@@ -41,6 +41,7 @@ app.on(["POST", "GET"], "/api/auth/**", (c) => {
   const auth = createAuth(drizzle(c.env.USERS_DB), {
     BETTER_AUTH_SECRET: c.env.BETTER_AUTH_SECRET,
     BETTER_AUTH_URL: c.env.BETTER_AUTH_URL,
+    TRUSTED_ORIGINS: c.env.TRUSTED_ORIGINS,
     GOOGLE_CLIENT_ID: c.env.GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET: c.env.GOOGLE_CLIENT_SECRET,
   });

@@ -10,10 +10,15 @@ export const users = sqliteTable(
     email: text("email").notNull(),
     emailVerified: integer("email_verified", { mode: "boolean" }).notNull().default(false),
     image: text("image"),
+    // Better Auth admin plugin fields
+    role: text("role").default("user"),
+    banned: integer("banned", { mode: "boolean" }),
+    banReason: text("ban_reason"),
+    banExpires: integer("ban_expires", { mode: "timestamp" }),
     // Custom fields
     roles: text("roles").default('["user"]'),
-    createdAt: text("created_at").default("(datetime('now'))"),
-    updatedAt: text("updated_at").default("(datetime('now'))"),
+    createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
   },
   (table) => [index("idx_user_email").on(table.email)]
 );
@@ -24,11 +29,12 @@ export const session = sqliteTable("session", {
     .notNull()
     .references(() => users.id),
   token: text("token").notNull().unique(),
-  expiresAt: text("expires_at").notNull(),
+  expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
   ipAddress: text("ip_address"),
   userAgent: text("user_agent"),
-  createdAt: text("created_at").default("(datetime('now'))"),
-  updatedAt: text("updated_at").default("(datetime('now'))"),
+  impersonatedBy: text("impersonated_by"),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });
 
 export const account = sqliteTable("account", {
@@ -40,22 +46,22 @@ export const account = sqliteTable("account", {
   providerId: text("provider_id").notNull(),
   accessToken: text("access_token"),
   refreshToken: text("refresh_token"),
-  accessTokenExpiresAt: text("access_token_expires_at"),
-  refreshTokenExpiresAt: text("refresh_token_expires_at"),
+  accessTokenExpiresAt: integer("access_token_expires_at", { mode: "timestamp" }),
+  refreshTokenExpiresAt: integer("refresh_token_expires_at", { mode: "timestamp" }),
   scope: text("scope"),
   idToken: text("id_token"),
   password: text("password"),
-  createdAt: text("created_at").default("(datetime('now'))"),
-  updatedAt: text("updated_at").default("(datetime('now'))"),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });
 
 export const verification = sqliteTable("verification", {
   id: text("id").primaryKey(),
   identifier: text("identifier").notNull(),
   value: text("value").notNull(),
-  expiresAt: text("expires_at").notNull(),
-  createdAt: text("created_at").default("(datetime('now'))"),
-  updatedAt: text("updated_at").default("(datetime('now'))"),
+  expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });
 
 export const apiTokens = sqliteTable(
