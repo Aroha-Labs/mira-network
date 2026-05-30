@@ -7,6 +7,18 @@ export const logsRoutes = new Hono<AppContext>();
 
 logsRoutes.use("*", authMiddleware);
 
+// The AI Gateway logs API requires full RFC3339 datetimes and rejects
+// date-only values (e.g. "2026-04-30") with "Invalid datetime". Frontends
+// send date-only filters, so normalize here before forwarding.
+function normalizeGatewayDate(
+  value: string | undefined,
+  endOfDay = false
+): string | undefined {
+  if (!value) return undefined;
+  if (value.includes("T")) return value; // already a datetime
+  return endOfDay ? `${value}T23:59:59Z` : `${value}T00:00:00Z`;
+}
+
 // GET /api-logs - Fetch logs from AI Gateway
 logsRoutes.get("/api-logs", async (c) => {
   const user = c.get("user")!;
@@ -44,8 +56,10 @@ logsRoutes.get("/api-logs", async (c) => {
     params.set("search", search);
   }
 
-  if (startDate) params.set("start_date", startDate);
-  if (endDate) params.set("end_date", endDate);
+  const sd = normalizeGatewayDate(startDate, false);
+  const ed = normalizeGatewayDate(endDate, true);
+  if (sd) params.set("start_date", sd);
+  if (ed) params.set("end_date", ed);
   if (cached) params.set("cached", cached);
   if (success) params.set("success", success);
 
@@ -134,8 +148,10 @@ logsRoutes.get("/api-logs/metrics", async (c) => {
     params.set("search", user.id);
   }
 
-  if (startDate) params.set("start_date", startDate);
-  if (endDate) params.set("end_date", endDate);
+  const sd = normalizeGatewayDate(startDate, false);
+  const ed = normalizeGatewayDate(endDate, true);
+  if (sd) params.set("start_date", sd);
+  if (ed) params.set("end_date", ed);
 
   try {
     const response = await fetch(

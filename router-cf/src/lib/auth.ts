@@ -51,12 +51,13 @@ export function createAuth(
         maxAge: 60 * 5, // 5 minutes
       },
     },
-    advanced: {
-      crossSubDomainCookies: {
-        enabled: true,
-        domain: ".arohalabs.tech",
-      },
-    },
+    // Host-only cookies (no Domain attribute) so a single worker can serve
+    // multiple frontends on different registrable domains (e.g.
+    // console.arohalabs.tech -> console-api.arohalabs.tech and
+    // console.mira.network -> api.mira.network). Each frontend is same-site
+    // with its own API host, so the SameSite=Lax session cookie is sent.
+    // Do NOT re-enable crossSubDomainCookies — pinning a Domain breaks the
+    // cross-registrable-domain setup.
     plugins: [admin()],
   });
 }

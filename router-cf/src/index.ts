@@ -38,9 +38,15 @@ app.get("/health", (c) => c.json({ status: "ok" }));
 
 // Better Auth handler
 app.on(["POST", "GET"], "/api/auth/**", (c) => {
+  // Derive baseURL from the request host so the OAuth redirect_uri and session
+  // cookie land on whichever API domain the user is actually using (this worker
+  // is served on multiple domains, e.g. console-api.arohalabs.tech and
+  // api.mira.network). This keeps the host-only session cookie same-site with
+  // each frontend. Both callback URLs must be registered in the Google OAuth client.
+  const origin = new URL(c.req.url).origin;
   const auth = createAuth(drizzle(c.env.USERS_DB), {
     BETTER_AUTH_SECRET: c.env.BETTER_AUTH_SECRET,
-    BETTER_AUTH_URL: c.env.BETTER_AUTH_URL,
+    BETTER_AUTH_URL: origin,
     TRUSTED_ORIGINS: c.env.TRUSTED_ORIGINS,
     GOOGLE_CLIENT_ID: c.env.GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET: c.env.GOOGLE_CLIENT_SECRET,
