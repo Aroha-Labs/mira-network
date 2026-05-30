@@ -6,7 +6,6 @@ import {
   PencilIcon,
   TrashIcon,
 } from "@heroicons/react/24/outline";
-import { User } from "@supabase/supabase-js";
 import { useState } from "react";
 import ConfirmModal from "src/components/ConfirmModal";
 import CopyToClipboardIcon from "src/components/CopyToClipboardIcon";
@@ -18,7 +17,7 @@ interface ChatBubbleProps {
     role: string;
     content: string;
   };
-  userInfo: User["user_metadata"];
+  userInfo: { avatar_url?: string };
   onDelete: () => void;
   onEdit: () => void;
   onRefresh: () => void;

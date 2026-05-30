@@ -1,8 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import axios from "axios";
 import { useEffect, useState } from "react";
 import Modal from "src/components/Modal";
-import { API_BASE_URL } from "src/config";
+import api from "src/lib/axios";
 import { useSession } from "src/hooks/useSession";
 
 interface ManageUserRolesProps {
@@ -12,26 +11,19 @@ interface ManageUserRolesProps {
 
 const roles = ["admin", "user"];
 
-const fetchUserRoles = async (userId: string, token: string) => {
-  const response = await axios.get(
-    `${API_BASE_URL}/admin/user-claims/${userId}`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    }
-  );
-  return response.data.claim.roles || [];
+const fetchUserRoles = async (userId: string) => {
+  const response = await api.get(`/admin/user-claims/${userId}`);
+  return response.data.roles || [];
 };
 
 const ManageUserRoles = ({ userId, onClose }: ManageUserRolesProps) => {
-  const { data: userSession } = useSession();
+  const { user } = useSession();
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
 
   const { data: userRoles, isLoading } = useQuery({
     queryKey: ["userRoles", userId],
-    queryFn: () => fetchUserRoles(userId, userSession?.access_token || ""),
-    enabled: !!userSession?.access_token,
+    queryFn: () => fetchUserRoles(userId),
+    enabled: !!user,
   });
 
   useEffect(() => {
@@ -42,17 +34,7 @@ const ManageUserRoles = ({ userId, onClose }: ManageUserRolesProps) => {
 
   const updateUserRolesMutation = useMutation({
     mutationFn: async (roles: string[]) => {
-      if (!userSession?.access_token) return;
-
-      await axios.post(
-        `${API_BASE_URL}/admin/user-claims/${userId}`,
-        { roles },
-        {
-          headers: {
-            Authorization: `Bearer ${userSession.access_token}`,
-          },
-        }
-      );
+      await api.post(`/admin/user-claims/${userId}`, { roles });
     },
     onSuccess: () => {
       alert("Roles updated successfully");

@@ -70,8 +70,7 @@ const fetchChatCompletion = async (
   messages: Message[],
   onMessage: (chunk: string) => void,
   controller: AbortController,
-  model: string,
-  token: string
+  model: string
 ) => {
   if (!model) {
     throw new Error("Model is required");
@@ -81,8 +80,8 @@ const fetchChatCompletion = async (
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
     },
+    credentials: "include",
     body: JSON.stringify({
       model,
       messages,
@@ -115,7 +114,7 @@ export const useChatMessages = ({
 }: {
   selectedModel: string;
 }): UseChatMessagesReturn => {
-  const { data: userSession } = useSession();
+  const { user } = useSession();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isSending, setIsSending] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -137,7 +136,7 @@ export const useChatMessages = ({
 
       abortControllerRef.current = new AbortController();
 
-      if (!userSession?.access_token) {
+      if (!user) {
         setErrorMessage("Please login to continue.");
         return;
       }
@@ -156,8 +155,7 @@ export const useChatMessages = ({
             ]);
           },
           abortControllerRef.current,
-          selectedModel,
-          userSession.access_token
+          selectedModel
         );
       } catch (error) {
         const err = error as Error;
@@ -172,11 +170,11 @@ export const useChatMessages = ({
         setIsSending(false);
       }
     },
-    [messages, userSession, selectedModel]
+    [messages, user, selectedModel]
   );
 
   const refreshMessage = async (index: number) => {
-    if (!userSession?.access_token) {
+    if (!user) {
       setErrorMessage("Please login to continue.");
       return;
     }
@@ -214,8 +212,7 @@ export const useChatMessages = ({
           ]);
         },
         abortControllerRef.current,
-        selectedModel,
-        userSession.access_token
+        selectedModel
       );
     } catch (error) {
       if ((error as Error).name !== "AbortError") {

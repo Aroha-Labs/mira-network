@@ -1,15 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "src/utils/supabase/client";
+import { useSession as useBetterAuthSession } from "src/lib/auth-client";
 
 export function useSession() {
-  return useQuery({
-    queryKey: ["userSession"],
-    queryFn: async () => {
-      const { data, error } = await supabase.auth.getSession();
-      if (error) {
-        throw error;
-      }
-      return data.session;
-    },
-  });
+  const { data, isPending, error } = useBetterAuthSession();
+
+  return {
+    data: data?.session ?? null,
+    user: data?.user ?? null,
+    isLoading: isPending,
+    error,
+  };
 }

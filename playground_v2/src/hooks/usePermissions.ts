@@ -1,37 +1,28 @@
-import { useEffect, useState } from "react";
-import { supabase } from "src/utils/supabase/client";
-import { jwtDecode } from "jwt-decode";
-import { Session } from "@supabase/supabase-js";
+import { useEffect } from "react";
+import { useSession } from "src/hooks/useSession";
 import { userRolesState } from "src/state/userRolesState";
+import api from "src/lib/axios";
 
 export const usePermissions = () => {
-  const [isLoading, setIsLoading] = useState(true);
-  const [session, setSession] = useState<Session | null>(null);
+  const { data: session, user, isLoading } = useSession();
 
   useEffect(() => {
-    const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
-      try {
-        setSession(session);
-        if (session) {
-          const data = jwtDecode<{ user_roles?: ("admin" | "user")[] }>(
-            session.access_token
-          );
-          const user_roles = data.user_roles || [];
-          userRolesState.setState(() => user_roles);
-        } else {
-          userRolesState.setState(() => []);
-        }
-      } catch (error) {
-        console.error("Error decoding JWT:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    });
+    if (!user) {
+      userRolesState.setState(() => []);
+      return;
+    }
 
-    return () => {
-      data.subscription.unsubscribe();
-    };
-  }, []);
+    // Fetch roles from backend /me endpoint
+    api
+      .get("/me")
+      .then((res) => {
+        const roles = res.data.roles || [];
+        userRolesState.setState(() => roles);
+      })
+      .catch(() => {
+        userRolesState.setState(() => []);
+      });
+  }, [user]);
 
   return { isLoading, session };
 };

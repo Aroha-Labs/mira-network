@@ -1,11 +1,11 @@
-import { User } from "@supabase/supabase-js";
 import Link from "next/link";
 import React from "react";
 import ProfileImage from "src/components/ProfileImage";
 import { useLogout } from "src/hooks/useLogout";
+import { AuthUser } from "src/lib/auth-client";
 
 interface UserInfoProps {
-  user?: User;
+  user?: AuthUser;
   children?: React.ReactNode;
 }
 
@@ -25,18 +25,14 @@ const UserInfo: React.FC<UserInfoProps> = ({ user, children }) => {
           <div className="flex items-center">
             <ProfileImage
               src={
-                isLoggedIn
-                  ? user.user_metadata.avatar_url
-                  : "/img/avatar-dummy.svg"
+                isLoggedIn ? user.image ?? undefined : "/img/avatar-dummy.svg"
               }
               alt="Avatar"
               className="w-12 h-12 mr-4"
             />
             <div>
               <p className="font-bold">
-                {isLoggedIn
-                  ? user.user_metadata.full_name
-                  : "Welcome to Playground"}
+                {isLoggedIn ? user.name : "Welcome to Playground"}
               </p>
               <p className="text-sm text-gray-600">
                 {isLoggedIn ? user.email : "Sign in to access your console"}

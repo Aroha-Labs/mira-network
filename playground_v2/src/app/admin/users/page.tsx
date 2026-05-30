@@ -1,32 +1,29 @@
 "use client";
 
 import { useInfiniteQuery } from "@tanstack/react-query";
-import axios from "axios";
 import Loading from "src/components/PageLoading";
 import UserCard from "src/components/UserCard";
-import { API_BASE_URL } from "src/config";
+import api from "src/lib/axios";
 import { useSession } from "src/hooks/useSession";
 
 interface User {
   id: string;
-  user_metadata: {
-    name: string;
-    email: string;
-    avatar_url: string;
-  };
+  user_id: string;
+  full_name: string;
+  email: string;
+  avatar_url: string;
 }
 
-const fetchUsers = async ({
-  pageParam = 1,
-  token,
-}: {
-  pageParam: number;
-  token: string;
-}) => {
-  const response = await axios.get<User[]>(`${API_BASE_URL}/admin/users`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+interface UsersResponse {
+  users: User[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+const fetchUsers = async ({ pageParam = 1 }: { pageParam: number }) => {
+  const response = await api.get<UsersResponse>(`/admin/users`, {
     params: {
       page: pageParam,
     },
@@ -35,7 +32,7 @@ const fetchUsers = async ({
 };
 
 const AdminUsers = () => {
-  const { data: userSession } = useSession();
+  const { user } = useSession();
 
   const {
     data,
@@ -47,23 +44,18 @@ const AdminUsers = () => {
   } = useInfiniteQuery({
     queryKey: ["users"],
     queryFn: ({ pageParam }) => {
-      if (!userSession?.access_token) {
-        return Promise.reject("No user session");
-      }
-
-      return fetchUsers({
-        pageParam,
-        token: userSession.access_token,
-      });
+      return fetchUsers({ pageParam });
     },
-    enabled: !!userSession?.access_token,
+    enabled: !!user,
     initialPageParam: 1,
-    getNextPageParam: (lastPage, pages) => {
-      return lastPage.length ? pages.length + 1 : undefined;
+    getNextPageParam: (lastPage) => {
+      return lastPage.page < lastPage.total_pages
+        ? lastPage.page + 1
+        : undefined;
     },
   });
 
-  if (!userSession?.access_token) {
+  if (!user) {
     return (
       <div className="flex items-center justify-center h-64">
         Please log in to view users.
@@ -89,7 +81,7 @@ const AdminUsers = () => {
       <p className="text-gray-700 mb-4">Manage users here.</p>
       <ul className="space-y-2">
         {data?.pages.flatMap((page) =>
-          page.map((user) => <UserCard key={user.id} user={user} />)
+          page.users.map((user) => <UserCard key={user.id} user={user} />)
         )}
       </ul>
       <div className="flex justify-center mt-4">

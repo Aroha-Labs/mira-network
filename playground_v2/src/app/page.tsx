@@ -6,7 +6,7 @@ import LoggedoutState from "src/components/dashboard/LoggedoutState";
 import { useSession } from "src/hooks/useSession";
 
 export default function Home() {
-  const { data: userSession, error, isLoading } = useSession();
+  const { user, error, isLoading } = useSession();
 
   if (isLoading) {
     return <Loading />;
@@ -26,9 +26,9 @@ export default function Home() {
     );
   }
 
-  if (!userSession?.user) {
+  if (!user) {
     return <LoggedoutState />;
   }
 
-  return <LoggedinState userSession={userSession} />;
+  return <LoggedinState user={user} />;
 }

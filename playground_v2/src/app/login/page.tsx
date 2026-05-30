@@ -1,19 +1,21 @@
 "use client";
 
 import Image from "next/image";
+import { useSearchParams } from "next/navigation";
 import React from "react";
-import { supabase } from "src/utils/supabase/client";
+import { signIn } from "src/lib/auth-client";
 
 export default function Login() {
+  const searchParams = useSearchParams();
+  const redirect = searchParams.get("redirect") || "/";
+
   const handleLogin = async (
     e: React.MouseEvent<HTMLButtonElement, MouseEvent>
   ) => {
     e.preventDefault();
-    supabase.auth.signInWithOAuth({
+    await signIn.social({
       provider: "google",
-      options: {
-        redirectTo: window.location.origin,
-      },
+      callbackURL: `${window.location.origin}${redirect}`,
     });
   };
 

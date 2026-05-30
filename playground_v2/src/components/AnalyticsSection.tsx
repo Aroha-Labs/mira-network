@@ -1,39 +1,29 @@
-import { Session } from "@supabase/supabase-js";
 import { useQuery } from "@tanstack/react-query";
-import axios from "axios";
 import Link from "next/link";
 import React from "react";
-import { API_BASE_URL } from "src/config";
+import api from "src/lib/axios";
+import { AuthUser } from "src/lib/auth-client";
 
 interface AnalyticsSectionProps {
-  userSession?: Session | null;
+  user?: AuthUser | null;
 }
 
-const fetchInferenceCalls = async (token: string) => {
-  const response = await axios.get(`${API_BASE_URL}/total-inference-calls`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
+const fetchInferenceCalls = async () => {
+  const response = await api.get(`/total-inference-calls`);
   return response.data;
 };
 
-const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({ userSession }) => {
-  const isLoggedIn = !!userSession?.access_token;
+const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({ user }) => {
+  const isLoggedIn = !!user;
 
   const {
     data: inferenceCalls,
     error,
     isLoading,
   } = useQuery({
-    queryKey: ["inferenceCalls"],
-    queryFn: () => {
-      if (!userSession?.access_token) {
-        throw new Error("User session not found");
-      }
-      return fetchInferenceCalls(userSession.access_token);
-    },
-    enabled: !!userSession?.access_token,
+    queryKey: ["inferenceCalls", user?.id],
+    queryFn: () => fetchInferenceCalls(),
+    enabled: !!user,
   });
 
   return (

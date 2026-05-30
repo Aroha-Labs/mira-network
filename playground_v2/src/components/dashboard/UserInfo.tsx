@@ -1,12 +1,12 @@
-import { User } from "@supabase/supabase-js";
 import cn from "clsx";
 import { useState } from "react";
 import jetBrainsMono from "src/app/fonts/jetBrainsMono";
 import { useLogout } from "src/hooks/useLogout";
+import { AuthUser } from "src/lib/auth-client";
 import { Button } from "../button";
 
 interface UserInfoProps {
-  user?: User;
+  user?: AuthUser;
 }
 
 const UserInfo = ({ user }: UserInfoProps) => {
@@ -30,11 +30,11 @@ const UserInfo = ({ user }: UserInfoProps) => {
             "text-black text-[13px] font-normal leading-[22px] tracking-[-0.156px]"
           )}
         >
-          {user?.user_metadata?.full_name}
+          {user?.name}
         </p>
 
         <p className="text-black text-[13px] font-medium leading-[22px] tracking-[-0.156px] list-item opacity-40 ml-4">
-          {user?.user_metadata?.email}
+          {user?.email}
         </p>
       </div>
       <div className="grow border-t border-dashed border-[#9CB9AE] mx-4 flex-1 h-[2px]" />

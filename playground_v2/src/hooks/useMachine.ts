@@ -1,6 +1,4 @@
-import { API_BASE_URL } from "src/config";
-
-import axios from "axios";
+import api from "src/lib/axios";
 
 import { useSession } from "./useSession";
 
@@ -12,21 +10,19 @@ interface Machine {
   status: "online" | "offline";
 }
 const useMachine = () => {
-  const { data: userSession } = useSession();
+  const { user } = useSession();
   const {
     data: machines,
     isLoading,
     error,
   } = useQuery<Machine[]>({
-    queryKey: ["machines"],
+    queryKey: ["machines", user?.id],
     queryFn: async () => {
-      if (!userSession?.access_token) throw new Error("User session not found");
-      const resp = await axios.get(`${API_BASE_URL}/machines`, {
-        headers: { Authorization: `Bearer ${userSession.access_token}` },
-      });
+      // NOTE: /machines is not yet implemented on the router-cf backend.
+      const resp = await api.get(`/machines`);
       return resp.data;
     },
-    enabled: !!userSession?.access_token,
+    enabled: !!user,
   });
 
   const onlineMachinesCount =

@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import axios from "axios";
-import { API_BASE_URL } from "src/config";
+import api from "src/lib/axios";
 import { DEFAULT_PARAMS } from "src/state/apiLogsParamsState";
 import getAllDaysBetween from "src/utils/getAllDaysBetween";
 import { useSession } from "./useSession";
@@ -50,7 +49,6 @@ interface ApiLogsParams {
 }
 
 const fetchApiLogs = async ({
-  token,
   page = 1,
   pageSize = 100,
   startDate,
@@ -59,7 +57,6 @@ const fetchApiLogs = async ({
   order = "desc",
   machineId,
 }: {
-  token: string;
   page: number;
   pageSize: number;
   startDate: string;
@@ -68,9 +65,6 @@ const fetchApiLogs = async ({
   order: string;
   machineId?: string | null;
 }) => {
-  if (!token) {
-    throw new Error("No token provided");
-  }
   const params: ApiLogsParams = {
     page,
     page_size: pageSize,
@@ -83,17 +77,12 @@ const fetchApiLogs = async ({
     params.machine_id = machineId;
   }
 
-  const response = await axios.get(`${API_BASE_URL}/api-logs`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    params,
-  });
+  const response = await api.get(`/api-logs`, { params });
   return response.data;
 };
 
 const useAllApiLogs = () => {
-  const { data: userSession } = useSession();
+  const { user } = useSession();
   const params = DEFAULT_PARAMS;
 
   const { data, error, isLoading } = useQuery<ApiLogsResponse, Error>({
@@ -106,14 +95,10 @@ const useAllApiLogs = () => {
       params.page,
       params.pageSize,
       params.machineId,
-      userSession?.access_token,
+      user?.id,
     ],
     queryFn: async () => {
-      if (!userSession?.access_token) {
-        throw new Error("User session not found");
-      }
       return await fetchApiLogs({
-        token: userSession.access_token,
         page: params.page,
         pageSize: params.pageSize,
         startDate: params.startDate,
@@ -123,7 +108,7 @@ const useAllApiLogs = () => {
         machineId: params.machineId,
       });
     },
-    enabled: !!userSession?.access_token,
+    enabled: !!user,
   });
 
   const chartDataByDay = getAllDaysBetween(

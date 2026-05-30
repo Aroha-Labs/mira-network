@@ -1,4 +1,4 @@
-import { Session } from "@supabase/supabase-js";
+import { AuthUser } from "src/lib/auth-client";
 import Footer from "../Footer";
 import Analytics from "./AnalyticsCard";
 import ApiLogs from "./ApiLogs";
@@ -8,12 +8,12 @@ import Network from "./Network";
 import UserInfo from "./UserInfo";
 
 interface LoggedinStateProps {
-  userSession: Session;
+  user: AuthUser;
 }
 
-const LoggedinState = ({ userSession }: LoggedinStateProps) => (
+const LoggedinState = ({ user }: LoggedinStateProps) => (
   <div className="max-w-[710px] w-full">
-    <UserInfo user={userSession?.user} />
+    <UserInfo user={user} />
     <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
       <div className="space-y-[36px]">
         <Analytics />

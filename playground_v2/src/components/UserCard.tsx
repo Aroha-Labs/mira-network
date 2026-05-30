@@ -7,12 +7,11 @@ import {
 } from "@headlessui/react";
 import { ChevronDownIcon as MenuIcon } from "@heroicons/react/24/outline";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import axios from "axios";
 import { Fragment, useState } from "react";
 import CopyToClipboardIcon from "src/components/CopyToClipboardIcon";
 import ManageUserRoles from "src/components/ManageUserRoles";
 import Modal from "src/components/Modal";
-import { API_BASE_URL } from "src/config";
+import api from "src/lib/axios";
 import { useSession } from "src/hooks/useSession";
 import ProfileImage from "./ProfileImage";
 
@@ -24,39 +23,24 @@ const USDollar = new Intl.NumberFormat("en-US", {
 
 interface User {
   id: string;
-  user_metadata: {
-    name: string;
-    email: string;
-    avatar_url: string;
-  };
+  user_id: string;
+  full_name: string;
+  email: string;
+  avatar_url: string;
 }
 
-const fetchUserCredits = async (userId: string, token: string) => {
-  const response = await axios.get(
-    `${API_BASE_URL}/admin/user-credits/${userId}`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    }
-  );
+const fetchUserCredits = async (userId: string) => {
+  const response = await api.get(`/admin/user-credits/${userId}`);
   return response.data.credits;
 };
 
-const fetchUserRoles = async (userId: string, token: string) => {
-  const response = await axios.get(
-    `${API_BASE_URL}/admin/user-claims/${userId}`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    }
-  );
-  return response.data?.claim?.roles || [];
+const fetchUserRoles = async (userId: string) => {
+  const response = await api.get(`/admin/user-claims/${userId}`);
+  return response.data?.roles || [];
 };
 
 const UserCard = ({ user }: { user: User }) => {
-  const { data: userSession } = useSession();
+  const { user: authUser } = useSession();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isRolesModalOpen, setIsRolesModalOpen] = useState(false);
   const [credits, setCredits] = useState(0);
@@ -68,8 +52,8 @@ const UserCard = ({ user }: { user: User }) => {
     isLoading: isCreditsLoading,
   } = useQuery({
     queryKey: ["userCredits", user.id],
-    queryFn: () => fetchUserCredits(user.id, userSession?.access_token || ""),
-    enabled: !!userSession?.access_token,
+    queryFn: () => fetchUserCredits(user.id),
+    enabled: !!authUser,
   });
 
   const {
@@ -78,27 +62,17 @@ const UserCard = ({ user }: { user: User }) => {
     error: rolesError,
   } = useQuery({
     queryKey: ["userRoles", user.id],
-    queryFn: () => fetchUserRoles(user.id, userSession?.access_token || ""),
-    enabled: !!userSession?.access_token,
+    queryFn: () => fetchUserRoles(user.id),
+    enabled: !!authUser,
   });
 
   const addCreditsMutation = useMutation({
     mutationFn: async (amount: number) => {
-      if (!userSession?.access_token) return;
-
-      await axios.post(
-        `${API_BASE_URL}/add-credit`,
-        {
-          user_id: user.id,
-          amount,
-          description: "Admin added credits",
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${userSession.access_token}`,
-          },
-        }
-      );
+      await api.post(`/admin/add-credit`, {
+        user_id: user.id,
+        amount,
+        description: "Admin added credits",
+      });
     },
     onSuccess: () => {
       alert("Credits added successfully");
@@ -125,13 +99,13 @@ const UserCard = ({ user }: { user: User }) => {
       <div className="flex items-start justify-between">
         <div className="flex items-center space-x-4">
           <ProfileImage
-            src={user.user_metadata.avatar_url}
-            alt={user.user_metadata.name}
+            src={user.avatar_url}
+            alt={user.full_name}
             className="w-10 h-10"
           />
           <div>
-            <p className="font-bold">{user.user_metadata.name}</p>
-            <p className="text-gray-600">{user.user_metadata.email}</p>
+            <p className="font-bold">{user.full_name}</p>
+            <p className="text-gray-600">{user.email}</p>
             <div className="flex items-center space-x-2">
               <span className="text-gray-500 text-sm">{user.id}</span>
               <CopyToClipboardIcon text={user.id} />

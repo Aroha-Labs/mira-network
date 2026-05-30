@@ -25,12 +25,12 @@ const fetchCreditHistory = async (): Promise<{
 };
 
 const useCreditHistory = () => {
-  const { data: userSession } = useSession();
+  const { user } = useSession();
 
   return useQuery({
-    queryKey: ["creditHistory"],
+    queryKey: ["creditHistory", user?.id],
     queryFn: fetchCreditHistory,
-    enabled: !!userSession?.access_token,
+    enabled: !!user,
   });
 };
 

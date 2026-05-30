@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useStore } from "@tanstack/react-store";
-import axios, { AxiosError } from "axios";
-import { API_BASE_URL } from "src/config";
+import { AxiosError } from "axios";
+import api from "src/lib/axios";
 import {
   apiKeysParamsState,
   DEFAULT_PARAMS,
@@ -30,53 +30,37 @@ interface ApiKeysParams {
 }
 
 const fetchApiKeys = async ({
-  token,
   page = DEFAULT_PARAMS.page,
   pageSize = DEFAULT_PARAMS.pageSize,
   orderBy = DEFAULT_PARAMS.orderBy,
   order = DEFAULT_PARAMS.order,
 }: {
-  token?: string;
   page?: number;
   pageSize?: number;
   orderBy?: string;
   order?: string;
 }): Promise<ApiKeysResponse> => {
-  if (!token) {
-    throw new Error("No token provided");
-  }
   const params: ApiKeysParams = {
     page,
     page_size: pageSize,
     order_by: orderBy,
     order,
   };
-  const response = await axios.get(`${API_BASE_URL}/api-tokens`, {
-    headers: { Authorization: `Bearer ${token}` },
-    params,
-  });
+  const response = await api.get(`/api-tokens`, { params });
   return response.data;
 };
 
-const deleteApiKey = async (token: string, tokenId: string) => {
-  const response = await axios.delete(`${API_BASE_URL}/api-tokens/${tokenId}`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
+const deleteApiKey = async (tokenId: string) => {
+  const response = await api.delete(`/api-tokens/${tokenId}`);
   return response.data;
 };
 
-const addApiKey = async (token: string, description: string) => {
+const addApiKey = async (description: string) => {
   try {
     if (!description || description.length === 0) {
       return;
     }
-    const response = await axios.post(
-      `${API_BASE_URL}/api-tokens`,
-      { description },
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
+    const response = await api.post(`/api-tokens`, { description });
     return response.data;
   } catch (e) {
     const error = e as AxiosError<{ detail: string }>;
@@ -85,7 +69,7 @@ const addApiKey = async (token: string, description: string) => {
 };
 
 const useApiTokens = () => {
-  const { data: userSession } = useSession();
+  const { user } = useSession();
   const queryClient = useQueryClient();
   const params = useStore(apiKeysParamsState, (state) => state);
 
@@ -96,29 +80,25 @@ const useApiTokens = () => {
       params.pageSize,
       params.orderBy,
       params.order,
-      userSession?.access_token,
+      user?.id,
     ],
     queryFn: () =>
       fetchApiKeys({
-        token: userSession?.access_token,
         page: params.page,
         pageSize: params.pageSize,
         orderBy: params.orderBy,
         order: params.order,
       }),
-    enabled: !!userSession?.access_token,
+    enabled: !!user,
   });
 
   const mutation = useMutation({
     mutationFn: (description: string) => {
-      if (!userSession?.access_token) {
-        throw new Error("User session not found");
-      }
       let toAdd = description;
       if (!toAdd || toAdd.length === 0) {
         toAdd = `secret-key-${(query?.data?.items?.length ?? 0) + 1}`;
       }
-      return addApiKey(userSession.access_token, toAdd);
+      return addApiKey(toAdd);
     },
     onSuccess: () => {
       // Refetch the 'apiKeys' query after a successful mutation
@@ -130,10 +110,7 @@ const useApiTokens = () => {
 
   const deleteMutation = useMutation({
     mutationFn: (tokenId: string) => {
-      if (!userSession?.access_token) {
-        throw new Error("User session not found");
-      }
-      return deleteApiKey(userSession.access_token, tokenId);
+      return deleteApiKey(tokenId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({

@@ -10,9 +10,9 @@ const MachinesHeader = ({
   activeMachine,
   changeActiveMachine,
 }: MachinesHeaderProps) => {
-  const { data: userSession, error, isLoading } = useSession();
+  const { user, error, isLoading } = useSession();
 
-  const firstName = userSession?.user?.user_metadata?.full_name?.split(" ")[0];
+  const firstName = user?.name?.split(" ")[0];
 
   if (isLoading || error) {
     return null;

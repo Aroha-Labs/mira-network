@@ -24,6 +24,7 @@
     "@tanstack/react-store": "^0.7.0",
     "@tanstack/store": "^0.7.0",
     "axios": "^1.7.9",
+    "better-auth": "^1.5.5",
     "chart.js": "^4.4.7",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
