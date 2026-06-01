@@ -8,6 +8,7 @@ import {
   CommandLineIcon,
   ChatBubbleBottomCenterTextIcon,
   QuestionMarkCircleIcon,
+  ShieldCheckIcon,
 } from "@heroicons/react/24/outline";
 import { useSession } from "src/hooks/useSession";
 import { useLogout } from "src/hooks/useLogout";
@@ -144,6 +145,14 @@ export const Header = () => {
               Terminal
             </Link>
             <Link
+              href="/verify"
+              onClick={handleNavClick}
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 transition-colors rounded-md hover:text-gray-900 hover:bg-gray-50"
+            >
+              <ShieldCheckIcon className="w-5 h-5" />
+              Verify
+            </Link>
+            <Link
               href="/help"
               className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 transition-colors rounded-md hover:text-gray-900 hover:bg-gray-50"
             >
@@ -186,6 +195,14 @@ export const Header = () => {
             >
               <CommandLineIcon className="w-5 h-5" />
               Terminal
+            </Link>
+            <Link
+              href="/verify"
+              className="inline-flex items-center block gap-2 px-3 py-2 text-sm font-medium text-gray-700 rounded-md hover:text-gray-900 hover:bg-gray-50"
+              onClick={handleNavClick}
+            >
+              <ShieldCheckIcon className="w-5 h-5" />
+              Verify
             </Link>
             <Link
               href="/help"

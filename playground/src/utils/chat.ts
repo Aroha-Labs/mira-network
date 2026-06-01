@@ -412,3 +412,156 @@ export const verifyMessages = async (
 
   return response.json();
 };
+
+// --- Rich fact verification (binarize -> multi-model -> consensus, streamed) ---
+
+export type Assessment = "TRUE" | "FALSE" | "NO CONSENSUS";
+export type VerifyDomain = "general" | "legal";
+
+export interface VerifyModelAnswer {
+  model: string;
+  answer?: string;
+  error?: string;
+}
+
+export interface VerifyClaimResult {
+  id: string;
+  claim: string;
+  assessment: Assessment;
+  original_question: string;
+  original_options: Record<string, string>;
+  claimed_answer: string;
+  consensus_answer: string;
+  model_answers: VerifyModelAnswer[];
+  span_position?: [number, number];
+  text_span?: string;
+}
+
+export interface VerifyFactResponse {
+  documentId?: string;
+  requestId: string;
+  original_fact: string;
+  domain: VerifyDomain;
+  url?: string;
+  minRequired: number;
+  timestamp: string;
+  errors?: string[];
+  results: VerifyClaimResult[];
+}
+
+export interface VerifyFactRequest {
+  fact: string;
+  minRequired?: number;
+  totalModels?: number;
+  domain?: VerifyDomain;
+  url?: string;
+}
+
+export interface VerifyStreamHandlers {
+  onStart?: (data: { fact: string; domain: VerifyDomain; models: string[] }) => void;
+  onClaimsExtracted?: (data: {
+    requestId: string;
+    claims: Array<{
+      id: string;
+      claim: string;
+      span_position?: [number, number];
+      text_span?: string;
+    }>;
+  }) => void;
+  onModelResult?: (data: { questionId: string; model: string; answer: string }) => void;
+  onModelError?: (data: { questionId: string; model: string; error: string }) => void;
+  onClaimVerified?: (data: { result: VerifyClaimResult }) => void;
+  onResult?: (data: VerifyFactResponse) => void;
+  onError?: (error: Error) => void;
+}
+
+export const verifyFactStream = async (
+  request: VerifyFactRequest,
+  handlers: VerifyStreamHandlers,
+  signal?: AbortSignal
+): Promise<void> => {
+  const response = await fetch(`${api.defaults.baseURL}/v1/verify/stream`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "text/event-stream",
+    },
+    body: JSON.stringify({
+      fact: request.fact,
+      minRequired: request.minRequired ?? 2,
+      totalModels: request.totalModels ?? 3,
+      domain: request.domain ?? "general",
+      ...(request.url ? { url: request.url } : {}),
+    }),
+    credentials: "include",
+    signal,
+  });
+
+  if (!response.ok) {
+    let detail = `Verification failed (${response.status})`;
+    try {
+      const body = await response.json();
+      detail = body.detail || body.error?.message || detail;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(detail);
+  }
+
+  const reader = response.body?.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  const dispatch = (event: string, raw: string) => {
+    if (raw === "[DONE]") return;
+    let payload: unknown;
+    try {
+      payload = JSON.parse(raw);
+    } catch {
+      return;
+    }
+    const p = payload as Record<string, unknown>;
+    switch (event) {
+      case "start":
+        handlers.onStart?.(p as never);
+        break;
+      case "claims_extracted":
+        handlers.onClaimsExtracted?.(p as never);
+        break;
+      case "model_result":
+        handlers.onModelResult?.(p as never);
+        break;
+      case "model_error":
+        handlers.onModelError?.(p as never);
+        break;
+      case "claim_verified":
+        handlers.onClaimVerified?.(p as never);
+        break;
+      case "result":
+        handlers.onResult?.(p as never);
+        break;
+      case "error":
+        handlers.onError?.(new Error((p.message as string) || "Verification failed"));
+        break;
+    }
+  };
+
+  while (reader) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    const blocks = buffer.split("\n\n");
+    buffer = blocks.pop() ?? "";
+    for (const block of blocks) {
+      if (!block.trim()) continue;
+      let event = "message";
+      const dataLines: string[] = [];
+      for (const line of block.split("\n")) {
+        if (line.startsWith("event:")) event = line.slice(6).trim();
+        else if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
+      }
+      dispatch(event, dataLines.join("\n"));
+    }
+  }
+};
