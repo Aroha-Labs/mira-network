@@ -37,6 +37,17 @@ export const verifyRequestSchema = z.object({
 
 export type VerifyRequest = z.infer<typeof verifyRequestSchema>;
 
+// Rich fact verification (binarize -> multi-model -> consensus)
+export const verifyFactRequestSchema = z.object({
+  fact: z.string().min(1, "Fact is required"),
+  minRequired: z.number().min(1).max(5).optional(),
+  totalModels: z.number().min(1).max(5).optional(),
+  url: z.string().url().optional(),
+  domain: z.enum(["general", "legal"]).optional(),
+});
+
+export type VerifyFactRequest = z.infer<typeof verifyFactRequestSchema>;
+
 // Flows
 export const createFlowRequestSchema = z.object({
   name: z.string().min(1, "Name is required"),

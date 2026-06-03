@@ -6,6 +6,7 @@ import Credit from "./Credit";
 import ManageApiKey from "./ManageApiKey";
 import Network from "./Network";
 import UserInfo from "./UserInfo";
+import Verify from "./Verify";
 
 interface LoggedinStateProps {
   user: AuthUser;
@@ -22,6 +23,7 @@ const LoggedinState = ({ user }: LoggedinStateProps) => (
       <div className="space-y-1">
         <Credit />
         <ManageApiKey />
+        <Verify />
         <ApiLogs />
         <Network />
       </div>
