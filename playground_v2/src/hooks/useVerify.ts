@@ -179,6 +179,7 @@ export const useVerify = () => {
 
           for (const { event, data } of events) {
             if (data === "[DONE]") continue;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             let payload: any;
             try {
               payload = JSON.parse(data);
@@ -193,7 +194,14 @@ export const useVerify = () => {
               case "claims_extracted":
                 setState((s) => ({
                   ...s,
-                  claims: (payload.claims ?? []).map((c: any) => ({
+                  claims: (
+                    (payload.claims ?? []) as Array<{
+                      id: string;
+                      claim: string;
+                      span_position?: [number, number];
+                      text_span?: string;
+                    }>
+                  ).map((c) => ({
                     id: c.id,
                     claim: c.claim,
                     span_position: c.span_position,
