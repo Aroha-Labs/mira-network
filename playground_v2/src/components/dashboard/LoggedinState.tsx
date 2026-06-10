@@ -4,7 +4,6 @@ import Analytics from "./AnalyticsCard";
 import ApiLogs from "./ApiLogs";
 import Credit from "./Credit";
 import ManageApiKey from "./ManageApiKey";
-import Network from "./Network";
 import UserInfo from "./UserInfo";
 import Verify from "./Verify";
 
@@ -25,7 +24,6 @@ const LoggedinState = ({ user }: LoggedinStateProps) => (
         <ManageApiKey />
         <Verify />
         <ApiLogs />
-        <Network />
       </div>
       <Footer className="block md:hidden" />
     </div>
